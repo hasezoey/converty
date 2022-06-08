@@ -1,0 +1,139 @@
+.centerp {
+  text-align: center;
+  text-indent: 0;
+}
+
+.nomargin {
+  margin: 0em;
+  padding: 0em;
+}
+
+.center {
+  text-align: center;
+}
+
+.section-marking {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.section-marking img {
+  height: 1em;
+}
+
+.main {
+  font-weight: normal;
+  letter-spacing: 0;
+  orphans: 1;
+  widows: 1;
+  word-spacing: 0;
+}
+
+.signature {
+  text-align: right;
+}
+
+.toc-title {
+  font-size: 1.55em;
+  margin-top: 10%;
+  margin-bottom: 2em;
+  text-align: center;
+  text-indent: 0em;
+  line-height: 1.2em;
+}
+
+.none {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cover {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  width: auto;
+  vertical-align: top;
+}
+
+.insert {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  width: auto;
+  vertical-align: top;
+}
+
+.extra-indent {
+  text-indent: 0em;
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+  margin-left: 40pt;
+}
+
+body {
+  line-height: 1.2em;
+  font-size: 1em;
+  overflow-wrap: break-word;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  width: auto;
+  vertical-align: top;
+}
+
+p {
+  display: block;
+  margin-top: 0em;
+  margin-bottom: 0em;
+  margin-left: 0em;
+  margin-right: 0em;
+  text-indent: 20pt;
+}
+
+li {
+  font-size: 1em;
+}
+
+li p {
+  text-indent: 0em;
+}
+
+ul {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+ol {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  text-align: left;
+}
+
+h1 {
+  font-size: 1.55em;
+  margin-top: 2em;
+  margin-bottom: 1em;
+  line-height: 1.2em;
+  text-align: center;
+}
+
+sup {
+  vertical-align: super;
+  font-size: 0.9em;
+  line-height: 100%;
+}
+
+sub {
+  vertical-align: sub;
+  font-size: 0.9em;
+  line-height: 100%;
+}
+
+nav[hidden],
+ol[hidden] {
+  display: none;
+  visibility: hidden;
+}

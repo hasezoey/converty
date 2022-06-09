@@ -25,6 +25,7 @@ const NCX_XML_NAMESPACE = 'http://www.daisy.org/z3986/2005/ncx/';
 const XHTML_XML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 const TOC_XHTML_FILENAME = 'toc.xhtml';
 const COVER_XHTML_FILENAME = 'cover.xhtml';
+const XML_BEGINNING_OP = '<?xml version="1.0" encoding="utf-8"?>';
 /**
  * The Template to use for each document, except special
  * available options to be replaced:
@@ -32,7 +33,7 @@ const COVER_XHTML_FILENAME = 'cover.xhtml';
  * "{{SECTIONID}}": will be replaced with the section id for the body
  * "{{EPUBTYPE}}": will be replaced with the EPUB Type, use enum "EPubType"
  */
-const MAIN_BODY_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
+const MAIN_BODY_TEMPLATE: string = `${XML_BEGINNING_OP}
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
   <head>
     <title>{{TITLE}}</title>
@@ -56,7 +57,7 @@ const MAIN_BODY_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
  * "{{IMGCLASS}}": will be replaced with the image Class, use enum "ImgClass"
  * "{{IMGSRC}}": will be replaced with the image Source
  */
-const JUST_IMAGE_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
+const JUST_IMAGE_TEMPLATE: string = `${XML_BEGINNING_OP}
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
   <head>
     <title>{{TITLE}}</title>
@@ -73,7 +74,7 @@ const JUST_IMAGE_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
 /**
  * The Template to use for each document
  */
-const TOC_XHTML_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
+const TOC_XHTML_TEMPLATE: string = `${XML_BEGINNING_OP}
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
   <head>
     <title>Table Of Contents</title>
@@ -100,7 +101,7 @@ const TOC_XHTML_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
  * available options to be replaced:
  * "{{TITLE}}": will be replaced with the document title (header) (oneline)
  */
-const TOC_NCX_TEMPLATE: string = `<?xml version="1.0" encoding="utf-8" ?>
+const TOC_NCX_TEMPLATE: string = `${XML_BEGINNING_OP}
 <ncx version="2005-1" xmlns="http://www.daisy.org/z3986/2005/ncx/">
   <head>
     <meta content="1" name="dtb:depth"/>
@@ -116,7 +117,7 @@ const TOC_NCX_TEMPLATE: string = `<?xml version="1.0" encoding="utf-8" ?>
 /**
  * The Template to use for each document
  */
-const CONTENTOPF_TEMPLATE: string = `<?xml version="1.0" encoding="utf-8"?>
+const CONTENTOPF_TEMPLATE: string = `${XML_BEGINNING_OP}
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id" xml:lang="en">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"></metadata>
   <manifest>
@@ -136,7 +137,7 @@ const CONTENTOPF_TEMPLATE: string = `<?xml version="1.0" encoding="utf-8"?>
 /**
  * The Template to use for each document
  */
-const CONTAINER_TEMPLATE: string = `<?xml version="1.0" encoding="UTF-8"?>
+const CONTAINER_TEMPLATE: string = `${XML_BEGINNING_OP}
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
     <rootfiles>
         <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
@@ -548,7 +549,7 @@ async function generateContentOPF(
     spineElementNew.appendChild(newNode);
   }
 
-  const serialized = currentDOM.serialize();
+  const serialized = `${XML_BEGINNING_OP}\n` + currentDOM.serialize();
 
   const writtenpath = path.resolve(baseOutputPath, 'content.opf');
   await utils.mkdir(path.dirname(writtenpath));
@@ -650,7 +651,7 @@ async function generateTocNCX(
   const filename = 'toc.ncx';
   const outPath = path.resolve(baseOutputPath, filename);
   await utils.mkdir(baseOutputPath);
-  await fspromises.writeFile(outPath, currentDOM.serialize());
+  await fspromises.writeFile(outPath, `${XML_BEGINNING_OP}\n` + currentDOM.serialize());
   epubContextOutput.Files.push({
     Id: filename,
     IndexInSequence: 0,
@@ -946,7 +947,7 @@ async function finishDOMtoFile(
   epubContextOutput: OutputEpubContext,
   epubfileOptions: Omit<EpubFile, 'MediaType' | 'Path'>
 ): Promise<string> {
-  const serialized = dom.serialize();
+  const serialized = `${XML_BEGINNING_OP}\n` + dom.serialize();
 
   const writtenpath = path.resolve(basePath, subdir, filename);
   await utils.mkdir(path.dirname(writtenpath));

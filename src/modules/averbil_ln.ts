@@ -161,7 +161,7 @@ export function matcher(name: string): boolean {
   return ret;
 }
 
-export async function process(options: utils.ConverterOptions): Promise<void> {
+export async function process(options: utils.ConverterOptions): Promise<string> {
   const { name: usePath, tmpdir: tmpdirInput } = await getInputPath(options.fileInputPath);
 
   const { context: epubContextInput, contentBody: contentBodyInput } = await getEpubContextForInput(usePath);
@@ -263,6 +263,8 @@ export async function process(options: utils.ConverterOptions): Promise<void> {
       console.log('dir still exists after removecallback!'.red);
     }
   }
+
+  return finishedEpubPath;
 }
 
 // LOCAL

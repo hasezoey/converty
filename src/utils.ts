@@ -14,12 +14,20 @@ export interface ConverterModuleStore extends ConverterModule {
 }
 
 export interface ConverterModule {
-  /** Function to identify a input for a module */
-  matcher: (name: string) => boolean;
+  /**
+   * Function to identify a input for a module
+   * @param name The full path of the input path to match a module for
+   * @return Wheter the current module is able to process the file
+   */
+  matcher(name: string): boolean;
   /** Function called when everything is ready (before processing any inputs) */
-  ready?: () => Promise<void>;
-  /** Function to process a input with a module */
-  process: (options: ConverterOptions) => Promise<void>;
+  ready?(): Promise<void>;
+  /**
+   * Function to process a input with a module
+   * @param options The required input options
+   * @returns The finished Path
+   */
+  process(options: ConverterOptions): Promise<string>;
 }
 
 export interface ConverterOptions {

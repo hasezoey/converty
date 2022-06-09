@@ -37,7 +37,6 @@ const MAIN_BODY_TEMPLATE: string = `${XML_BEGINNING_OP}
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
   <head>
     <title>{{TITLE}}</title>
-    <meta content="application/xhtml+xml;charset=utf-8" http-equiv="Content-Type"/>
     <link href="../Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
   </head>
   <body>
@@ -61,7 +60,6 @@ const JUST_IMAGE_TEMPLATE: string = `${XML_BEGINNING_OP}
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
   <head>
     <title>{{TITLE}}</title>
-    <meta content="application/xhtml+xml;charset=utf-8" http-equiv="Content-Type"/>
     <link href="../Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
   </head>
   <body class="nomargin center">

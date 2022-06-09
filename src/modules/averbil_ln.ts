@@ -1686,18 +1686,18 @@ async function doTextContent(
       {
         const imgNode = elem.querySelector('img');
 
-        const mainElementEmpty = isElementEmpty(mainElement);
+        const skipSavingMainDOM = isElementEmpty(mainElement) || onlyhash1(mainElement);
 
         if (!utils.isNullOrUndefined(imgNode)) {
           const imgNodeSrc = imgNode.src;
 
           // dont save a empty dom
-          if (!mainElementEmpty) {
+          if (!skipSavingMainDOM) {
             const xhtmlNameMain = `${currentBaseName}.xhtml`;
             await finishDOMtoFile(currentDOM, baseOutputPath, xhtmlNameMain, FinishFileSubDir.Text, epubContextOutput, {
               Id: xhtmlNameMain,
               OriginalFilename: currentInputFile,
-              Main: currentSubChapter === 0,
+              Main: currentSubChapter === 0 && sequenceCounter === 0,
               IndexInSequence: sequenceCounter,
               Title: title,
             });
@@ -1726,14 +1726,15 @@ async function doTextContent(
           await finishDOMtoFile(imgDOM, baseOutputPath, xhtmlNameIMG, FinishFileSubDir.Text, epubContextOutput, {
             Id: xhtmlNameIMG,
             OriginalFilename: currentInputFile,
-            Main: false,
+            Main: currentSubChapter === 0 && sequenceCounter === 0, // the image is the first page on first-page image chapaters (a image before the chapter header)
+            Title: title,
 
             IndexInSequence: sequenceCounter,
           });
           sequenceCounter += 1;
 
           // dont create a new dom if the old one is still empty
-          if (!mainElementEmpty) {
+          if (!skipSavingMainDOM) {
             currentBaseName = options.genID(epubContextOutput.LastStates, currentSubChapter);
             const nextchapter = createMAINDOM(title, currentBaseName);
             currentDOM = nextchapter.currentDOM;
@@ -1766,7 +1767,7 @@ async function doTextContent(
     await finishDOMtoFile(currentDOM, baseOutputPath, xhtmlNameMain, FinishFileSubDir.Text, epubContextOutput, {
       Id: xhtmlNameMain,
       OriginalFilename: currentInputFile,
-      Main: currentSubChapter === 0,
+      Main: currentSubChapter === 0 && sequenceCounter === 0,
       IndexInSequence: sequenceCounter,
       Title: title,
     });
@@ -1774,6 +1775,16 @@ async function doTextContent(
   } else {
     log('Not saving final DOM, because main element is empty');
   }
+}
+
+/**
+ * Check if it only has one element and that one element is the "h1"
+ * Only returns "true" if there is one element and that one element is a "h1"
+ * @param elem The Element to check
+ * @returns "true" if there is one element and that one element is a "h1"
+ */
+function onlyhash1(elem: Element): boolean {
+  return elem.children.length === 1 && elem.children[0].localName === 'h1';
 }
 
 /** Small Helper functions to consistently tell if a node has no children */

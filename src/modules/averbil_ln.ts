@@ -245,6 +245,8 @@ export async function process(options: utils.ConverterOptions): Promise<void> {
       epubContextInput.NCXPath = file;
       continue;
     }
+
+    console.error(`Unhandled "mimetype": ${mimetype}`.red);
   }
 
   await generateContentOPF(contentBodyInput, epubContextInput, epubContextOutput, baseOutputPath);
@@ -256,6 +258,10 @@ export async function process(options: utils.ConverterOptions): Promise<void> {
 
   if (!utils.isNullOrUndefined(tmpdirInput)) {
     tmpdirInput.removeCallback();
+
+    if (!utils.isNullOrUndefined(await utils.statPath(tmpdirOutputName))) {
+      console.log('dir still exists after removecallback!'.red);
+    }
   }
 }
 
@@ -798,10 +804,11 @@ async function processHTMLFile(
 
   // ignore everything that matches the regex
   if (new RegExp(TITLES_TO_FILTER_OUT_REGEX).test(title.fullTitle)) {
+    log(`Skipping file "${filePath}" because it is in the filter regex (titles)`);
+
     return;
   }
 
-  // const currentBaseName = '';
   switch (title.titleType) {
     case TitleType.CoverPage:
       await doCoverPage(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
@@ -1759,7 +1766,7 @@ async function doTextContent(
       }
     }
 
-    console.error(`unhandled localName: ${elem.localName}`.red);
+    console.error(`Unhandled "localName": ${elem.localName}`.red);
   }
 
   if (!isElementEmpty(mainElement)) {
@@ -1850,7 +1857,7 @@ function generatePElementInner(origNode: Node, documentNew: Document): Node[] {
   }
 
   if (origNode.nodeType !== documentNew.ELEMENT_NODE) {
-    console.log('encountered unhandled nodeType:'.red, origNode.nodeType);
+    console.error('Encountered unhandled "nodeType":'.red, origNode.nodeType);
 
     return [];
   }
@@ -1901,7 +1908,7 @@ function generatePElementInner(origNode: Node, documentNew: Document): Node[] {
         continue;
       }
 
-      console.log(`Unhandled Style found: \"${style}\"`.red);
+      console.error(`Unhandled Style found: \"${style}\"`.red);
     }
   }
 

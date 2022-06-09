@@ -113,7 +113,8 @@ async function main_loop() {
   }
 
   for (const file of waitingFiles) {
-    console.log('Processing "'.green + file.grey + '"'.green);
+    // the following paths are made relative, to have less verbose output in the log
+    console.log('Processing "'.green + path.relative(CONVERTER_READ_PATH, file).grey + '"'.green);
 
     let processingModel: utils.ConverterModule | undefined = undefined;
     for (const module of modules) {
@@ -132,13 +133,20 @@ async function main_loop() {
       continue;
     }
 
-    await processingModel.process({
+    const finishedPath = await processingModel.process({
       converterInputPath: CONVERTER_READ_PATH,
       converterOutputPath: CONVERTER_OUT_PATH,
       fileInputPath: file,
     });
 
-    console.log('Finished Processing File "'.green + file.grey + '"'.green);
+    // the following paths are made relative, to have less verbose output in the log
+    console.log(
+      'Finished Processing File "'.green +
+        path.relative(CONVERTER_READ_PATH, file).toString().grey +
+        '" into "'.green +
+        path.relative(CONVERTER_OUT_PATH, finishedPath).grey +
+        '"'.green
+    );
     finished.push(file);
   }
 }

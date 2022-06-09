@@ -1,6 +1,7 @@
 import * as utils from './utils.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
+import { homedir } from 'os';
 
 const log = utils.createNameSpace('main');
 const currentModulePath = utils.getCurrentModuleDirectory(import.meta.url);
@@ -11,9 +12,9 @@ const currentModulePath = utils.getCurrentModuleDirectory(import.meta.url);
 const PROJECT_NAME = 'converty';
 
 /** Converter input path */
-const CONVERTER_READ_PATH = path.resolve(currentModulePath, '../..', `${PROJECT_NAME}-in`);
+const CONVERTER_READ_PATH = path.resolve(homedir(), 'Downloads', `${PROJECT_NAME}-in`);
 /** Converter output path */
-const CONVERTER_OUT_PATH = path.resolve(currentModulePath, '../../', `${PROJECT_NAME}-out`);
+const CONVERTER_OUT_PATH = path.resolve(homedir(), 'Downloads', `${PROJECT_NAME}-out`);
 /** Overwrite files to process instead of finding all */
 const OVERWRITE_FILES: undefined | string[] = undefined;
 /** Set "No Module for File" Errors to be Silent */

@@ -261,8 +261,10 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
   if (!utils.isNullOrUndefined(tmpdirInput)) {
     tmpdirInput.removeCallback();
 
+    // somehow "tmp" is not reliable to remove the directory again
     if (!utils.isNullOrUndefined(await utils.statPath(tmpdirOutputName))) {
-      console.log('dir still exists after removecallback!'.red);
+      log('"tmp" dir still existed after "removeCallback", manually cleaning');
+      await fspromises.rm(tmpdirOutputName, { recursive: true, maxRetries: 1 });
     }
   }
 

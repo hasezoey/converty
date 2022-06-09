@@ -23,6 +23,8 @@ const DC_XML_NAMESPACE = 'http://purl.org/dc/elements/1.1/';
 const OPF_XML_NAMESPACE = 'http://www.idpf.org/2007/opf';
 const NCX_XML_NAMESPACE = 'http://www.daisy.org/z3986/2005/ncx/';
 const XHTML_XML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+const TOC_XHTML_FILENAME = 'toc.xhtml';
+const COVER_XHTML_FILENAME = 'cover.xhtml';
 /**
  * The Template to use for each document, except special
  * available options to be replaced:
@@ -87,7 +89,7 @@ const TOC_XHTML_TEMPLATE: string = `<?xml version='1.0' encoding='utf-8'?>
     <nav epub:type="landmarks" id="landmarks" hidden="">
       <h1>Landmarks</h1>
       <ol>
-        <li><a epub:type="toc" href="../Text/toc.xhtml">Table of Contents</a></li>
+        <li><a epub:type="toc" href="../Text/${TOC_XHTML_FILENAME}">Table of Contents</a></li>
       </ol>
     </nav>
   </body>
@@ -119,15 +121,15 @@ const CONTENTOPF_TEMPLATE: string = `<?xml version="1.0" encoding="utf-8"?>
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"></metadata>
   <manifest>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-    <item id="toc.xhtml" href="Text/toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-    <item id="cover.xhtml" href="Text/cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="${TOC_XHTML_FILENAME}" href="Text/${TOC_XHTML_FILENAME}" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="${COVER_XHTML_FILENAME}" href="Text/${COVER_XHTML_FILENAME}" media-type="application/xhtml+xml"/>
   </manifest>
   <spine toc="ncx" page-progression-direction="ltr">
-    <itemref idref="cover.xhtml"/>
-    <itemref idref="toc.xhtml" linear="yes"/>
+    <itemref idref="${COVER_XHTML_FILENAME}"/>
+    <itemref idref="${TOC_XHTML_FILENAME}" linear="yes"/>
   </spine>
   <guide>
-    <reference type="toc" title="Table of Contents" href="Text/toc.xhtml"/>
+    <reference type="toc" title="Table of Contents" href="Text/${TOC_XHTML_FILENAME}"/>
   </guide>
 </package>
 `;
@@ -458,7 +460,7 @@ async function generateContentOPF(
     // ignore cover.xhtml
     // ignore toc.xhtml
     // ignore toc.ncx
-    if (elem.Id === 'cover.xhtml' || elem.Id === 'toc.xhtml' || elem.Id === 'ncx') {
+    if (elem.Id === COVER_XHTML_FILENAME || elem.Id === TOC_XHTML_FILENAME || elem.Id === 'ncx') {
       continue;
     }
 
@@ -522,6 +524,7 @@ async function generateContentOPF(
     return comp;
   });
 
+  // generate the "<spine>" (eg. the play-order)
   for (const file of epubContextOutput.Files) {
     // only add xhtml types to the spine
     if (file.MediaType !== XHTML_MIMETYPE) {
@@ -529,7 +532,7 @@ async function generateContentOPF(
     }
     // ignore cover, because it already exists in the template
     // ignore "toc.xhtml" in case it should already exist
-    if (file.Id === 'cover' || file.Id === 'toc.xhtml') {
+    if (file.Id === COVER_XHTML_FILENAME || file.Id === TOC_XHTML_FILENAME) {
       continue;
     }
 
@@ -580,9 +583,8 @@ async function generateTocXHTML(
     olElement.appendChild(liElement);
   }
 
-  const xhtmlName = 'toc.xhtml';
-  await finishDOMtoFile(currentDOM, baseOutputPath, xhtmlName, FinishFileSubDir.Text, epubContextOutput, {
-    Id: xhtmlName,
+  await finishDOMtoFile(currentDOM, baseOutputPath, TOC_XHTML_FILENAME, FinishFileSubDir.Text, epubContextOutput, {
+    Id: TOC_XHTML_FILENAME,
     IndexInSequence: 0,
     Main: true,
     OriginalFilename: '',
@@ -1074,9 +1076,8 @@ async function doCoverPage(
   });
   const { currentDOM: imgDOM } = createIMGDOM(title, imgId, ImgClass.Cover, `../Images/${imgFilename}`);
 
-  const xhtmlName = `cover.xhtml`;
-  await finishDOMtoFile(imgDOM, baseOutputPath, xhtmlName, FinishFileSubDir.Text, epubContextOutput, {
-    Id: xhtmlName,
+  await finishDOMtoFile(imgDOM, baseOutputPath, COVER_XHTML_FILENAME, FinishFileSubDir.Text, epubContextOutput, {
+    Id: COVER_XHTML_FILENAME,
     OriginalFilename: currentInputFile,
     Main: true,
     IndexInSequence: 0,

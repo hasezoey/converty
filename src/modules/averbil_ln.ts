@@ -451,6 +451,11 @@ async function generateContentOPF(
       newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:date');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
+    } else if (elem.tagName === 'dc:identifier') {
+      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:identifier');
+      newNode.setAttribute('id', 'pub-id');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(documentNew.createTextNode(elem.textContent));
     }
 
     if (!utils.isNullOrUndefined(newNode)) {

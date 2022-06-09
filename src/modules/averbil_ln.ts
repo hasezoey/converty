@@ -1778,7 +1778,8 @@ async function doTextContent(
     console.error(`Unhandled "localName": ${elem.localName}`.red);
   }
 
-  if (!isElementEmpty(mainElement)) {
+  // ignore DOM's that are empty or only have the chapter header
+  if (!isElementEmpty(mainElement) && !onlyhash1(mainElement)) {
     const xhtmlNameMain = `${currentBaseName}.xhtml`;
     await finishDOMtoFile(currentDOM, baseOutputPath, xhtmlNameMain, FinishFileSubDir.Text, epubContextOutput, {
       Id: xhtmlNameMain,

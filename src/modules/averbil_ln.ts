@@ -411,7 +411,7 @@ async function generateContentOPF(
   utils.assertionDefined(manifestElementOld, new Error('Expected "manifestElementOld" to exist'));
   utils.assertionDefined(spineElementOld, new Error('Expected "spineElementOld" to exist'));
 
-  let creatorCount = 0;
+  let idCount = 0;
   // copy metadata from old to new
   // using "children" to exclude text nodes
   for (const elem of Array.from(metadataElementOld.children)) {
@@ -441,11 +441,11 @@ async function generateContentOPF(
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
     } else if (elem.tagName === 'dc:creator') {
-      creatorCount += 1;
+      idCount += 1;
       newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:creator');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
-      newNode.setAttribute('id', `creator${creatorCount.toString().padStart(2, '0')}`);
+      newNode.setAttribute('id', `id-${idCount}`);
     } else if (elem.tagName === 'dc:date') {
       newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:date');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
@@ -459,6 +459,42 @@ async function generateContentOPF(
 
     if (!utils.isNullOrUndefined(newNode)) {
       metadataElementNew.appendChild(newNode);
+    }
+  }
+
+  // apply series metadata (to have automatic sorting already)
+  {
+    // Regex to extract the series title and if available the volume position
+    const caps = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/gim.exec(epubContextOutput.Title);
+
+    if (!utils.isNullOrUndefined(caps)) {
+      const seriesTitleNoVolume = regexMatchGroupRequired(caps, 'series', 'generateContentOPF meta collection');
+      const seriesPos = regexMatchGroup(caps, 'num');
+
+      idCount += 1;
+      const metaCollectionId = `id-${idCount}`;
+      const metaCollectionElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
+      const metaTypeElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
+      const metaPositionElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
+
+      metaCollectionElem.setAttribute('property', 'belongs-to-collection');
+      metaCollectionElem.setAttribute('id', metaCollectionId);
+      metaCollectionElem.appendChild(documentNew.createTextNode(seriesTitleNoVolume));
+
+      metaTypeElem.setAttribute('refines', `#${metaCollectionId}`);
+      metaTypeElem.setAttribute('property', 'collection-type');
+      metaTypeElem.appendChild(documentNew.createTextNode('series'));
+
+      metaPositionElem.setAttribute('refines', `#${metaCollectionId}`);
+      metaPositionElem.setAttribute('property', 'group-position');
+      // default to "1" in case it does not have a volume id (like a spinoff)
+      metaPositionElem.appendChild(documentNew.createTextNode(seriesPos ?? '1'));
+
+      metadataElementNew.appendChild(metaCollectionElem);
+      metadataElementNew.appendChild(metaTypeElem);
+      metadataElementNew.appendChild(metaPositionElem);
+    } else {
+      log('Found no series captures for: "'.red + epubContextOutput.Title.grey + '"'.red);
     }
   }
 

@@ -391,13 +391,17 @@ async function generateContentOPF(
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
   const currentDOM = new JSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
   const documentNew = currentDOM.window.document;
-  const packageElement = currentDOM.window.document.querySelector('package');
+  const packageElementNew = currentDOM.window.document.querySelector('package');
 
-  utils.assertionDefined(packageElement, new Error('Expected "packageElement" to exist'));
+  utils.assertionDefined(packageElementNew, new Error('Expected "packageElementNew" to exist'));
 
-  const metadataElementNew = packageElement.querySelector('metadata');
-  const manifestElementNew = packageElement.querySelector('manifest');
-  const spineElementNew = packageElement.querySelector('spine');
+  const packageElementOld = documentOld.querySelector('package');
+
+  utils.assertionDefined(packageElementOld, new Error('Expected "packageElementOld" to exist'));
+
+  const metadataElementNew = packageElementNew.querySelector('metadata');
+  const manifestElementNew = packageElementNew.querySelector('manifest');
+  const spineElementNew = packageElementNew.querySelector('spine');
 
   utils.assertionDefined(metadataElementNew, new Error('Expected "metdataElementNew" to exist'));
   utils.assertionDefined(manifestElementNew, new Error('Expected "manifestElementNew" to exist'));
@@ -452,9 +456,20 @@ async function generateContentOPF(
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
     } else if (elem.tagName === 'dc:identifier') {
       newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:identifier');
-      newNode.setAttribute('id', 'pub-id');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
+      {
+        const packageUniqueID = packageElementOld.getAttribute('unique-identifier');
+        const elemID = elem.getAttribute('id');
+
+        if (!utils.isNullOrUndefined(packageUniqueID) && !utils.isNullOrUndefined(elemID) && packageUniqueID === elemID) {
+          newNode.setAttribute('id', 'pub-id');
+        }
+      }
+
+      if (elem.getAttribute('opf:scheme') === 'calibre') {
+        newNode.setAttribute('opf:scheme', 'calibre');
+      }
     }
 
     if (!utils.isNullOrUndefined(newNode)) {

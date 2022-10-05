@@ -67,3 +67,14 @@ export function newJSDOM(
 
   return { dom, document };
 }
+
+/**
+ * Apply multiple attributes with one function
+ * @param elem The Element to apply the attributes on
+ * @param attrs The Attributes to apply
+ */
+export function applyAttributes(elem: Element, attrs: Record<string, string>): void {
+  for (const [attr, value] of Object.entries(attrs)) {
+    elem.setAttribute(attr, value);
+  }
+}

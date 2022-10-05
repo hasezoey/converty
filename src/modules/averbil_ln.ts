@@ -6,7 +6,7 @@ import * as tmp from 'tmp';
 import yauzl from 'yauzl';
 import yazl from 'yazl';
 import * as mime from 'mime-types';
-import { getTemplate, template } from '../helpers/template.js';
+import { getTemplate, applyTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
 
 const log = utils.createNameSpace('average_ln_original');
@@ -270,7 +270,7 @@ async function generateContentOPF(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = template(await getTemplate('content.opf'), {
+  const replacedOutputTemplate = applyTemplate(await getTemplate('content.opf'), {
     '{{TOC_XHTML_FILENAME}}': TOC_XHTML_FILENAME,
   });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
@@ -526,7 +526,7 @@ async function generateTocXHTML(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = template(await getTemplate('toc.xhtml'), {
+  const replacedOutputTemplate = applyTemplate(await getTemplate('toc.xhtml'), {
     '{{CSSPATH}}': CSSPATH_FOR_XHTML,
     '{{TOC_XHTML_FILENAME}}': `../Text/${TOC_XHTML_FILENAME}`,
   });
@@ -570,7 +570,7 @@ async function generateTocNCX(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = template(await getTemplate('toc.ncx'), {
+  const replacedOutputTemplate = applyTemplate(await getTemplate('toc.ncx'), {
     '{{TITLE}}': epubContextOutput.Title,
   });
 
@@ -825,7 +825,7 @@ interface IcreateMAINDOM extends xh.INewJSDOMReturn {
  * @returns The DOM, document and mainelement
  */
 async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMAINDOM> {
-  const modXHTML = template(await getTemplate(''), {
+  const modXHTML = applyTemplate(await getTemplate(''), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
     '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
@@ -851,7 +851,7 @@ async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMA
  * @returns The DOM, document and mainelement
  */
 async function createIMGDOM(title: Title, sectionid: string, imgclass: ImgClass, imgsrc: string): Promise<ReturnType<typeof xh.newJSDOM>> {
-  const modXHTML = template(await getTemplate('img-ln.xhtml'), {
+  const modXHTML = applyTemplate(await getTemplate('img-ln.xhtml'), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
     '{{EPUBTYPE}}': EPubType.BodyMatterChapter,

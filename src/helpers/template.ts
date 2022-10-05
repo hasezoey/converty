@@ -56,7 +56,7 @@ export function clearTemplates(): void {
  * @param args The Arguments to format "input" with
  * @returns The Formatted input
  */
-export function template(input: string, args: Record<string, any>): string {
+export function applyTemplate(input: string, args: Record<string, any>): string {
   for (const [key, value] of Object.entries(args)) {
     log(`Template for key: "${key}"`);
     input = input.replaceAll(key, value);

@@ -88,4 +88,4 @@ export const STATICS = {
   OPF_XML_NAMESPACE: 'http://www.idpf.org/2007/opf',
   NCX_XML_NAMESPACE: 'http://www.daisy.org/z3986/2005/ncx/',
   XHTML_XML_NAMESPACE: 'http://www.w3.org/1999/xhtml',
-};
+} as const;

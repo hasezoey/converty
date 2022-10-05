@@ -2,8 +2,6 @@ import { promises as fspromises, Stats } from 'fs';
 import debug from 'debug';
 import 'colors'; // side-effect import, in utils because this file is imported across entry-points
 import * as path from 'path';
-import { JSDOM } from 'jsdom';
-import { fileURLToPath } from 'url';
 
 const log = createNameSpace('utils');
 
@@ -43,6 +41,7 @@ export interface ConverterOptions {
  */
 export async function sleep(waitTime: number): Promise<void> {
   return new Promise((res) => {
+    log('sleep for', waitTime);
     setTimeout(res, waitTime);
   });
 }
@@ -209,21 +208,6 @@ export function isNullOrUndefined(val: unknown): val is null | undefined {
 // }
 
 /**
- * Apply a "args" to "input" string
- * @param input The Input which needs to be formatted
- * @param args The Arguments to format "input" with
- * @returns The Formatted input
- */
-export function template(input: string, args: Record<string, any>): string {
-  for (const [key, value] of Object.entries(args)) {
-    log(`Template for key: "${key}"`);
-    input = input.replaceAll(key, value);
-  }
-
-  return input;
-}
-
-/**
  * FS Async mkdir with recursive already set
  * @param path The Path to recursively create
  */
@@ -384,128 +368,6 @@ export function createNameSpace(ns: string): debug.Debugger {
 }
 
 /**
- * Process "input" to read-able and consistent characters
- * @param input The input to process
- * @returns The processed input
- */
-function stringFixSpaces(input: string): string {
-  return input
-    .replaceAll(' ', ' ') // replace "no-break space" with normal spaces
-    .replaceAll(/\s\s+/gim, ' ') // replace multiple spaces to one
-    .trim();
-}
-
-/**
- * Templates from "templates/"
- */
-const templates: Map<string, string> = new Map();
-
-/**
- * Handle getting templates from cache or from file
- * @param filename The filename in the "templates/" directory
- * @returns The loaded file
- * @throws {Error} If path does not exist
- * @throws {Error} If path is not a file
- */
-export async function getTemplate(filename: string): Promise<string> {
-  {
-    const got = templates.get(filename);
-
-    if (!isNullOrUndefined(got)) {
-      return got;
-    }
-  }
-
-  const filePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', 'templates', filename);
-  const stat = await statPath(filePath);
-
-  if (isNullOrUndefined(stat)) {
-    throw new Error(`Could not find template path "${filePath}"`);
-  }
-  if (!stat.isFile()) {
-    throw new Error(`Template Path is not a file! "${filePath}"`);
-  }
-
-  const loaded = (await fspromises.readFile(filePath)).toString();
-
-  templates.set(filename, loaded);
-
-  return loaded;
-}
-
-/**
- * Clear all current cached Templates
- */
-export function clearTemplates(): void {
-  templates.clear();
-}
-
-/**
- * Chain-Assert that input "elem" is defined
- * @param elem The Element to assert to be defined
- * @param elemName The Element name for the Error
- * @returns The input "elem"
- */
-export function definedElement<T extends Node>(elem: T | undefined | null, elemName: string): T {
-  assertionDefined(elem, new Error(`Expected Node "${elemName}" to be defined`));
-
-  return elem;
-}
-
-/**
- * Chain-Assert that input list "elem" is defined and has length above 0
- * @param elem The Element-List to assert to be defined
- * @param elemName The Element name for the Error
- * @returns The input "elem"
- */
-export function definedElementAll<T extends NodeListOf<Node>>(elem: T | undefined | null, elemName: string): T {
-  assertionDefined(elem, new Error(`Expected NodeList for "${elemName}" to be defined`));
-  assertion(elem.length > 0, new Error('Expected NodeList for "${elemName}" to not be 0'));
-
-  return elem;
-}
-
-/**
- * Helper for easier querying with {@link definedElement} without having to duplicate so much
- * @param queryOn The Element to query on
- * @param selector The CSS Selector
- * @returns The found Element
- */
-export function queryDefinedElement<T extends Element = Element>(queryOn: Document | Element, selector: string): T {
-  return definedElement(queryOn.querySelector(selector) as T, selector);
-}
-
-/**
- * Helper for easier querying with {@link definedElement} without having to duplicate so much
- * @param queryOn The Element to query on
- * @param selector The CSS Selector
- * @returns The found Element
- */
-export function queryDefinedElementAll<T extends Element = Element>(queryOn: Document | Element, selector: string): NodeListOf<T> {
-  return definedElementAll(queryOn.querySelectorAll(selector), selector);
-}
-
-export interface INewJSDOMReturn {
-  dom: JSDOM;
-  document: Document;
-}
-
-/**
- * Helper to easily get JSDOM dom and Document
- * @param content The content of the JSDOM
- * @returns The DOM and Document
- */
-export function newJSDOM(
-  content: NonNullable<ConstructorParameters<typeof JSDOM>[0]>,
-  options?: ConstructorParameters<typeof JSDOM>[1]
-): INewJSDOMReturn {
-  const dom = new JSDOM(typeof content !== 'string' ? content.toString() : content, options);
-  const document = dom.window.document;
-
-  return { dom, document };
-}
-
-/**
  * Consistently parse "cN"("c1") to a number without throwing
  * @param input The input to try to parse
  * @returns The Parsed number or undefined
@@ -548,35 +410,6 @@ export function parseChapterInputToNumber(input: string | number | undefined): n
   }
 
   return undefined;
-}
-
-/**
- * Convert input to filename consumable title
- * @param input The input to process
- */
-export function stringToFilename(input: string): string {
-  return stringFixSpaces(
-    xmlToString(input)
-      // do the following before "replaceAllForPlainText" because that function replaces multiple spaces to one
-      .replaceAll(/\n|\\n/gim, ' ') // replace new lines with nothing
-      .replaceAll(/\//gim, '⁄') // replace "/" with a character that looks similar (otherwise it would result in a directory)
-      .trim()
-  );
-}
-
-/**
- * Replace xml placeholders with actual characters
- * @param input The input to Process
- */
-export function xmlToString(input: string): string {
-  return input
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;"', '>')
-    .replaceAll('&amp;', '&')
-    .replaceAll('&nbsp;', ' ')
-    .replaceAll('&#8217;', '’')
-    .replaceAll('&#8220;', '“')
-    .replaceAll('&#8221;', '”');
 }
 
 /**

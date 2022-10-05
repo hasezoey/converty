@@ -6,6 +6,8 @@ import * as tmp from 'tmp';
 import yauzl from 'yauzl';
 import yazl from 'yazl';
 import * as mime from 'mime-types';
+import { getTemplate, template } from '../helpers/template.js';
+import * as xh from '../helpers/xml.js';
 
 const log = utils.createNameSpace('average_ln_original');
 
@@ -60,7 +62,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
   const containerPath = path.resolve(tmpdirOutputName, 'META-INF/container.xml');
   await utils.mkdir(path.dirname(containerPath));
   // write the "META-INF/container.xml" file, because it will not change
-  await fspromises.writeFile(containerPath, await utils.getTemplate('container.xml'));
+  await fspromises.writeFile(containerPath, await getTemplate('container.xml'));
 
   const epubContextOutput: OutputEpubContext = {
     Files: [],
@@ -81,7 +83,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
 
   const stylesheetpath = path.resolve(baseOutputPath, 'Styles', 'stylesheet.css');
   await utils.mkdir(path.dirname(stylesheetpath));
-  await fspromises.writeFile(stylesheetpath, await utils.getTemplate('text-ln.css'));
+  await fspromises.writeFile(stylesheetpath, await getTemplate('text-ln.css'));
   epubContextOutput.Files.push({
     Id: 'stylesheet',
     // this function creates the path, so it will be added here
@@ -268,22 +270,22 @@ async function generateContentOPF(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = utils.template(await utils.getTemplate('content.opf'), {
+  const replacedOutputTemplate = template(await getTemplate('content.opf'), {
     '{{TOC_XHTML_FILENAME}}': TOC_XHTML_FILENAME,
   });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
-  const packageElementNew = utils.queryDefinedElement(documentNew, 'package');
+  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
+  const packageElementNew = xh.queryDefinedElement(documentNew, 'package');
 
-  const packageElementOld = utils.queryDefinedElement(documentOld, 'package');
+  const packageElementOld = xh.queryDefinedElement(documentOld, 'package');
 
-  const metadataElementNew = utils.queryDefinedElement(packageElementNew, 'metadata');
-  const manifestElementNew = utils.queryDefinedElement(packageElementNew, 'manifest');
-  const spineElementNew = utils.queryDefinedElement(packageElementNew, 'spine');
+  const metadataElementNew = xh.queryDefinedElement(packageElementNew, 'metadata');
+  const manifestElementNew = xh.queryDefinedElement(packageElementNew, 'manifest');
+  const spineElementNew = xh.queryDefinedElement(packageElementNew, 'spine');
 
-  const metadataElementOld = utils.queryDefinedElement(documentOld, 'metadata');
-  const manifestElementOld = utils.queryDefinedElement(documentOld, 'manifest');
-  const spineElementOld = utils.queryDefinedElement(documentOld, 'spine');
+  const metadataElementOld = xh.queryDefinedElement(documentOld, 'metadata');
+  const manifestElementOld = xh.queryDefinedElement(documentOld, 'manifest');
+  const spineElementOld = xh.queryDefinedElement(documentOld, 'spine');
 
   // add extra nodes to the manifest
   {
@@ -524,13 +526,13 @@ async function generateTocXHTML(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = utils.template(await utils.getTemplate('toc.xhtml'), {
+  const replacedOutputTemplate = template(await getTemplate('toc.xhtml'), {
     '{{CSSPATH}}': CSSPATH_FOR_XHTML,
     '{{TOC_XHTML_FILENAME}}': `../Text/${TOC_XHTML_FILENAME}`,
   });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, JSDOM_XHTML_OPTIONS);
-  const olElement = utils.queryDefinedElement(documentNew, 'body > nav > ol.none');
+  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, JSDOM_XHTML_OPTIONS);
+  const olElement = xh.queryDefinedElement(documentNew, 'body > nav > ol.none');
 
   const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
 
@@ -568,13 +570,13 @@ async function generateTocNCX(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = utils.template(await utils.getTemplate('toc.ncx'), {
+  const replacedOutputTemplate = template(await getTemplate('toc.ncx'), {
     '{{TITLE}}': epubContextOutput.Title,
   });
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, { contentType: XML_MIMETYPE });
-  const navMapElement = utils.queryDefinedElement(documentNew, 'ncx > navMap');
+  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, { contentType: XML_MIMETYPE });
+  const navMapElement = xh.queryDefinedElement(documentNew, 'ncx > navMap');
 
   const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
 
@@ -637,18 +639,18 @@ async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
  */
 async function getEpubContextForInput(usePath: string): Promise<{ context: EpubContext; contentBody: Document }> {
   const containerBuffer = await fspromises.readFile(path.resolve(usePath, 'META-INF/container.xml'));
-  const { document: containerBody } = utils.newJSDOM(containerBuffer, { contentType: XML_MIMETYPE });
+  const { document: containerBody } = xh.newJSDOM(containerBuffer, { contentType: XML_MIMETYPE });
 
-  const contentPathNode = utils.queryDefinedElement(containerBody, 'container > rootfiles > rootfile');
+  const contentPathNode = xh.queryDefinedElement(containerBody, 'container > rootfiles > rootfile');
 
   const contentPath = contentPathNode.getAttribute('full-path');
 
   utils.assertionDefined(contentPath, new Error('Expected "contentPath" to be defined'));
 
   const contentBuffer = await fspromises.readFile(path.resolve(usePath, contentPath));
-  const { document: contentBody } = utils.newJSDOM(contentBuffer, { contentType: XML_MIMETYPE });
+  const { document: contentBody } = xh.newJSDOM(contentBuffer, { contentType: XML_MIMETYPE });
 
-  const titleNode = utils.queryDefinedElement(contentBody, 'package > metadata > dc\\:title');
+  const titleNode = xh.queryDefinedElement(contentBody, 'package > metadata > dc\\:title');
 
   const volumeTitle = titleNode.textContent;
 
@@ -751,7 +753,7 @@ async function processHTMLFile(
   baseOutputPath: string
 ): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
-  const { document: documentInput } = utils.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
+  const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
   const title = getTitle(documentInput.title);
 
@@ -812,7 +814,7 @@ async function processHTMLFile(
   }
 }
 
-interface IcreateMAINDOM extends utils.INewJSDOMReturn {
+interface IcreateMAINDOM extends xh.INewJSDOMReturn {
   mainElement: Element;
 }
 
@@ -823,7 +825,7 @@ interface IcreateMAINDOM extends utils.INewJSDOMReturn {
  * @returns The DOM, document and mainelement
  */
 async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMAINDOM> {
-  const modXHTML = utils.template(await utils.getTemplate(''), {
+  const modXHTML = template(await getTemplate(''), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
     '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
@@ -831,8 +833,8 @@ async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMA
   });
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const ret = utils.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
-  const mainElement = utils.queryDefinedElement(ret.document, 'div.main');
+  const ret = xh.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
+  const mainElement = xh.queryDefinedElement(ret.document, 'div.main');
 
   return {
     ...ret,
@@ -848,13 +850,8 @@ async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMA
  * @param imgsrc The source of the "img" element
  * @returns The DOM, document and mainelement
  */
-async function createIMGDOM(
-  title: Title,
-  sectionid: string,
-  imgclass: ImgClass,
-  imgsrc: string
-): Promise<ReturnType<typeof utils.newJSDOM>> {
-  const modXHTML = utils.template(await utils.getTemplate('img-ln.xhtml'), {
+async function createIMGDOM(title: Title, sectionid: string, imgclass: ImgClass, imgsrc: string): Promise<ReturnType<typeof xh.newJSDOM>> {
+  const modXHTML = template(await getTemplate('img-ln.xhtml'), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
     '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
@@ -865,7 +862,7 @@ async function createIMGDOM(
   });
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  return utils.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
+  return xh.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
 }
 
 enum FinishFileSubDir {
@@ -1008,7 +1005,7 @@ async function doCoverPage(
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.CoverPage, new Error('Expected TitleType to be "CoverPage"'));
 
-  const imgNode = utils.queryDefinedElement(documentInput, 'img');
+  const imgNode = xh.queryDefinedElement(documentInput, 'img');
 
   const imgNodeSrc = imgNode.getAttribute('imgNode');
 
@@ -1068,7 +1065,7 @@ async function doFrontMatter(
     throw new Error(`Expected "title.titleType" to be a supported FONT_TYPE, got \"${TitleType[title.titleType]}\"`);
   }
 
-  const imgNodes = utils.queryDefinedElementAll(documentInput, 'img');
+  const imgNodes = xh.queryDefinedElementAll(documentInput, 'img');
 
   for (const elem of Array.from(imgNodes)) {
     epubContextOutput.LastStates.LastFrontNum += 1;
@@ -1126,7 +1123,7 @@ async function doShortStory(
   utils.assertion(title.titleType === TitleType.ShortStory, new Error('Expected TitleType to be "ShortStory"'));
   epubContextOutput.LastStates.LastShortStoryNum += 1;
 
-  const bodyElement = utils.queryDefinedElement(documentInput, 'body');
+  const bodyElement = xh.queryDefinedElement(documentInput, 'body');
   utils.assertionDefined(bodyElement, new Error('Expected "bodyElement" to exist'));
 
   let indexOfFirstNonBreakElement = Array.from(bodyElement.children).findIndex(

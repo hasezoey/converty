@@ -1,12 +1,14 @@
-import * as https from 'https';
-import { IncomingMessage } from 'http';
 import { promises as fspromises, Stats } from 'fs';
 import debug from 'debug';
-import 'colors';
-import path from 'path';
+import 'colors'; // side-effect import, in utils because this file is imported across entry-points
+import * as path from 'path';
+import { JSDOM } from 'jsdom';
 import { fileURLToPath } from 'url';
 
 const log = createNameSpace('utils');
+
+/** Default Search depth for recursive search-functions */
+export const DEFAULT_SEARCH_DEPTH = 3;
 
 export interface ConverterModuleStore extends ConverterModule {
   /** File Name of the module */
@@ -74,112 +76,137 @@ export function isNullOrUndefined(val: unknown): val is null | undefined {
   return val === null || val === undefined;
 }
 
-/** Custom Error to test for to re-try */
-export class DownloadFailedError extends Error {
-  constructor(public url: URL, public code: number, public response: IncomingMessage) {
-    super(`URL "${url.toString()}" failed with code "${code}"`);
-  }
-}
+// /** Custom Error to test for to re-try */
+// export class DownloadFailedError extends Error {
+//   constructor(public url: URL, public code: number, public response: IncomingMessage) {
+//     super(`URL "${url.toString()}" failed with code "${code}"`);
+//   }
+// }
 
-/**
- * Download given url, without extra processing to the URL
- * @param url The URL to download
- * @param extraOptions Extra Options to pass to https
- * @param withRateLimit Check & Wait for a Rate Limit
- * @returns Downloaded buffer
- */
-export async function downloadDirect(url: URL, extraOptions?: https.RequestOptions, withRateLimit?: RateLimit): Promise<Buffer> {
-  return new Promise(async (res, rej) => {
-    if (!isNullOrUndefined(withRateLimit)) {
-      if (withRateLimit.currentCounter >= withRateLimit.maxCounter) {
-        log(`Waiting for RateLimit for "${url.toString()}"`);
-        await withRateLimit.waitfn();
-        log(`Waiting for RateLimit Finished for "${url.toString()}"`);
-      }
+// /**
+//  * Download given url, without extra processing to the URL
+//  * @param url The URL to download
+//  * @param extraOptions Extra Options to pass to https
+//  * @param withRateLimit Check & Wait for a Rate Limit
+//  * @returns Downloaded buffer
+//  */
+// export async function downloadDirect(url: URL, extraOptions?: https.RequestOptions, withRateLimit?: RateLimit): Promise<Buffer> {
+//   return new Promise(async (res, rej) => {
+//     if (!isNullOrUndefined(withRateLimit)) {
+//       if (withRateLimit.currentCounter >= withRateLimit.options.maxCount) {
+//         log(`Waiting for RateLimit for "${url.toString()}"`);
+//         await withRateLimit.waitfn();
+//         log(`Waiting for RateLimit Finished for "${url.toString()}"`);
+//       }
 
-      withRateLimit.currentCounter += 1;
-    }
+//       withRateLimit.currentCounter += 1;
+//     }
 
-    // Downloading statement put after ratelimit, to make more sense in the log
-    log(`Downloading: "${url.toString()}", with rateLimit: ${!isNullOrUndefined(withRateLimit)}`);
+//     // Downloading statement put after ratelimit, to make more sense in the log
+//     log(`Downloading: "${url.toString()}", with rateLimit: ${!isNullOrUndefined(withRateLimit)}`);
 
-    const httpsOptions = extraOptions ?? {};
+//     const httpsOptions = extraOptions ?? {};
 
-    https.get(url.toString(), httpsOptions as any, (response) => {
-      log('Download Status Code: ', response.statusCode);
+//     const cr = https.get(url.toString(), httpsOptions as any, (response) => {
+//       log('Download Status Code: ', response.statusCode);
 
-      if (response.statusCode !== 200) {
-        rej(new DownloadFailedError(url, response.statusCode || 0, response));
+//       if (response.statusCode !== 200) {
+//         rej(new DownloadFailedError(url, response.statusCode || 0, response));
 
-        return;
-      }
+//         return;
+//       }
 
-      const chunks: any = [];
+//       const chunks: any = [];
 
-      response.on('data', (chunk) => {
-        chunks.push(chunk);
-      });
+//       response.on('data', (chunk) => {
+//         chunks.push(chunk);
+//       });
 
-      response.on('error', (err) => {
-        rej(err);
-      });
+//       response.on('error', (err) => {
+//         rej(err);
+//       });
 
-      response.on('end', () => {
-        log(`Download finished for "${url.toString()}"`);
-        res(Buffer.concat(chunks));
-      });
-    });
-  });
-}
+//       response.on('end', () => {
+//         log(`Download finished for "${url.toString()}"`);
+//         res(Buffer.concat(chunks));
+//       });
+//     });
 
-/**
- * Main Download function, follows redirects (up to 5)
- * @param url The url to download
- * @param extraOptions Extra Options to pass to https
- * @param withRateLimit Check & Wait for a Rate Limit
- * @returns Downloaded buffer
- */
-export async function download(url: URL, extraOptions?: https.RequestOptions, withRateLimit?: RateLimit): Promise<Buffer> {
-  const actualURL = url;
-  let depth = 0;
+//     cr.on('error', (err) => {
+//       rej(err);
+//     });
+//   });
+// }
 
-  // act like rust's "loop"
-  while (true) {
-    if (depth >= 5 || depth < 0) {
-      throw new Error('Redirect Depth (5) reached');
-    }
+// /**
+//  * Main Download function, follows redirects (up to 5)
+//  * @param url The url to download
+//  * @param extraOptions Extra Options to pass to https
+//  * @param withRateLimit Check & Wait for a Rate Limit
+//  * @returns Downloaded buffer
+//  */
+// export async function download(url: URL, extraOptions?: https.RequestOptions, withRateLimit?: RateLimit): Promise<Buffer> {
+//   let currentURLObj = url;
+//   let depth = 0;
+//   let dnsfailurecount = 0;
 
-    const buff: Buffer | Error | undefined = await downloadDirect(actualURL, extraOptions, withRateLimit).catch((err) => {
-      if (err instanceof DownloadFailedError) {
-        switch (err.code) {
-          case 301:
-          case 302:
-          case 303:
-          case 307:
-          case 308:
-            console.log('TEST REDIRECT'.red, err.response);
+//   // act like rust's "loop"
+//   while (true) {
+//     if (depth >= 5 || depth < 0) {
+//       throw new Error('Redirect Depth (5) reached');
+//     }
 
-            throw new Error('Redirect unimplemented');
+//     const buff: Buffer | Error | undefined = await downloadDirect(currentURLObj, extraOptions, withRateLimit).catch((err) => {
+//       if (err instanceof DownloadFailedError) {
+//         switch (err.code) {
+//           // all redirect codes
+//           case 301:
+//           case 302:
+//           case 303:
+//           case 307:
+//           case 308:
+//             const redirectUrl = err.response.headers['location'];
+//             assertionDefined(redirectUrl, new Error('Expected Status 308 to have "Location" header'));
+//             assertion(typeof redirectUrl === 'string', new Error(`Expected redirectUrl to be a string, got "${typeof redirectUrl}"`));
+//             log(`Redirect happened from "${currentURLObj}" to "${redirectUrl}"`);
 
-            return undefined;
-        }
-      }
+//             currentURLObj = new URL(redirectUrl);
+//             currentURLObj.protocol = 'https:'; // always force https
+//             depth += 1;
 
-      return err;
-    });
+//             return undefined;
+//         }
+//       }
 
-    if (isNullOrUndefined(buff)) {
-      depth += 1;
-      continue;
-    }
+//       return err;
+//     });
 
-    if (buff instanceof Error) {
-      throw buff;
-    }
+//     if (isNullOrUndefined(buff)) {
+//       depth += 1;
+//       continue;
+//     }
 
-    return buff;
-  }
-}
+//     if (buff instanceof Error) {
+//       // code "EAI_AGAIN" means DNS failure, so try again after some waiting
+//       if ((buff as any)?.code === 'EAI_AGAIN') {
+//         dnsfailurecount += 1;
+//         log('Error "EAI_AGAIN" (DNS Failure) happened, waiting and trying again');
+
+//         if (dnsfailurecount > 0 && dnsfailurecount % 5 === 0) {
+//           console.log(`DNS Failure happened multiple times, waiting and trying again (dns failure count: ${dnsfailurecount})`.red);
+//         }
+
+//         await sleep(1000 * 5); // 5 seconds
+
+//         continue;
+//       }
+
+//       throw buff;
+//     }
+
+//     return buff;
+//   }
+// }
 
 /**
  * Apply a "args" to "input" string
@@ -188,20 +215,20 @@ export async function download(url: URL, extraOptions?: https.RequestOptions, wi
  * @returns The Formatted input
  */
 export function template(input: string, args: Record<string, any>): string {
-  for (const { 0: key, 1: value } of Object.entries(args)) {
-    log(`Template for key: "${key[0]}"`);
-    input.replaceAll(`<${key.toUpperCase()}>`, value);
+  for (const [key, value] of Object.entries(args)) {
+    log(`Template for key: "${key}"`);
+    input = input.replaceAll(key, value);
   }
 
   return input;
 }
 
+/**
+ * FS Async mkdir with recursive already set
+ * @param path The Path to recursively create
+ */
 export async function mkdir(path: string): Promise<void> {
   await fspromises.mkdir(path, { recursive: true });
-}
-
-export async function write_file(file: string, content: string | Buffer): Promise<void> {
-  await fspromises.writeFile(file, content);
 }
 
 /**
@@ -231,53 +258,121 @@ export async function pathExists(path: string): Promise<boolean> {
   return !isNullOrUndefined(await statPath(path));
 }
 
-/**
- * RateLimit, to enforce RateLimits
- */
-export abstract class RateLimit {
-  public currentCounter: number = 0;
-  public abstract maxCounter: number;
-  public timer?: NodeJS.Timer = undefined;
+// /** Common options for the {@link RateLimit} class */
+// export interface RateLimitOptions {
+//   /**
+//    * The number of max tries before a reset in the waiter will be called (current unused)
+//    * @default 3
+//    */
+//   failCount: number;
+//   /**
+//    * The time to use for the `setInterval` time, in ms
+//    * @default 5000 5 seconds
+//    */
+//   intervalTime: number;
+//   /**
+//    * The time to use for waiting between waiting tries, in ms
+//    * @default 10000 10 seconds
+//    */
+//   sleepTime: number;
+//   /**
+//    * The number to decrement the counter by in the interval
+//    * @default 1
+//    */
+//   decrementCount: number;
+//   /**
+//    * Set the max number to allow before having to wait
+//    * @default 60
+//    */
+//   maxCount: number;
+// }
 
-  public abstract waitfn(): Promise<void>;
-  public abstract reset(): Promise<void>;
-  public abstract createTimer(): Promise<void>;
+// /**
+//  * RateLimit, to enforce RateLimits
+//  */
+// export class RateLimit {
+//   /** The Current Count of how many request have been made without reduction */
+//   public currentCounter: number = 0;
+//   /** The Timer instance for reduction */
+//   public timer?: NodeJS.Timer = undefined;
 
-  public async clearTimer() {
-    if (isNullOrUndefined(this.timer)) {
-      return;
-    }
+//   /** The options set in the constructor */
+//   public readonly options: RateLimitOptions;
 
-    while (this.currentCounter > 0) {
-      await this.waitfn();
-    }
+//   constructor(opts: Partial<RateLimitOptions>) {
+//     this.options = {
+//       failCount: opts.failCount ?? 5,
+//       intervalTime: opts.intervalTime ?? 1000 * 5, // 5 seconds
+//       sleepTime: opts.sleepTime ?? 1000 * 10, // 10 seconds
+//       decrementCount: opts.decrementCount ?? 1,
+//       maxCount: opts.maxCount ?? 60,
+//     };
+//   }
 
-    clearInterval(this.timer);
-  }
-}
+//   /** The function to use to determine and wait until a free space is available */
+//   public async waitfn() {
+//     return defaultRateLimitFn.call(this, this.options.sleepTime, this.options.failCount);
+//   }
 
-/**
- * Basic RateLimit Function to wait for the rate limit (input) to lower
- * @param time The Time to wait between checks
- * @param reset The Times it can fail, before calling "reset" on "rl"
- * @param rl The RateLimit Object
- */
-export async function defaultRateLimitFn(this: RateLimit, time: number, fail: number): Promise<void> {
-  if (isNullOrUndefined(this.timer)) {
-    await this.createTimer();
-  }
+//   /** Reset the current instance of the timer and start it again */
+//   public async reset() {
+//     console.log('RateLimit reset called'.red);
 
-  let tries = 0;
-  while (this.currentCounter >= this.maxCounter) {
-    await sleep(time);
-    tries += 1;
+//     if (!isNullOrUndefined(this.timer)) {
+//       clearInterval(this.timer);
+//     }
 
-    if (tries >= fail) {
-      // await this.reset();
-      tries = 0;
-    }
-  }
-}
+//     await this.createTimer();
+//   }
+
+//   /** Start the reduction timer */
+//   public async createTimer() {
+//     this.timer = setInterval(() => {
+//       if (this.currentCounter > 0) {
+//         this.currentCounter -= this.options.decrementCount;
+//       }
+//     }, this.options.intervalTime);
+//   }
+
+//   /**
+//    * Function to clear / stop the current reduction timer
+//    * This function will wait until "currentCounter" is "0" again
+//    */
+//   public async clearTimer() {
+//     if (isNullOrUndefined(this.timer)) {
+//       return;
+//     }
+
+//     while (this.currentCounter > 0) {
+//       await this.waitfn();
+//     }
+
+//     clearInterval(this.timer);
+//   }
+// }
+
+// /**
+//  * Basic RateLimit Function to wait for the rate limit (input) to lower
+//  * @param this The RateLimit Object
+//  * @param sleepTime The Time to wait between tries
+//  * @param fail The Times it can fail, before calling "reset" on "rl" (unused)
+//  */
+// export async function defaultRateLimitFn(this: RateLimit, sleepTime: number, fail: number): Promise<void> {
+//   if (isNullOrUndefined(this.timer)) {
+//     await this.createTimer();
+//   }
+
+//   let tries = 0;
+//   while (this.currentCounter > this.options.maxCount) {
+//     await sleep(sleepTime);
+//     tries += 1;
+
+//     if (tries >= fail) {
+//       // await this.reset();
+//       tries = 0;
+//     }
+//   }
+// }
 
 /**
  * Create a "debug" namespace, without extra imports
@@ -285,14 +380,226 @@ export async function defaultRateLimitFn(this: RateLimit, time: number, fail: nu
  * @returns a debugger
  */
 export function createNameSpace(ns: string): debug.Debugger {
-  return debug(`scraper:${ns}`);
+  return debug(`converty:${ns}`);
 }
 
 /**
- * Conver the input "import.meta.url" to the dirname
- * @param currentURL the file url, as returned by "import.meta.url"
- * @returns the dirname of "import.meta.url" and converted to path
+ * Process "input" to read-able and consistent characters
+ * @param input The input to process
+ * @returns The processed input
  */
-export function getCurrentModuleDirectory(currentURL: string): string {
-  return path.dirname(fileURLToPath(currentURL));
+function stringFixSpaces(input: string): string {
+  return input
+    .replaceAll(' ', ' ') // replace "no-break space" with normal spaces
+    .replaceAll(/\s\s+/gim, ' ') // replace multiple spaces to one
+    .trim();
+}
+
+/**
+ * Templates from "templates/"
+ */
+const templates: Map<string, string> = new Map();
+
+/**
+ * Handle getting templates from cache or from file
+ * @param filename The filename in the "templates/" directory
+ * @returns The loaded file
+ * @throws {Error} If path does not exist
+ * @throws {Error} If path is not a file
+ */
+export async function getTemplate(filename: string): Promise<string> {
+  {
+    const got = templates.get(filename);
+
+    if (!isNullOrUndefined(got)) {
+      return got;
+    }
+  }
+
+  const filePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', 'templates', filename);
+  const stat = await statPath(filePath);
+
+  if (isNullOrUndefined(stat)) {
+    throw new Error(`Could not find template path "${filePath}"`);
+  }
+  if (!stat.isFile()) {
+    throw new Error(`Template Path is not a file! "${filePath}"`);
+  }
+
+  const loaded = (await fspromises.readFile(filePath)).toString();
+
+  templates.set(filename, loaded);
+
+  return loaded;
+}
+
+/**
+ * Clear all current cached Templates
+ */
+export function clearTemplates(): void {
+  templates.clear();
+}
+
+/**
+ * Chain-Assert that input "elem" is defined
+ * @param elem The Element to assert to be defined
+ * @param elemName The Element name for the Erorr
+ * @returns The input "elem"
+ */
+export function definedElement<T extends Element | Node>(elem: T | undefined | null, elemName: string): T {
+  assertionDefined(elem, new Error(`Expected Node "${elemName}" to be defined`));
+
+  return elem;
+}
+
+/**
+ * Helper for easier querying with {@link definedElement} without having to duplicate so much
+ * @param queryOn The Element to query on
+ * @param selector The CSS Selector
+ * @returns The found Element
+ */
+export function queryDefinedElement(queryOn: Document | Element, selector: string): Element {
+  return definedElement(queryOn.querySelector(selector), selector);
+}
+
+export interface INewJSDOMReturn {
+  dom: JSDOM;
+  document: Document;
+}
+
+/**
+ * Helper to easily get JSDOM dom and Document
+ * @param content The content of the JSDOM
+ * @returns The DOM and Document
+ */
+export function newJSDOM(
+  content: NonNullable<ConstructorParameters<typeof JSDOM>[0]>,
+  options?: ConstructorParameters<typeof JSDOM>[1]
+): INewJSDOMReturn {
+  const dom = new JSDOM(typeof content !== 'string' ? content.toString() : content, options);
+  const document = dom.window.document;
+
+  return { dom, document };
+}
+
+/**
+ * Consistently parse "cN"("c1") to a number without throwing
+ * @param input The input to try to parse
+ * @returns The Parsed number or undefined
+ */
+export function parseChapterInputToNumber(input: string | number | undefined): number | undefined {
+  if (isNullOrUndefined(input)) {
+    return undefined;
+  }
+  if (typeof input === 'number') {
+    return input;
+  }
+
+  // just in case something other gets here
+  if (typeof input !== 'string') {
+    return undefined;
+  }
+
+  if (input.length === 0) {
+    return undefined;
+  }
+
+  try {
+    let int: number;
+
+    // not all regex output will include a starting "c" but the number directly
+    if (input.startsWith('c')) {
+      int = parseInt(input.substring(1));
+    } else {
+      int = parseInt(input);
+    }
+
+    // specific to chapter handling
+    if (Number.isNaN(int) || int < 0) {
+      return undefined;
+    }
+
+    return int;
+  } catch (err) {
+    // ignore error
+  }
+
+  return undefined;
+}
+
+/**
+ * Convert input to filename consumable title
+ * @param input The input to process
+ */
+export function stringToFilename(input: string): string {
+  return stringFixSpaces(
+    xmlToString(input)
+      // do the following before "replaceAllForPlainText" because that function replaces multiple spaces to one
+      .replaceAll(/\n|\\n/gim, ' ') // replace new lines with nothing
+      .replaceAll(/\//gim, '⁄') // replace "/" with a character that looks similar (otherwise it would result in a directory)
+      .trim()
+  );
+}
+
+/**
+ * Replace xml placeholders with actual characters
+ * @param input The input to Process
+ */
+export function xmlToString(input: string): string {
+  return input
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;"', '>')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&nbsp;', ' ')
+    .replaceAll('&#8217;', '’')
+    .replaceAll('&#8220;', '“')
+    .replaceAll('&#8221;', '”');
+}
+
+/**
+ * Search for "combinerConfig.json" files to at most "currentDepth" deep
+ * @param startPath The path to search at (recursive)
+ * @param filename The filename to search for
+ * @param currentDepth The depth to how much to search deep
+ * @returns The array of found files or undefined
+ */
+export async function searchForFile(
+  startPath: string,
+  filename: string,
+  currentDepth: number = DEFAULT_SEARCH_DEPTH
+): Promise<string[] | undefined> {
+  if (currentDepth <= 0) {
+    return undefined;
+  }
+
+  if (!(filename.length > 0)) {
+    throw new Error('"filename" length needs to be 1 or above');
+  }
+
+  const stat = await statPath(startPath);
+
+  if (isNullOrUndefined(stat)) {
+    return undefined;
+  }
+  if (stat.isFile()) {
+    if (path.basename(startPath) === filename) {
+      return [startPath];
+    }
+  }
+  if (stat.isDirectory()) {
+    const arr: string[] = [];
+    for (const entry of await fspromises.readdir(startPath)) {
+      const ret = await searchForFile(path.resolve(startPath, entry), filename, currentDepth - 1);
+
+      if (isNullOrUndefined(ret)) {
+        continue;
+      }
+
+      arr.push(...ret);
+    }
+
+    return arr.length > 0 ? arr : undefined;
+  }
+
+  return undefined;
 }

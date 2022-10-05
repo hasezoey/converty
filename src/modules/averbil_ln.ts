@@ -7,6 +7,7 @@ import debug from 'debug';
 import yauzl from 'yauzl';
 import yazl from 'yazl';
 import * as mime from 'mime-types';
+import { fileURLToPath } from 'url';
 
 const log = debug('converter:average_ln_original');
 
@@ -144,7 +145,7 @@ const CONTAINER_TEMPLATE: string = `${XML_BEGINNING_OP}
 `;
 /** StyleSheet copied to the output */
 const STYLESHEET: string = (
-  await fspromises.readFile(path.resolve(utils.getCurrentModuleDirectory(import.meta.url), '../../templates', 'averbil_ln.css'))
+  await fspromises.readFile(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../templates', 'averbil_ln.css'))
 ).toString();
 
 // CODE

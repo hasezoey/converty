@@ -3,13 +3,11 @@ import { createWriteStream, promises as fspromises } from 'fs';
 import * as path from 'path';
 import { JSDOM } from 'jsdom';
 import * as tmp from 'tmp';
-import debug from 'debug';
 import yauzl from 'yauzl';
 import yazl from 'yazl';
 import * as mime from 'mime-types';
-import { fileURLToPath } from 'url';
 
-const log = debug('converter:average_ln_original');
+const log = utils.createNameSpace('average_ln_original');
 
 tmp.setGracefulCleanup();
 
@@ -27,126 +25,8 @@ const XHTML_XML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 const TOC_XHTML_FILENAME = 'toc.xhtml';
 const COVER_XHTML_FILENAME = 'cover.xhtml';
 const XML_BEGINNING_OP = '<?xml version="1.0" encoding="utf-8"?>';
-/**
- * The Template to use for each document, except special
- * available options to be replaced:
- * "{{TITLE}}": will be replaced with the document title (header) (oneline)
- * "{{SECTIONID}}": will be replaced with the section id for the body
- * "{{EPUBTYPE}}": will be replaced with the EPUB Type, use enum "EPubType"
- */
-const MAIN_BODY_TEMPLATE: string = `${XML_BEGINNING_OP}
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
-  <head>
-    <title>{{TITLE}}</title>
-    <link href="../Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
-  </head>
-  <body>
-    <section epub:type="{{EPUBTYPE}}" id="{{SECTIONID}}">
-      <div class="main"></div>
-    </section>
-  </body>
-</html>
-`;
-/**
- * The Template to use for each document, except special
- * available options to be replaced:
- * "{{TITLE}}": will be replaced with the document title (header) (oneline)
- * "{{SECTIONID}}": will be replaced with the section id for the body
- * "{{EPUBTYPE}}": will be replaced with the EPUB Type, use enum "EPubType"
- * "{{IMGALT}}": will be replaced with the image ALT name
- * "{{IMGCLASS}}": will be replaced with the image Class, use enum "ImgClass"
- * "{{IMGSRC}}": will be replaced with the image Source
- */
-const JUST_IMAGE_TEMPLATE: string = `${XML_BEGINNING_OP}
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
-  <head>
-    <title>{{TITLE}}</title>
-    <link href="../Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
-  </head>
-  <body class="nomargin center">
-    <section epub:type="{{EPUBTYPE}}" id="{{SECTIONID}}">
-      <img alt="{{IMGALT}}" class="{{IMGCLASS}}" src="{{IMGSRC}}"/>
-    </section>
-  </body>
-</html>
-`;
-/**
- * The Template to use for each document
- */
-const TOC_XHTML_TEMPLATE: string = `${XML_BEGINNING_OP}
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xml="http://www.w3.org/XML/1998/namespace" lang="en" xml:lang="en">
-  <head>
-    <title>Table Of Contents</title>
-    <meta content="application/xhtml+xml;charset=utf-8" http-equiv="Content-Type"/>
-    <link href="../Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
-  </head>
-  <body>
-    <nav epub:type="toc" id="toc">
-      <h1 class="toc-title">Table of Contents</h1>
-      <ol class="none" epub:type="list"></ol>
-    </nav>
-
-    <nav epub:type="landmarks" id="landmarks" hidden="">
-      <h1>Landmarks</h1>
-      <ol>
-        <li><a epub:type="toc" href="../Text/${TOC_XHTML_FILENAME}">Table of Contents</a></li>
-      </ol>
-    </nav>
-  </body>
-</html>
-`;
-/**
- * The Template to use for each document, except special
- * available options to be replaced:
- * "{{TITLE}}": will be replaced with the document title (header) (oneline)
- */
-const TOC_NCX_TEMPLATE: string = `${XML_BEGINNING_OP}
-<ncx version="2005-1" xmlns="http://www.daisy.org/z3986/2005/ncx/">
-  <head>
-    <meta content="1" name="dtb:depth"/>
-    <meta content="0" name="dtb:totalPageCount"/>
-    <meta content="0" name="dtb:maxPageNumber"/>
-  </head>
-  <docTitle>
-    <text>{{TITLE}}</text>
-  </docTitle>
-  <navMap></navMap>
-</ncx>
-`;
-/**
- * The Template to use for each document
- */
-const CONTENTOPF_TEMPLATE: string = `${XML_BEGINNING_OP}
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id" xml:lang="en">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"></metadata>
-  <manifest>
-    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-    <item id="${TOC_XHTML_FILENAME}" href="Text/${TOC_XHTML_FILENAME}" media-type="application/xhtml+xml" properties="nav"/>
-    <item id="${COVER_XHTML_FILENAME}" href="Text/${COVER_XHTML_FILENAME}" media-type="application/xhtml+xml"/>
-  </manifest>
-  <spine toc="ncx" page-progression-direction="ltr">
-    <itemref idref="${COVER_XHTML_FILENAME}"/>
-    <itemref idref="${TOC_XHTML_FILENAME}" linear="yes"/>
-  </spine>
-  <guide>
-    <reference type="toc" title="Table of Contents" href="Text/${TOC_XHTML_FILENAME}"/>
-  </guide>
-</package>
-`;
-/**
- * The Template to use for each document
- */
-const CONTAINER_TEMPLATE: string = `${XML_BEGINNING_OP}
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-    <rootfiles>
-        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
-   </rootfiles>
-</container>
-`;
-/** StyleSheet copied to the output */
-const STYLESHEET: string = (
-  await fspromises.readFile(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../templates', 'averbil_ln.css'))
-).toString();
+const CSSPATH_FOR_XHTML = '../Styles/stylesheet.css';
+const JSDOM_XHTML_OPTIONS = { contentType: XHTML_MIMETYPE };
 
 // CODE
 
@@ -180,7 +60,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
   const containerPath = path.resolve(tmpdirOutputName, 'META-INF/container.xml');
   await utils.mkdir(path.dirname(containerPath));
   // write the "META-INF/container.xml" file, because it will not change
-  await fspromises.writeFile(containerPath, CONTAINER_TEMPLATE);
+  await fspromises.writeFile(containerPath, await utils.getTemplate('container.xml'));
 
   const epubContextOutput: OutputEpubContext = {
     Files: [],
@@ -201,7 +81,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
 
   const stylesheetpath = path.resolve(baseOutputPath, 'Styles', 'stylesheet.css');
   await utils.mkdir(path.dirname(stylesheetpath));
-  await fspromises.writeFile(stylesheetpath, STYLESHEET);
+  await fspromises.writeFile(stylesheetpath, await utils.getTemplate('text-ln.css'));
   epubContextOutput.Files.push({
     Id: 'stylesheet',
     // this function creates the path, so it will be added here
@@ -388,10 +268,11 @@ async function generateContentOPF(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = CONTENTOPF_TEMPLATE;
+  const replacedOutputTemplate = utils.template(await utils.getTemplate('content.opf'), {
+    '{{TOC_XHTML_FILENAME}}': TOC_XHTML_FILENAME,
+  });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const currentDOM = new JSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
-  const documentNew = currentDOM.window.document;
+  const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
   const packageElementNew = currentDOM.window.document.querySelector('package');
 
   utils.assertionDefined(packageElementNew, new Error('Expected "packageElementNew" to exist'));
@@ -415,6 +296,40 @@ async function generateContentOPF(
   utils.assertionDefined(metadataElementOld, new Error('Expected "metdataElementOld" to exist'));
   utils.assertionDefined(manifestElementOld, new Error('Expected "manifestElementOld" to exist'));
   utils.assertionDefined(spineElementOld, new Error('Expected "spineElementOld" to exist'));
+
+  // add extra nodes to the manifest
+  {
+    const ncxNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    ncxNode.setAttribute('id', 'ncx');
+    ncxNode.setAttribute('href', 'toc.ncx');
+    ncxNode.setAttribute('media-type', 'application/x-dtbncx+xml');
+    manifestElementNew.appendChild(ncxNode);
+
+    const tocXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    tocXHTMLNode.setAttribute('id', TOC_XHTML_FILENAME);
+    tocXHTMLNode.setAttribute('href', `Text/${TOC_XHTML_FILENAME}`);
+    tocXHTMLNode.setAttribute('media-type', XHTML_MIMETYPE);
+    tocXHTMLNode.setAttribute('properties', 'nav');
+    manifestElementNew.appendChild(tocXHTMLNode);
+
+    const coverXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    coverXHTMLNode.setAttribute('id', COVER_XHTML_FILENAME);
+    coverXHTMLNode.setAttribute('href', `Text/${COVER_XHTML_FILENAME}`);
+    coverXHTMLNode.setAttribute('media-type', XHTML_MIMETYPE);
+    manifestElementNew.appendChild(coverXHTMLNode);
+  }
+
+  // add extra nodes to the spine
+  {
+    const coverXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'itemref');
+    coverXHTMLNode.setAttribute('idref', COVER_XHTML_FILENAME);
+    manifestElementNew.appendChild(coverXHTMLNode);
+
+    const tocXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'itemref');
+    tocXHTMLNode.setAttribute('idref', TOC_XHTML_FILENAME);
+    tocXHTMLNode.setAttribute('linear', 'yes');
+    manifestElementNew.appendChild(tocXHTMLNode);
+  }
 
   let idCount = 0;
   // copy metadata from old to new
@@ -621,10 +536,12 @@ async function generateTocXHTML(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = TOC_XHTML_TEMPLATE;
+  const replacedOutputTemplate = utils.template(await utils.getTemplate('toc.xhtml'), {
+    '{{CSSPATH}}': CSSPATH_FOR_XHTML,
+    '{{TOC_XHTML_FILENAME}}': `../Text/${TOC_XHTML_FILENAME}`,
+  });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const currentDOM = new JSDOM(replacedOutputTemplate, { contentType: XHTML_MIMETYPE });
-  const documentNew = currentDOM.window.document;
+  const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, JSDOM_XHTML_OPTIONS);
   const olElement = documentNew.querySelector('body > nav > ol.none');
 
   utils.assertionDefined(olElement, new Error('Expected "olElement" to exist'));
@@ -665,10 +582,12 @@ async function generateTocNCX(
   epubContextOutput: OutputEpubContext,
   baseOutputPath: string
 ) {
-  const replacedOutputTemplate = TOC_NCX_TEMPLATE.replaceAll('{{TITLE}}', epubContextOutput.Title);
+  const replacedOutputTemplate = utils.template(await utils.getTemplate('toc.ncx'), {
+    '{{TITLE}}': epubContextOutput.Title,
+  });
+
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const currentDOM = new JSDOM(replacedOutputTemplate, { contentType: XML_MIMETYPE });
-  const documentNew = currentDOM.window.document;
+  const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, { contentType: XML_MIMETYPE });
   const navMapElement = documentNew.querySelector('ncx > navMap');
 
   utils.assertionDefined(navMapElement, new Error('Expected "navMapElement" to exist'));
@@ -734,8 +653,7 @@ async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
  */
 async function getEpubContextForInput(usePath: string): Promise<{ context: EpubContext; contentBody: Document }> {
   const containerBuffer = await fspromises.readFile(path.resolve(usePath, 'META-INF/container.xml'));
-  const container = new JSDOM(containerBuffer, { contentType: XML_MIMETYPE });
-  const containerBody = container.window.document;
+  const { document: containerBody } = utils.newJSDOM(containerBuffer, { contentType: XML_MIMETYPE });
 
   const contentPathNode = containerBody.querySelector('container > rootfiles > rootfile');
 
@@ -746,8 +664,7 @@ async function getEpubContextForInput(usePath: string): Promise<{ context: EpubC
   utils.assertionDefined(contentPath, new Error('Expected "contentPath" to be defined'));
 
   const contentBuffer = await fspromises.readFile(path.resolve(usePath, contentPath));
-  const content = new JSDOM(contentBuffer, { contentType: XML_MIMETYPE });
-  const contentBody = content.window.document;
+  const { document: contentBody } = utils.newJSDOM(contentBuffer, { contentType: XML_MIMETYPE });
 
   const titleNode = contentBody.querySelector('package > metadata > dc\\:title');
 
@@ -854,8 +771,7 @@ async function processHTMLFile(
   baseOutputPath: string
 ): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
-  const parsedInput = new JSDOM(loadedFile, { contentType: XHTML_MIMETYPE });
-  const documentInput = parsedInput.window.document;
+  const { document: documentInput } = utils.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
   const title = getTitle(documentInput.title);
 
@@ -916,9 +832,7 @@ async function processHTMLFile(
   }
 }
 
-interface IcreateMAINDOM {
-  currentDOM: JSDOM;
-  documentNew: Document;
+interface IcreateMAINDOM extends utils.INewJSDOMReturn {
   mainElement: Element;
 }
 
@@ -928,20 +842,20 @@ interface IcreateMAINDOM {
  * @param sectionid The id of the "section" element
  * @returns The DOM, document and mainelement
  */
-function createMAINDOM(title: Title, sectionid: string): IcreateMAINDOM {
-  const replacedOutputTemplate = MAIN_BODY_TEMPLATE.replaceAll('{{TITLE}}', title.fullTitle)
-    .replaceAll('{{SECTIONID}}', sectionid)
-    .replaceAll('{{EPUBTYPE}}', EPubType.BodyMatterChapter);
-  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const currentDOM = new JSDOM(replacedOutputTemplate, { contentType: XHTML_MIMETYPE });
-  const documentNew = currentDOM.window.document;
-  const mainElement = documentNew.body.querySelector('div.main');
+async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMAINDOM> {
+  const modXHTML = utils.template(await utils.getTemplate(''), {
+    '{{TITLE}}': title.fullTitle,
+    '{{SECTIONID}}': sectionid,
+    '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
+    '{{CSSPATH}}': CSSPATH_FOR_XHTML,
+  });
 
-  utils.assertionDefined(mainElement, new Error('Expected "mainElement" to exist'));
+  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
+  const ret = utils.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
+  const mainElement = utils.queryDefinedElement(ret.document, 'div.main');
 
   return {
-    currentDOM,
-    documentNew,
+    ...ret,
     mainElement,
   };
 }
@@ -954,25 +868,24 @@ function createMAINDOM(title: Title, sectionid: string): IcreateMAINDOM {
  * @param imgsrc The source of the "img" element
  * @returns The DOM, document and mainelement
  */
-function createIMGDOM(title: Title, sectionid: string, imgclass: ImgClass, imgsrc: string): IcreateMAINDOM {
-  const replacedOutputTemplate = JUST_IMAGE_TEMPLATE.replaceAll('{{TITLE}}', title.fullTitle)
-    .replaceAll('{{SECTIONID}}', sectionid)
-    .replaceAll('{{EPUBTYPE}}', EPubType.BodyMatterChapter)
-    .replaceAll('{{IMGALT}}', sectionid)
-    .replaceAll('{{IMGCLASS}}', imgclass)
-    .replaceAll('{{IMGSRC}}', imgsrc);
+async function createIMGDOM(
+  title: Title,
+  sectionid: string,
+  imgclass: ImgClass,
+  imgsrc: string
+): Promise<ReturnType<typeof utils.newJSDOM>> {
+  const modXHTML = utils.template(await utils.getTemplate('img-ln.xhtml'), {
+    '{{TITLE}}': title.fullTitle,
+    '{{SECTIONID}}': sectionid,
+    '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
+    '{{IMGALT}}': sectionid,
+    '{{IMGCLASS}}': imgclass,
+    '{{IMGSRC}}': imgsrc,
+    '{{CSSPATH}}': CSSPATH_FOR_XHTML,
+  });
+
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const currentDOM = new JSDOM(replacedOutputTemplate, { contentType: XHTML_MIMETYPE });
-  const documentNew = currentDOM.window.document;
-  const sectionElement = documentNew.body.querySelector('section');
-
-  utils.assertionDefined(sectionElement, new Error('Expected "sectionElement" to exist'));
-
-  return {
-    currentDOM,
-    documentNew,
-    mainElement: sectionElement,
-  };
+  return utils.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
 }
 
 enum FinishFileSubDir {
@@ -1132,7 +1045,7 @@ async function doCoverPage(
     Main: false,
     IndexInSequence: 0,
   });
-  const { currentDOM: imgDOM } = createIMGDOM(title, imgId, ImgClass.Cover, `../Images/${imgFilename}`);
+  const { dom: imgDOM } = await createIMGDOM(title, imgId, ImgClass.Cover, `../Images/${imgFilename}`);
 
   await finishDOMtoFile(imgDOM, baseOutputPath, COVER_XHTML_FILENAME, FinishFileSubDir.Text, epubContextOutput, {
     Id: COVER_XHTML_FILENAME,
@@ -1197,7 +1110,7 @@ async function doFrontMatter(
       Main: false,
       IndexInSequence: 0,
     });
-    const { currentDOM: imgDOM } = createIMGDOM(title, imgId, ImgClass.Insert, `../Images/${imgFilename}`);
+    const { dom: imgDOM } = await createIMGDOM(title, imgId, ImgClass.Insert, `../Images/${imgFilename}`);
 
     const isMain = epubContextOutput.Files.find((v) => v.Title === title);
 
@@ -1707,7 +1620,7 @@ async function doTextContent(
   let currentSubChapter = 0;
   let currentBaseName = replaceID(options.genID(epubContextOutput.LastStates, currentSubChapter));
 
-  let { currentDOM, documentNew, mainElement } = createMAINDOM(title, currentBaseName);
+  let { dom: currentDOM, document: documentNew, mainElement } = await createMAINDOM(title, currentBaseName);
 
   // create initial "h1" (header) element and add it
   {
@@ -1788,7 +1701,7 @@ async function doTextContent(
             Main: false,
             IndexInSequence: 0,
           });
-          const { currentDOM: imgDOM } = createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`);
+          const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`);
 
           const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
           await finishDOMtoFile(imgDOM, baseOutputPath, xhtmlNameIMG, FinishFileSubDir.Text, epubContextOutput, {
@@ -1804,9 +1717,9 @@ async function doTextContent(
           // dont create a new dom if the old one is still empty
           if (!skipSavingMainDOM) {
             currentBaseName = replaceID(options.genID(epubContextOutput.LastStates, currentSubChapter));
-            const nextchapter = createMAINDOM(title, currentBaseName);
-            currentDOM = nextchapter.currentDOM;
-            documentNew = nextchapter.documentNew;
+            const nextchapter = await createMAINDOM(title, currentBaseName);
+            currentDOM = nextchapter.dom;
+            documentNew = nextchapter.document;
             mainElement = nextchapter.mainElement;
           }
 

@@ -2,9 +2,10 @@ import * as utils from './utils.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import { homedir } from 'os';
+import { fileURLToPath } from 'url';
 
 const log = utils.createNameSpace('main');
-const currentModulePath = utils.getCurrentModuleDirectory(import.meta.url);
+const currentModulePath = path.dirname(fileURLToPath(import.meta.url));
 
 // STATIC OPTIONS
 

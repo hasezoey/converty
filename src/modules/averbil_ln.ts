@@ -273,29 +273,17 @@ async function generateContentOPF(
   });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
   const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
-  const packageElementNew = currentDOM.window.document.querySelector('package');
+  const packageElementNew = utils.queryDefinedElement(documentNew, 'package');
 
-  utils.assertionDefined(packageElementNew, new Error('Expected "packageElementNew" to exist'));
+  const packageElementOld = utils.queryDefinedElement(documentOld, 'package');
 
-  const packageElementOld = documentOld.querySelector('package');
+  const metadataElementNew = utils.queryDefinedElement(packageElementNew, 'metadata');
+  const manifestElementNew = utils.queryDefinedElement(packageElementNew, 'manifest');
+  const spineElementNew = utils.queryDefinedElement(packageElementNew, 'spine');
 
-  utils.assertionDefined(packageElementOld, new Error('Expected "packageElementOld" to exist'));
-
-  const metadataElementNew = packageElementNew.querySelector('metadata');
-  const manifestElementNew = packageElementNew.querySelector('manifest');
-  const spineElementNew = packageElementNew.querySelector('spine');
-
-  utils.assertionDefined(metadataElementNew, new Error('Expected "metdataElementNew" to exist'));
-  utils.assertionDefined(manifestElementNew, new Error('Expected "manifestElementNew" to exist'));
-  utils.assertionDefined(spineElementNew, new Error('Expected "spineElementNew" to exist'));
-
-  const metadataElementOld = documentOld.querySelector('metadata');
-  const manifestElementOld = documentOld.querySelector('manifest');
-  const spineElementOld = documentOld.querySelector('spine');
-
-  utils.assertionDefined(metadataElementOld, new Error('Expected "metdataElementOld" to exist'));
-  utils.assertionDefined(manifestElementOld, new Error('Expected "manifestElementOld" to exist'));
-  utils.assertionDefined(spineElementOld, new Error('Expected "spineElementOld" to exist'));
+  const metadataElementOld = utils.queryDefinedElement(documentOld, 'metadata');
+  const manifestElementOld = utils.queryDefinedElement(documentOld, 'manifest');
+  const spineElementOld = utils.queryDefinedElement(documentOld, 'spine');
 
   // add extra nodes to the manifest
   {
@@ -542,9 +530,7 @@ async function generateTocXHTML(
   });
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
   const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, JSDOM_XHTML_OPTIONS);
-  const olElement = documentNew.querySelector('body > nav > ol.none');
-
-  utils.assertionDefined(olElement, new Error('Expected "olElement" to exist'));
+  const olElement = utils.queryDefinedElement(documentNew, 'body > nav > ol.none');
 
   const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
 
@@ -588,9 +574,7 @@ async function generateTocNCX(
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
   const { document: documentNew, dom: currentDOM } = utils.newJSDOM(replacedOutputTemplate, { contentType: XML_MIMETYPE });
-  const navMapElement = documentNew.querySelector('ncx > navMap');
-
-  utils.assertionDefined(navMapElement, new Error('Expected "navMapElement" to exist'));
+  const navMapElement = utils.queryDefinedElement(documentNew, 'ncx > navMap');
 
   const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
 
@@ -655,9 +639,7 @@ async function getEpubContextForInput(usePath: string): Promise<{ context: EpubC
   const containerBuffer = await fspromises.readFile(path.resolve(usePath, 'META-INF/container.xml'));
   const { document: containerBody } = utils.newJSDOM(containerBuffer, { contentType: XML_MIMETYPE });
 
-  const contentPathNode = containerBody.querySelector('container > rootfiles > rootfile');
-
-  utils.assertionDefined(contentPathNode, new Error('Expected "contentPathNode" to be defined'));
+  const contentPathNode = utils.queryDefinedElement(containerBody, 'container > rootfiles > rootfile');
 
   const contentPath = contentPathNode.getAttribute('full-path');
 
@@ -666,9 +648,7 @@ async function getEpubContextForInput(usePath: string): Promise<{ context: EpubC
   const contentBuffer = await fspromises.readFile(path.resolve(usePath, contentPath));
   const { document: contentBody } = utils.newJSDOM(contentBuffer, { contentType: XML_MIMETYPE });
 
-  const titleNode = contentBody.querySelector('package > metadata > dc\\:title');
-
-  utils.assertionDefined(titleNode, new Error('Expected "titleNode" to be defined'));
+  const titleNode = utils.queryDefinedElement(contentBody, 'package > metadata > dc\\:title');
 
   const volumeTitle = titleNode.textContent;
 
@@ -1028,11 +1008,11 @@ async function doCoverPage(
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.CoverPage, new Error('Expected TitleType to be "CoverPage"'));
 
-  const imgNode = documentInput.querySelector('img');
+  const imgNode = utils.queryDefinedElement(documentInput, 'img');
 
-  utils.assertionDefined(imgNode, new Error('Expected "imgNode" to be defined'));
+  const imgNodeSrc = imgNode.getAttribute('imgNode');
 
-  const imgNodeSrc = imgNode.src;
+  utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
 
   const fromPath = path.resolve(path.dirname(currentInputFile), imgNodeSrc);
   const ext = path.extname(fromPath);
@@ -1146,7 +1126,7 @@ async function doShortStory(
   utils.assertion(title.titleType === TitleType.ShortStory, new Error('Expected TitleType to be "ShortStory"'));
   epubContextOutput.LastStates.LastShortStoryNum += 1;
 
-  const bodyElement = documentInput.querySelector('body');
+  const bodyElement = utils.queryDefinedElement(documentInput, 'body');
   utils.assertionDefined(bodyElement, new Error('Expected "bodyElement" to exist'));
 
   let indexOfFirstNonBreakElement = Array.from(bodyElement.children).findIndex(

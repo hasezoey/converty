@@ -1,13 +1,12 @@
 import * as utils from '../utils.js';
 import { createWriteStream, promises as fspromises } from 'fs';
 import * as path from 'path';
-import { JSDOM } from 'jsdom';
 import * as tmp from 'tmp';
 import yauzl from 'yauzl';
-import yazl from 'yazl';
 import * as mime from 'mime-types';
 import { getTemplate, applyTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
+import * as epubh from '../helpers/epub.js';
 
 const log = utils.createNameSpace('average_ln_original');
 
@@ -18,7 +17,6 @@ const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 const TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
-const TOC_XHTML_FILENAME = 'toc.xhtml';
 const COVER_XHTML_FILENAME = 'cover.xhtml';
 const CSSPATH_FOR_XHTML = '../Styles/stylesheet.css';
 const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
@@ -38,30 +36,17 @@ export function matcher(name: string): boolean {
   return ret;
 }
 
+type EpubContextTrackers = Record<keyof LastStates, number>;
+
 export async function process(options: utils.ConverterOptions): Promise<string> {
   const { name: usePath, tmpdir: tmpdirInput } = await getInputPath(options.fileInputPath);
 
   const { context: epubContextInput, contentBody: contentBodyInput } = await getEpubContextForInput(usePath);
 
-  const tmpdirOutput = tmp.dirSync({ prefix: 'converty-out' });
-  const tmpdirOutputName = tmpdirOutput.name;
-
-  const outputContentPath = 'OEBPS/content.opf';
-  const baseOutputPath = path.resolve(tmpdirOutputName, path.dirname(outputContentPath));
-  await utils.mkdir(baseOutputPath);
-  // await fspromises.writeFile(path.resolve(tmpdirOutputName, outputContentPath), '');
-  // write the "mimetype" file, because it will not be modifed again
-  await fspromises.writeFile(path.resolve(tmpdirOutputName, 'mimetype'), 'application/epub+zip');
-  const containerPath = path.resolve(tmpdirOutputName, 'META-INF/container.xml');
-  await utils.mkdir(path.dirname(containerPath));
-  // write the "META-INF/container.xml" file, because it will not change
-  await fspromises.writeFile(containerPath, await getTemplate('container.xml'));
-
-  const epubContextOutput: OutputEpubContext = {
-    Files: [],
-    Title: epubContextInput.Title,
-    ContentPath: outputContentPath,
-    LastStates: {
+  const epubctxOut = new epubh.EpubContext<EpubContextTrackers>({
+    title: epubContextInput.Title,
+    trackers: {
+      Global: 0,
       LastBonusStoryNum: 0,
       LastChapterNum: 0,
       LastFrontNum: 0,
@@ -72,22 +57,18 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       LastGenericNum: 0,
       LastAfterwordNum: 0,
     },
-  };
+  });
 
-  const stylesheetpath = path.resolve(baseOutputPath, 'Styles', 'stylesheet.css');
+  const stylesheetpath = path.resolve(path.dirname(epubctxOut.contentPath), epubh.FileDir.Styles, 'stylesheet.css');
   await utils.mkdir(path.dirname(stylesheetpath));
   await fspromises.writeFile(stylesheetpath, await getTemplate('text-ln.css'));
-  epubContextOutput.Files.push({
-    Id: 'stylesheet',
-    // this function creates the path, so it will be added here
-    Path: stylesheetpath,
-    // ensure it is the XHTML mimetype, because this function only writes the dom to file
-    MediaType: 'text/css',
-    // ensure only the basename is added, not the full path
-    OriginalFilename: '',
-    Main: false,
-    IndexInSequence: 0,
-  });
+  epubctxOut.addFile(
+    new epubh.EpubContextFileBase({
+      id: 'stylesheet',
+      mediaType: epubh.STATICS.CSS_MIMETYPE,
+      filePath: stylesheetpath,
+    })
+  );
 
   for await (const file of recursiveDirRead(path.dirname(path.resolve(usePath, epubContextInput.ContentPath)))) {
     if (new RegExp(FILES_TO_FILTER_OUT_REGEX).test(file)) {
@@ -114,7 +95,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       continue;
     }
     if (mimetype === 'text/html' || mimetype === xh.STATICS.XHTML_MIMETYPE) {
-      await processHTMLFile(file, epubContextInput, epubContextOutput, baseOutputPath);
+      await processHTMLFile(file, epubctxOut);
       continue;
     }
     if (mimetype === xh.STATICS.NCX_MIMETYPE) {
@@ -126,20 +107,128 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     console.error(`Unhandled "mimetype": ${mimetype}`.red);
   }
 
-  await generateContentOPF(contentBodyInput, epubContextInput, epubContextOutput, baseOutputPath);
+  function contentOPFHook({ document, idCounter, metadataElem }: Parameters<epubh.ContentOPFFn>[0]) {
+    const packageElementOld = xh.queryDefinedElement(contentBodyInput, 'package');
+    const metadataElementOld = xh.queryDefinedElement(contentBodyInput, 'metadata');
 
-  await generateTocXHTML(contentBodyInput, epubContextInput, epubContextOutput, baseOutputPath);
-  await generateTocNCX(contentBodyInput, epubContextInput, epubContextOutput, baseOutputPath);
+    // copy metadata from old to new
+    // using "children" to exclude text nodes
+    for (const elem of Array.from(metadataElementOld.children)) {
+      // special handling for "cover", just to be sure
+      if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
+        const coverImgId = epubctxOut.files.find((v) => v.id.includes('cover') && v.mediaType != xh.STATICS.XHTML_MIMETYPE);
+        utils.assertionDefined(coverImgId, new Error('Expected "coverImgId" to be defined'));
+        const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
+        newCoverNode.setAttribute('name', 'cover');
+        newCoverNode.setAttribute('content', coverImgId.id);
+        metadataElem.appendChild(newCoverNode);
+        continue;
+      }
 
-  const finishedEpubPath = await writeEpubFile(epubContextOutput, tmpdirOutputName, options);
+      let newNode: Element | undefined = undefined;
+
+      if (elem.tagName === 'dc:title') {
+        // ignore title element, because its already added in generateContentOPF
+        continue;
+      } else if (elem.tagName === 'dc:publisher') {
+        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:publisher');
+        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+        newNode.appendChild(document.createTextNode(elem.textContent));
+      } else if (elem.tagName === 'dc:language') {
+        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:language');
+        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+        newNode.appendChild(document.createTextNode(elem.textContent));
+      } else if (elem.tagName === 'dc:creator') {
+        idCounter += 1;
+        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:creator');
+        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+        newNode.appendChild(document.createTextNode(elem.textContent));
+        newNode.setAttribute('id', `id-${idCounter}`);
+      } else if (elem.tagName === 'dc:date') {
+        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:date');
+        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+        newNode.appendChild(document.createTextNode(elem.textContent));
+      } else if (elem.tagName === 'dc:identifier') {
+        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:identifier');
+        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+        newNode.appendChild(document.createTextNode(elem.textContent));
+        {
+          const packageUniqueID = packageElementOld.getAttribute('unique-identifier');
+          const elemID = elem.getAttribute('id');
+
+          if (!utils.isNullOrUndefined(packageUniqueID) && !utils.isNullOrUndefined(elemID) && packageUniqueID === elemID) {
+            newNode.setAttribute('id', 'pub-id');
+          }
+        }
+
+        if (elem.getAttribute('opf:scheme') === 'calibre') {
+          newNode.setAttribute('opf:scheme', 'calibre');
+        }
+      }
+
+      if (!utils.isNullOrUndefined(newNode)) {
+        metadataElem.appendChild(newNode);
+      }
+    }
+
+    // apply series metadata (to have automatic sorting already)
+    {
+      // Regex to extract the series title and if available the volume position
+      const caps = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/gim.exec(epubctxOut.title);
+
+      if (!utils.isNullOrUndefined(caps)) {
+        const seriesTitleNoVolume = regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
+        const seriesPos = regexMatchGroup(caps, 'num');
+
+        idCounter += 1;
+        const metaCollectionId = `id-${idCounter}`;
+        const metaCollectionElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+        const metaTypeElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+        const metaPositionElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+
+        xh.applyAttributes(metaCollectionElem, {
+          property: 'belongs-to-collection',
+          id: metaCollectionId,
+        });
+        metaCollectionElem.appendChild(document.createTextNode(seriesTitleNoVolume));
+
+        xh.applyAttributes(metaTypeElem, {
+          refines: `#${metaCollectionId}`,
+          property: 'collection-type',
+        });
+        metaTypeElem.appendChild(document.createTextNode('series'));
+
+        xh.applyAttributes(metaPositionElem, {
+          refines: `#${metaCollectionId}`,
+          property: 'group-position',
+        });
+        // default to "1" in case it does not have a volume id (like a spinoff)
+        metaPositionElem.appendChild(document.createTextNode(seriesPos ?? '1'));
+
+        metadataElem.appendChild(metaCollectionElem);
+        metadataElem.appendChild(metaTypeElem);
+        metadataElem.appendChild(metaPositionElem);
+      } else {
+        log('Found no series captures for: "'.red + epubctxOut.title.grey + '"'.red);
+      }
+    }
+  }
+
+  const outPath = await epubctxOut.finish({
+    contentOPF: contentOPFHook,
+  });
+
+  const finishedEpubPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}.epub`);
+
+  await fspromises.copyFile(outPath, finishedEpubPath);
 
   if (!utils.isNullOrUndefined(tmpdirInput)) {
     tmpdirInput.removeCallback();
 
     // somehow "tmp" is not reliable to remove the directory again
-    if (!utils.isNullOrUndefined(await utils.statPath(tmpdirOutputName))) {
+    if (!utils.isNullOrUndefined(await utils.statPath(epubctxOut.rootDir))) {
       log('"tmp" dir still existed after "removeCallback", manually cleaning');
-      await fspromises.rm(tmpdirOutputName, { recursive: true, maxRetries: 1 });
+      await fspromises.rm(epubctxOut.rootDir, { recursive: true, maxRetries: 1 });
     }
   }
 
@@ -148,21 +237,8 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
 
 // LOCAL
 
-/** Possible values for "epub:type" */
-enum EPubType {
-  Cover = 'cover',
-  BackMatter = 'backmatter',
-  BodyMatterChapter = 'bodymatter chapter',
-}
-
-/** Possible values for the img-class option */
-enum ImgClass {
-  Cover = 'cover',
-  Insert = 'insert',
-}
-
 /** Context storing all important options */
-interface EpubContext {
+interface EpubContextInput {
   /** Path to the "rootfile", relative to the root of the input file */
   ContentPath: string;
   /** Volume Title */
@@ -173,12 +249,8 @@ interface EpubContext {
   NCXPath?: string;
 }
 
-interface OutputEpubContext extends EpubContext {
-  /** States of the numbering */
-  LastStates: LastStates;
-}
-
 interface LastStates {
+  Global: number;
   LastInsertNum: number;
   LastFrontNum: number;
   LastGenericNum: number;
@@ -207,427 +279,6 @@ interface EpubFile {
   Title?: Title;
 }
 
-/**
- * Package all files to a EPUB+zip to the output directory
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
- * @param options The Options provided by the main file
- * @returns The Finished EPUB file Path
- */
-async function writeEpubFile(
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
-  options: utils.ConverterOptions
-): Promise<string> {
-  const epubFilePath = path.resolve(options.converterOutputPath, `${epubContextOutput.Title}.epub`);
-  const epubFilePathTMP = path.resolve(options.converterOutputPath, `.${epubContextOutput.Title}.epub.part`);
-  await new Promise((res, rej) => {
-    const zipfile = new yazl.ZipFile();
-    const writeStream = createWriteStream(epubFilePathTMP);
-    writeStream.once('close', res);
-    writeStream.once('error', rej);
-    zipfile.outputStream.once('error', rej);
-    zipfile.outputStream.pipe(writeStream);
-
-    // explicitly add the following files because they do not exist in "epubContextOutput.Files" and should be at the beginning according to the spec
-    zipfile.addFile(path.resolve(baseOutputPath, 'mimetype'), 'mimetype');
-    zipfile.addFile(path.resolve(baseOutputPath, 'META-INF/container.xml'), 'META-INF/container.xml');
-    zipfile.addFile(path.resolve(baseOutputPath, epubContextOutput.ContentPath), 'OEBPS/content.opf');
-
-    const OEBPSPath = path.resolve(baseOutputPath, path.dirname(epubContextOutput.ContentPath));
-
-    for (const file of epubContextOutput.Files) {
-      const filePath = path.resolve(OEBPSPath, file.Path);
-      const relativePath = path.relative(OEBPSPath, filePath);
-      zipfile.addFile(filePath, `OEBPS/${relativePath}`);
-    }
-
-    zipfile.end();
-  });
-
-  await fspromises.rename(epubFilePathTMP, epubFilePath);
-
-  return epubFilePath;
-}
-
-/**
- * Generate a Content.opf file
- * @param documentOld The old Content.opf JSDOM "body" element
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
- */
-async function generateContentOPF(
-  documentOld: Document,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string
-) {
-  const replacedOutputTemplate = applyTemplate(await getTemplate('content.opf'), {
-    '{{TOC_XHTML_FILENAME}}': TOC_XHTML_FILENAME,
-  });
-  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, { contentType: 'application/xml' });
-  const packageElementNew = xh.queryDefinedElement(documentNew, 'package');
-
-  const packageElementOld = xh.queryDefinedElement(documentOld, 'package');
-
-  const metadataElementNew = xh.queryDefinedElement(packageElementNew, 'metadata');
-  const manifestElementNew = xh.queryDefinedElement(packageElementNew, 'manifest');
-  const spineElementNew = xh.queryDefinedElement(packageElementNew, 'spine');
-
-  const metadataElementOld = xh.queryDefinedElement(documentOld, 'metadata');
-  const manifestElementOld = xh.queryDefinedElement(documentOld, 'manifest');
-  const spineElementOld = xh.queryDefinedElement(documentOld, 'spine');
-
-  // add extra nodes to the manifest
-  {
-    const ncxNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
-    xh.applyAttributes(ncxNode, {
-      id: 'ncx',
-      href: 'toc.ncx',
-      'media-type': xh.STATICS.NCX_MIMETYPE,
-    });
-    manifestElementNew.appendChild(ncxNode);
-
-    const tocXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
-    xh.applyAttributes(tocXHTMLNode, {
-      id: TOC_XHTML_FILENAME,
-      href: `Text/${TOC_XHTML_FILENAME}`,
-      'media-type': xh.STATICS.XHTML_MIMETYPE,
-      properties: 'nav',
-    });
-    manifestElementNew.appendChild(tocXHTMLNode);
-
-    const coverXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
-    xh.applyAttributes(coverXHTMLNode, {
-      id: COVER_XHTML_FILENAME,
-      href: `Text/${COVER_XHTML_FILENAME}`,
-      'media-type': xh.STATICS.XHTML_MIMETYPE,
-    });
-    manifestElementNew.appendChild(coverXHTMLNode);
-  }
-
-  // add extra nodes to the spine
-  {
-    const coverXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'itemref');
-    coverXHTMLNode.setAttribute('idref', COVER_XHTML_FILENAME);
-    manifestElementNew.appendChild(coverXHTMLNode);
-
-    const tocXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'itemref');
-    xh.applyAttributes(tocXHTMLNode, {
-      idref: TOC_XHTML_FILENAME,
-      linear: 'yes',
-    });
-    manifestElementNew.appendChild(tocXHTMLNode);
-  }
-
-  let idCount = 0;
-  // copy metadata from old to new
-  // using "children" to exclude text nodes
-  for (const elem of Array.from(metadataElementOld.children)) {
-    // special handling for "cover", just to be sure
-    if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
-      const coverImgId = epubContextOutput.Files.find((v) => v.Id.includes('cover') && v.MediaType != xh.STATICS.XHTML_MIMETYPE);
-      utils.assertionDefined(coverImgId, new Error('Expected "coverImgId" to be defined'));
-      const newCoverNode = documentNew.createElementNS(metadataElementNew.namespaceURI, 'meta');
-      newCoverNode.setAttribute('name', 'cover');
-      newCoverNode.setAttribute('content', coverImgId.Id);
-      metadataElementNew.appendChild(newCoverNode);
-      continue;
-    }
-
-    let newNode: Element | undefined = undefined;
-
-    if (elem.tagName === 'dc:title') {
-      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:title');
-      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-      newNode.appendChild(documentNew.createTextNode(elem.textContent));
-    } else if (elem.tagName === 'dc:publisher') {
-      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:publisher');
-      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-      newNode.appendChild(documentNew.createTextNode(elem.textContent));
-    } else if (elem.tagName === 'dc:language') {
-      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:language');
-      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-      newNode.appendChild(documentNew.createTextNode(elem.textContent));
-    } else if (elem.tagName === 'dc:creator') {
-      idCount += 1;
-      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:creator');
-      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-      newNode.appendChild(documentNew.createTextNode(elem.textContent));
-      newNode.setAttribute('id', `id-${idCount}`);
-    } else if (elem.tagName === 'dc:date') {
-      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:date');
-      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-      newNode.appendChild(documentNew.createTextNode(elem.textContent));
-    } else if (elem.tagName === 'dc:identifier') {
-      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:identifier');
-      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-      newNode.appendChild(documentNew.createTextNode(elem.textContent));
-      {
-        const packageUniqueID = packageElementOld.getAttribute('unique-identifier');
-        const elemID = elem.getAttribute('id');
-
-        if (!utils.isNullOrUndefined(packageUniqueID) && !utils.isNullOrUndefined(elemID) && packageUniqueID === elemID) {
-          newNode.setAttribute('id', 'pub-id');
-        }
-      }
-
-      if (elem.getAttribute('opf:scheme') === 'calibre') {
-        newNode.setAttribute('opf:scheme', 'calibre');
-      }
-    }
-
-    if (!utils.isNullOrUndefined(newNode)) {
-      metadataElementNew.appendChild(newNode);
-    }
-  }
-
-  // apply series metadata (to have automatic sorting already)
-  {
-    // Regex to extract the series title and if available the volume position
-    const caps = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/gim.exec(epubContextOutput.Title);
-
-    if (!utils.isNullOrUndefined(caps)) {
-      const seriesTitleNoVolume = regexMatchGroupRequired(caps, 'series', 'generateContentOPF meta collection');
-      const seriesPos = regexMatchGroup(caps, 'num');
-
-      idCount += 1;
-      const metaCollectionId = `id-${idCount}`;
-      const metaCollectionElem = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
-      const metaTypeElem = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
-      const metaPositionElem = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
-
-      xh.applyAttributes(metaCollectionElem, {
-        property: 'belongs-to-collection',
-        id: metaCollectionId,
-      });
-      metaCollectionElem.appendChild(documentNew.createTextNode(seriesTitleNoVolume));
-
-      xh.applyAttributes(metaTypeElem, {
-        refines: `#${metaCollectionId}`,
-        property: 'collection-type',
-      });
-      metaTypeElem.appendChild(documentNew.createTextNode('series'));
-
-      xh.applyAttributes(metaPositionElem, {
-        refines: `#${metaCollectionId}`,
-        property: 'group-position',
-      });
-      // default to "1" in case it does not have a volume id (like a spinoff)
-      metaPositionElem.appendChild(documentNew.createTextNode(seriesPos ?? '1'));
-
-      metadataElementNew.appendChild(metaCollectionElem);
-      metadataElementNew.appendChild(metaTypeElem);
-      metadataElementNew.appendChild(metaPositionElem);
-    } else {
-      log('Found no series captures for: "'.red + epubContextOutput.Title.grey + '"'.red);
-    }
-  }
-
-  for (const elem of epubContextOutput.Files) {
-    // ignore cover.xhtml
-    // ignore toc.xhtml
-    // ignore toc.ncx
-    if (elem.Id === COVER_XHTML_FILENAME || elem.Id === TOC_XHTML_FILENAME || elem.Id === 'ncx') {
-      continue;
-    }
-
-    const newNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
-    xh.applyAttributes(newNode, {
-      id: elem.Id,
-      href: path.relative(baseOutputPath, elem.Path),
-      'media-type': elem.MediaType,
-    });
-    manifestElementNew.appendChild(newNode);
-  }
-
-  /** spine of the old content.opf, sorted and as filename */
-  const sortedOldSpine: string[] = [];
-
-  {
-    /** id-filename Map, stores "id" as key and "filename" as value */
-    const manifestIdMap: Map<string, string> = new Map();
-
-    // using "children" to exclude text nodes
-    for (const elem of Array.from(manifestElementOld.children)) {
-      // ignore all non-"item" elements
-      if (elem.localName !== 'item') {
-        continue;
-      }
-
-      const filename = elem.getAttribute('href');
-      const id = elem.getAttribute('id');
-
-      utils.assertionDefined(filename, new Error('Expected "filename" to be defined'));
-      utils.assertionDefined(id, new Error('Expected "id" to be defined'));
-
-      manifestIdMap.set(id, filename);
-    }
-
-    // using "children" to exclude text nodes
-    for (const elem of Array.from(spineElementOld.children)) {
-      // ignore all non-"itemref" elements
-      if (elem.nodeName !== 'itemref') {
-        continue;
-      }
-
-      const idref = elem.getAttribute('idref');
-      utils.assertionDefined(idref, new Error('Expected "idref" to be defined'));
-
-      const filename = manifestIdMap.get(idref);
-      utils.assertionDefined(filename, new Error('Expected "filename" to be defined'));
-
-      sortedOldSpine.push(filename);
-    }
-  }
-
-  epubContextOutput.Files.sort((a, b) => {
-    const aindex = sortedOldSpine.findIndex((v) => v === a.OriginalFilename);
-    const bindex = sortedOldSpine.findIndex((v) => v === b.OriginalFilename);
-
-    const comp = aindex - bindex;
-
-    if (comp === 0) {
-      return a.IndexInSequence - b.IndexInSequence;
-    }
-
-    return comp;
-  });
-
-  // generate the "<spine>" (eg. the play-order)
-  for (const file of epubContextOutput.Files) {
-    // only add xhtml types to the spine
-    if (file.MediaType !== xh.STATICS.XHTML_MIMETYPE) {
-      continue;
-    }
-    // ignore cover, because it already exists in the template
-    // ignore "toc.xhtml" in case it should already exist
-    if (file.Id === COVER_XHTML_FILENAME || file.Id === TOC_XHTML_FILENAME) {
-      continue;
-    }
-
-    const newNode = documentNew.createElementNS(spineElementNew.namespaceURI, 'itemref');
-    newNode.setAttribute('idref', file.Id);
-    spineElementNew.appendChild(newNode);
-  }
-
-  const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + currentDOM.serialize();
-
-  const writtenpath = path.resolve(baseOutputPath, 'content.opf');
-  await utils.mkdir(path.dirname(writtenpath));
-  await fspromises.writeFile(writtenpath, serialized);
-}
-
-/**
- * Generate a Table Of Contents XHTML file
- *
- * Assumes "epubContextOutput.Files" is already sorted
- * @param documentOld The old Content.opf JSDOM "body" element
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
- */
-async function generateTocXHTML(
-  documentOld: Document,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string
-) {
-  const replacedOutputTemplate = applyTemplate(await getTemplate('toc.xhtml'), {
-    '{{CSSPATH}}': CSSPATH_FOR_XHTML,
-    '{{TOC_XHTML_FILENAME}}': `../Text/${TOC_XHTML_FILENAME}`,
-  });
-  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, JSDOM_XHTML_OPTIONS);
-  const olElement = xh.queryDefinedElement(documentNew, 'body > nav > ol.none');
-
-  const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
-
-  for (const file of filesToLoop) {
-    const liElement = documentNew.createElement('li');
-    const aElement = documentNew.createElement('a');
-    aElement.setAttribute('href', path.join('..', path.relative(baseOutputPath, file.Path)));
-    utils.assertionDefined(file.Title, new Error(`Expected Main file to have a Title (outpath: "${file.Path}")`));
-    aElement.appendChild(documentNew.createTextNode(file.Title.fullTitle));
-    liElement.appendChild(aElement);
-    olElement.appendChild(liElement);
-  }
-
-  await finishDOMtoFile(currentDOM, baseOutputPath, TOC_XHTML_FILENAME, FinishFileSubDir.Text, epubContextOutput, {
-    Id: TOC_XHTML_FILENAME,
-    IndexInSequence: 0,
-    Main: true,
-    OriginalFilename: '',
-    Title: {
-      fullTitle: 'Table Of Contents',
-    },
-  });
-}
-
-/**
- * Generate a Table Of Contents NCX file
- * @param documentOld The old Content.opf JSDOM "body" element
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
- */
-async function generateTocNCX(
-  documentOld: Document,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string
-) {
-  const replacedOutputTemplate = applyTemplate(await getTemplate('toc.ncx'), {
-    '{{TITLE}}': epubContextOutput.Title,
-  });
-
-  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, { contentType: xh.STATICS.XML_MIMETYPE });
-  const navMapElement = xh.queryDefinedElement(documentNew, 'ncx > navMap');
-
-  const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
-
-  let currentpoint = 0;
-
-  for (const file of filesToLoop) {
-    utils.assertionDefined(file.Title, new Error(`Expected Main file to have a Title (outpath: "${file.Path}")`));
-    currentpoint += 1;
-
-    const navpointElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'navPoint');
-    const navlabelElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'navLabel');
-    const textElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'text');
-    const contentElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'content');
-
-    textElement.appendChild(documentNew.createTextNode(file.Title.fullTitle));
-    xh.applyAttributes(navpointElement, {
-      id: `navPoint${currentpoint}`,
-      playOrder: currentpoint.toString(),
-    });
-    contentElement.setAttribute('src', path.relative(baseOutputPath, file.Path));
-
-    navlabelElement.appendChild(textElement);
-    navpointElement.appendChild(navlabelElement);
-    navpointElement.appendChild(contentElement);
-
-    navMapElement.appendChild(navpointElement);
-  }
-
-  const filename = 'toc.ncx';
-  const outPath = path.resolve(baseOutputPath, filename);
-  await utils.mkdir(baseOutputPath);
-  await fspromises.writeFile(outPath, `${xh.STATICS.XML_BEGINNING_OP}\n` + currentDOM.serialize());
-  epubContextOutput.Files.push({
-    Id: filename,
-    IndexInSequence: 0,
-    Main: false,
-    OriginalFilename: '',
-    Path: outPath,
-    MediaType: xh.STATICS.NCX_MIMETYPE,
-  });
-}
-
 /** Read a Directory recursively */
 async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
   const entries = await fspromises.readdir(inputPath, { withFileTypes: true });
@@ -648,7 +299,7 @@ async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
  * @param usePath The input directory path
  * @returns the context and the body to query for later transfer
  */
-async function getEpubContextForInput(usePath: string): Promise<{ context: EpubContext; contentBody: Document }> {
+async function getEpubContextForInput(usePath: string): Promise<{ context: EpubContextInput; contentBody: Document }> {
   const containerBuffer = await fspromises.readFile(path.resolve(usePath, 'META-INF/container.xml'));
   const { document: containerBody } = xh.newJSDOM(containerBuffer, { contentType: xh.STATICS.XML_MIMETYPE });
 
@@ -667,7 +318,7 @@ async function getEpubContextForInput(usePath: string): Promise<{ context: EpubC
 
   utils.assertionDefined(volumeTitle, new Error('Expected "volumeTitle" to be defined'));
 
-  const context: EpubContext = {
+  const context: EpubContextInput = {
     ContentPath: contentPath,
     Title: volumeTitle,
     Files: [],
@@ -757,12 +408,7 @@ async function getInputPath(inputPath: string): Promise<{ name: string; tmpdir: 
 }
 
 /** Process a (X)HTML file from input to output */
-async function processHTMLFile(
-  filePath: string,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string
-): Promise<void> {
+async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<EpubContextTrackers>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
@@ -782,45 +428,45 @@ async function processHTMLFile(
 
   switch (title.titleType) {
     case TitleType.CoverPage:
-      await doCoverPage(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doCoverPage(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.Afterword:
-      await doAfterword(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doAfterword(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.TitlePage:
     case TitleType.ColorInserts:
     case TitleType.CopyrightsAndCredits:
     case TitleType.TocImage:
     case TitleType.CastOfCharacters:
-      await doFrontMatter(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doFrontMatter(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.BonusStory:
-      await doBonusStory(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doBonusStory(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.ShortStory:
-      await doShortStory(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doShortStory(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.SideStory:
-      await doSideStory(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doSideStory(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.Chapter:
-      await doChapter(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doChapter(documentInput, title, epubctxOut, filePath);
       break;
     case TitleType.Interlude:
-      await doInterlude(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doInterlude(documentInput, title, epubctxOut, filePath);
       break;
     // the following will use the generic target
     case TitleType.Dedication:
     case TitleType.NamedSideStory:
-      await doGeneric(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath, 0);
+      await doGeneric(documentInput, title, epubctxOut, filePath, 0);
       break;
     case TitleType.Previously:
     case TitleType.AboutAuthorAndIllust:
-      await doGeneric(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath);
+      await doGeneric(documentInput, title, epubctxOut, filePath);
       break;
     default:
       log(`Unhandled Type \"${title.titleType}\" + "${title.fullTitle}"`.red);
-      await doGeneric(documentInput, title, epubContextInput, epubContextOutput, baseOutputPath, filePath, 0);
+      await doGeneric(documentInput, title, epubctxOut, filePath, 0);
       break;
   }
 }
@@ -836,10 +482,10 @@ interface IcreateMAINDOM extends xh.INewJSDOMReturn {
  * @returns The DOM, document and mainelement
  */
 async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMAINDOM> {
-  const modXHTML = applyTemplate(await getTemplate(''), {
+  const modXHTML = applyTemplate(await getTemplate('xhtml-ln.xhtml'), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
-    '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
+    '{{EPUBTYPE}}': epubh.EPubType.BodyMatterChapter,
     '{{CSSPATH}}': CSSPATH_FOR_XHTML,
   });
 
@@ -861,11 +507,16 @@ async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMA
  * @param imgsrc The source of the "img" element
  * @returns The DOM, document and mainelement
  */
-async function createIMGDOM(title: Title, sectionid: string, imgclass: ImgClass, imgsrc: string): Promise<ReturnType<typeof xh.newJSDOM>> {
+async function createIMGDOM(
+  title: Title,
+  sectionid: string,
+  imgclass: epubh.ImgClass,
+  imgsrc: string
+): Promise<ReturnType<typeof xh.newJSDOM>> {
   const modXHTML = applyTemplate(await getTemplate('img-ln.xhtml'), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
-    '{{EPUBTYPE}}': EPubType.BodyMatterChapter,
+    '{{EPUBTYPE}}': epubh.EPubType.BodyMatterChapter,
     '{{IMGALT}}': sectionid,
     '{{IMGCLASS}}': imgclass,
     '{{IMGSRC}}': imgsrc,
@@ -876,96 +527,48 @@ async function createIMGDOM(title: Title, sectionid: string, imgclass: ImgClass,
   return xh.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
 }
 
-enum FinishFileSubDir {
-  Text = 'Text',
-  Images = 'Images',
-  Styles = 'Styles',
-}
-
-/**
- * Serialize a DOM into a file consistently
- * @param dom The DOM to save
- * @param basePath The base path to output files to
- * @param filename The name of the file (including extension)
- * @param subdir The Subdirectory to store the file in
- * @returns The Path the file was saved in
- */
-async function finishDOMtoFile(
-  dom: JSDOM,
-  basePath: string,
-  filename: string,
-  subdir: FinishFileSubDir,
-  epubContextOutput: OutputEpubContext,
-  epubfileOptions: Omit<EpubFile, 'MediaType' | 'Path'>
-): Promise<string> {
-  const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize();
-
-  const writtenpath = path.resolve(basePath, subdir, filename);
-  await utils.mkdir(path.dirname(writtenpath));
-  await fspromises.writeFile(writtenpath, serialized);
-
-  epubContextOutput.Files.push({
-    ...epubfileOptions,
-    // this function creates the path, so it will be added here
-    Path: writtenpath,
-    // ensure it is the XHTML mimetype, because this function only writes the dom to file
-    MediaType: xh.STATICS.XHTML_MIMETYPE,
-    // ensure only the basename is added, not the full path
-    OriginalFilename: path.basename(epubfileOptions.OriginalFilename),
-  });
-
-  return writtenpath;
-}
-
 async function copyImage(
   fromPath: string,
-  basePath: string,
-  epubContextOutput: OutputEpubContext,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   filename: string,
   epubfileOptions: Omit<EpubFile, 'MediaType' | 'Path'>
 ): Promise<string> {
-  const writtenpath = path.resolve(basePath, FinishFileSubDir.Images, filename);
-  await utils.mkdir(path.dirname(writtenpath));
-  await fspromises.copyFile(fromPath, writtenpath);
+  const copiedPath = path.resolve(path.dirname(epubctxOut.contentPath), epubh.FileDir.Images, filename);
+  await utils.mkdir(path.dirname(copiedPath));
+  await fspromises.copyFile(fromPath, copiedPath);
 
   const mimetype = mime.lookup(filename) || undefined;
 
   utils.assertionDefined(mimetype, new Error('Expected "mimetype" to be defined'));
 
-  epubContextOutput.Files.push({
-    ...epubfileOptions,
-    // this function creates the path, so it will be added here
-    Path: writtenpath,
-    // ensure it is the XHTML mimetype, because this function only writes the dom to file
-    MediaType: mimetype,
-    // ensure only the basename is added, not the full path
-    OriginalFilename: path.basename(epubfileOptions.OriginalFilename),
-  });
+  epubctxOut.addFile(
+    new epubh.EpubContextFileBase({
+      filePath: copiedPath,
+      mediaType: mimetype,
+      id: epubfileOptions.Id,
+    })
+  );
 
-  return writtenpath;
+  return copiedPath;
 }
 
 /**
  * Handle everything related to the "Title.CoverPage" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doAfterword(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.Afterword, new Error('Expected TitleType to be "Afterword"'));
 
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
       let baseName = 'afterword';
 
@@ -977,16 +580,16 @@ async function doAfterword(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastAfterwordNum += 1;
+      const newState = epubctxOut.incTracker('LastAfterwordNum');
       const ext = path.extname(inputimg);
-      const imgid = `afterword_img${epubContextOutput.LastStates.LastAfterwordNum}${ext}`;
-      const imgfilename = `Afterword${epubContextOutput.LastStates.LastAfterwordNum}${ext}`;
-      const xhtmlName = `afterword_img${epubContextOutput.LastStates.LastAfterwordNum}`;
+      const imgid = `afterword_img${newState}${ext}`;
+      const imgfilename = `Afterword${newState}${ext}`;
+      const xhtmlName = `afterword_img${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1000,17 +603,13 @@ async function doAfterword(
  * Handle everything related to the "Title.CoverPage" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doCoverPage(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
@@ -1018,7 +617,7 @@ async function doCoverPage(
 
   const imgNode = xh.queryDefinedElement(documentInput, 'img');
 
-  const imgNodeSrc = imgNode.getAttribute('imgNode');
+  const imgNodeSrc = imgNode.getAttribute('src');
 
   utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
 
@@ -1027,20 +626,20 @@ async function doCoverPage(
   const imgId = `cover${ext}`;
   const imgFilename = `Cover${ext}`;
 
-  await copyImage(fromPath, baseOutputPath, epubContextOutput, imgFilename, {
+  await copyImage(fromPath, epubctxOut, imgFilename, {
     Id: imgId,
     OriginalFilename: fromPath,
     Main: false,
     IndexInSequence: 0,
   });
-  const { dom: imgDOM } = await createIMGDOM(title, imgId, ImgClass.Cover, `../Images/${imgFilename}`);
+  const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Cover, `../Images/${imgFilename}`);
 
-  await finishDOMtoFile(imgDOM, baseOutputPath, COVER_XHTML_FILENAME, FinishFileSubDir.Text, epubContextOutput, {
-    Id: COVER_XHTML_FILENAME,
-    OriginalFilename: currentInputFile,
-    Main: true,
-    IndexInSequence: 0,
-    Title: title,
+  await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentPath), COVER_XHTML_FILENAME, epubh.FileDir.Text, epubctxOut, {
+    seqIndex: 0,
+    type: { type: epubh.EpubContextFileXHTMLTypes.IMG, imgClass: epubh.ImgClass.Cover, imgType: epubh.ImgType.Cover },
+    id: COVER_XHTML_FILENAME,
+    title: title.fullTitle,
+    globalSeqIndex: 0,
   });
 }
 
@@ -1048,17 +647,13 @@ async function doCoverPage(
  * Handle everything related to the Frontmatter Title types
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doFrontMatter(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
@@ -1077,12 +672,12 @@ async function doFrontMatter(
   }
 
   const imgNodes = xh.queryDefinedElementAll(documentInput, 'img');
+  const globState = epubctxOut.incTracker('Global');
+
+  let seq = 0;
 
   for (const elem of Array.from(imgNodes)) {
-    epubContextOutput.LastStates.LastFrontNum += 1;
-
-    /** Alias for better handling */
-    const frontnum = epubContextOutput.LastStates.LastFrontNum;
+    const frontnum = epubctxOut.incTracker('LastFrontNum');
     const imgNodeSrc = elem.getAttribute('src');
 
     utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
@@ -1092,24 +687,28 @@ async function doFrontMatter(
     const imgId = `frontmatter${frontnum}${ext}`;
     const imgFilename = `Frontmatter${frontnum}${ext}`;
 
-    await copyImage(fromPath, baseOutputPath, epubContextOutput, imgFilename, {
+    await copyImage(fromPath, epubctxOut, imgFilename, {
       Id: imgId,
       OriginalFilename: fromPath,
       Main: false,
       IndexInSequence: 0,
     });
-    const { dom: imgDOM } = await createIMGDOM(title, imgId, ImgClass.Insert, `../Images/${imgFilename}`);
-
-    const isMain = epubContextOutput.Files.find((v) => v.Title === title);
+    const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Insert, `../Images/${imgFilename}`);
 
     const xhtmlName = `frontmatter${frontnum}.xhtml`;
-    await finishDOMtoFile(imgDOM, baseOutputPath, xhtmlName, FinishFileSubDir.Text, epubContextOutput, {
-      Id: xhtmlName,
-      OriginalFilename: currentInputFile,
-      Main: utils.isNullOrUndefined(isMain),
-      IndexInSequence: frontnum,
-      Title: title,
+    await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentPath), xhtmlName, epubh.FileDir.Text, epubctxOut, {
+      id: xhtmlName,
+      seqIndex: seq,
+      title: title.fullTitle,
+      type: {
+        type: epubh.EpubContextFileXHTMLTypes.IMG,
+        imgClass: epubh.ImgClass.Insert,
+        imgType: epubh.ImgType.Frontmatter,
+      },
+      globalSeqIndex: globState, // should be automatically sorted to the front
     });
+
+    seq += 1;
   }
 }
 
@@ -1117,22 +716,18 @@ async function doFrontMatter(
  * Handle everything related to the "Title.ShortStory" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doShortStory(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.ShortStory, new Error('Expected TitleType to be "ShortStory"'));
-  epubContextOutput.LastStates.LastShortStoryNum += 1;
+  epubctxOut.incTracker('LastShortStoryNum');
 
   const bodyElement = xh.queryDefinedElement(documentInput, 'body');
   utils.assertionDefined(bodyElement, new Error('Expected "bodyElement" to exist'));
@@ -1150,9 +745,9 @@ async function doShortStory(
     console.log('Encountered more than 3 Elements to skip in Short Stories ('.red + currentInputFile + ')'.red);
   }
 
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'shortstory' + epubContextOutput.LastStates.LastShortStoryNum;
+      let baseName = 'shortstory' + lastStates.LastShortStoryNum;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -1162,16 +757,16 @@ async function doShortStory(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastInsertNum += 1;
+      const newState = epubctxOut.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
-      const imgid = `insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const imgfilename = `Insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const xhtmlName = `insert${epubContextOutput.LastStates.LastInsertNum}`;
+      const imgid = `insert${newState}${ext}`;
+      const imgfilename = `Insert${newState}${ext}`;
+      const xhtmlName = `insert${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1212,26 +807,22 @@ async function doShortStory(
  * Handle everything related to the "Title.SideStory" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doSideStory(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.SideStory, new Error('Expected TitleType to be "SideStory"'));
-  epubContextOutput.LastStates.LastSideStoryNum += 1;
+  epubctxOut.incTracker('LastSideStoryNum');
 
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'sidestory' + epubContextOutput.LastStates.LastSideStoryNum;
+      let baseName = 'sidestory' + lastStates.LastSideStoryNum;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -1241,16 +832,16 @@ async function doSideStory(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastInsertNum += 1;
+      const newState = epubctxOut.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
-      const imgid = `insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const imgfilename = `Insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const xhtmlName = `insert${epubContextOutput.LastStates.LastInsertNum}`;
+      const imgid = `insert${newState}${ext}`;
+      const imgfilename = `Insert${newState}${ext}`;
+      const xhtmlName = `insert${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1276,26 +867,22 @@ async function doSideStory(
  * Handle everything related to the "Title.BonusStory" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doBonusStory(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.BonusStory, new Error('Expected TitleType to be "BonusStory"'));
-  epubContextOutput.LastStates.LastBonusStoryNum += 1;
+  epubctxOut.incTracker('LastBonusStoryNum');
 
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'bonusstory' + epubContextOutput.LastStates.LastBonusStoryNum;
+      let baseName = 'bonusstory' + lastStates.LastBonusStoryNum;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -1305,16 +892,16 @@ async function doBonusStory(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastInsertNum += 1;
+      const newState = epubctxOut.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
-      const imgid = `insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const imgfilename = `Insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const xhtmlName = `insert${epubContextOutput.LastStates.LastInsertNum}`;
+      const imgid = `insert${newState}${ext}`;
+      const imgfilename = `Insert${newState}${ext}`;
+      const xhtmlName = `insert${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1340,26 +927,22 @@ async function doBonusStory(
  * Handle everything related to the "Title.Interlude" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doInterlude(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.Interlude, new Error('Expected TitleType to be "Interlude"'));
-  epubContextOutput.LastStates.LastInterludeNum += 1;
+  epubctxOut.incTracker('LastInterludeNum');
 
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'interlude' + epubContextOutput.LastStates.LastInterludeNum;
+      let baseName = 'interlude' + lastStates.LastInterludeNum;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -1369,16 +952,16 @@ async function doInterlude(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastInsertNum += 1;
+      const newState = epubctxOut.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
-      const imgid = `insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const imgfilename = `Insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const xhtmlName = `insert${epubContextOutput.LastStates.LastInsertNum}`;
+      const imgid = `insert${newState}${ext}`;
+      const imgfilename = `Insert${newState}${ext}`;
+      const xhtmlName = `insert${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1405,26 +988,22 @@ async function doInterlude(
  * Handle everything related to the "Title.Chapter" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
 async function doChapter(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.Chapter, new Error('Expected TitleType to be "Chapter"'));
-  epubContextOutput.LastStates.LastChapterNum += 1;
+  epubctxOut.incTracker('LastChapterNum');
 
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'chapter' + epubContextOutput.LastStates.LastChapterNum;
+      let baseName = 'chapter' + lastStates.LastChapterNum;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -1434,16 +1013,16 @@ async function doChapter(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastInsertNum += 1;
+      const newState = epubctxOut.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
-      const imgid = `insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const imgfilename = `Insert${epubContextOutput.LastStates.LastInsertNum}${ext}`;
-      const xhtmlName = `insert${epubContextOutput.LastStates.LastInsertNum}`;
+      const imgid = `insert${newState}${ext}`;
+      const imgfilename = `Insert${newState}${ext}`;
+      const xhtmlName = `insert${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1476,23 +1055,19 @@ async function doChapter(
  * Handle Generic Title Types
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextInput EPUB Context of the Input file
- * @param epubContextOutput EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
+ * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  * @param skipElements Set how many elements to initally skip
  */
 async function doGeneric(
   documentInput: Document,
   title: Title,
-  epubContextInput: EpubContext,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string,
   skipElements?: number
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
-  await doTextContent(documentInput, title, epubContextOutput, baseOutputPath, currentInputFile, {
+  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
     genID: function (lastStates: LastStates, subnum: number): string {
       // transform fullTitle to spaceless lowercase version
       let baseName = title.fullTitle.trim().replaceAll(/ /gim, '').toLowerCase();
@@ -1505,16 +1080,16 @@ async function doGeneric(
       return baseName;
     },
     genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      epubContextOutput.LastStates.LastGenericNum += 1;
+      const newState = epubctxOut.incTracker('LastGenericNum');
       const ext = path.extname(inputimg);
-      const imgid = `generic${epubContextOutput.LastStates.LastGenericNum}${ext}`;
-      const imgfilename = `Generic${epubContextOutput.LastStates.LastGenericNum}${ext}`;
-      const xhtmlName = `generic${epubContextOutput.LastStates.LastGenericNum}`;
+      const imgid = `generic${newState}${ext}`;
+      const imgfilename = `Generic${newState}${ext}`;
+      const xhtmlName = `generic${newState}`;
 
       return {
         imgFilename: imgfilename,
         id: imgid,
-        imgtype: ImgClass.Insert,
+        imgtype: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
@@ -1553,7 +1128,7 @@ interface DoTextContentIMGID {
   /** Filename (without extension) of the xhtml containing the image */
   xhtmlFilename: string;
   /** Image Type */
-  imgtype: ImgClass;
+  imgtype: epubh.ImgClass;
 }
 
 interface DoTextContentOptions {
@@ -1593,20 +1168,20 @@ interface DoTextContentOptions {
  * Handle everything related to the "Title.Chapter" type
  * @param documentInput The Input Document's "document.body"
  * @param title The Title Object
- * @param epubContextOutput EPUB Context of the Output file
+ * @param epubctxOut EPUB Context of the Output file
  * @param baseOutputPath Base Output path to output files to
  * @param currentInputFile Currently processing's Input file path
  */
 async function doTextContent(
   documentInput: Document,
   title: Title,
-  epubContextOutput: OutputEpubContext,
-  baseOutputPath: string,
+  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   currentInputFile: string,
   options: DoTextContentOptions
 ): Promise<void> {
   let currentSubChapter = 0;
-  let currentBaseName = replaceID(options.genID(epubContextOutput.LastStates, currentSubChapter));
+  let currentBaseName = replaceID(options.genID(epubctxOut.tracker, currentSubChapter));
+  const globState = epubctxOut.incTracker('Global');
 
   let { dom: currentDOM, document: documentNew, mainElement } = await createMAINDOM(title, currentBaseName);
 
@@ -1663,12 +1238,14 @@ async function doTextContent(
           // dont save a empty dom
           if (!skipSavingMainDOM) {
             const xhtmlNameMain = `${currentBaseName}.xhtml`;
-            await finishDOMtoFile(currentDOM, baseOutputPath, xhtmlNameMain, FinishFileSubDir.Text, epubContextOutput, {
-              Id: xhtmlNameMain,
-              OriginalFilename: currentInputFile,
-              Main: currentSubChapter === 0 && sequenceCounter === 0,
-              IndexInSequence: sequenceCounter,
-              Title: title,
+            await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
+              id: xhtmlNameMain,
+              seqIndex: sequenceCounter,
+              title: title.fullTitle,
+              type: {
+                type: epubh.EpubContextFileXHTMLTypes.TEXT,
+              },
+              globalSeqIndex: globState,
             });
             currentSubChapter += 1;
             sequenceCounter += 1;
@@ -1681,9 +1258,9 @@ async function doTextContent(
             id: imgid,
             imgFilename: imgFilename,
             xhtmlFilename: imgXHTMLFileName,
-          } = options.genIMGID(epubContextOutput.LastStates, fromPath);
+          } = options.genIMGID(epubctxOut.tracker, fromPath);
 
-          await copyImage(fromPath, baseOutputPath, epubContextOutput, imgFilename, {
+          await copyImage(fromPath, epubctxOut, imgFilename, {
             Id: imgid,
             OriginalFilename: fromPath,
             Main: false,
@@ -1692,19 +1269,22 @@ async function doTextContent(
           const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`);
 
           const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
-          await finishDOMtoFile(imgDOM, baseOutputPath, xhtmlNameIMG, FinishFileSubDir.Text, epubContextOutput, {
-            Id: xhtmlNameIMG,
-            OriginalFilename: currentInputFile,
-            Main: currentSubChapter === 0 && sequenceCounter === 0, // the image is the first page on first-page image chapaters (a image before the chapter header)
-            Title: title,
-
-            IndexInSequence: sequenceCounter,
+          await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentPath), xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
+            id: xhtmlNameIMG,
+            seqIndex: sequenceCounter,
+            title: title.fullTitle,
+            type: {
+              type: epubh.EpubContextFileXHTMLTypes.IMG,
+              imgClass: epubh.ImgClass.Insert,
+              imgType: epubh.ImgType.Insert,
+            },
+            globalSeqIndex: globState,
           });
           sequenceCounter += 1;
 
           // dont create a new dom if the old one is still empty
           if (!skipSavingMainDOM) {
-            currentBaseName = replaceID(options.genID(epubContextOutput.LastStates, currentSubChapter));
+            currentBaseName = replaceID(options.genID(epubctxOut.tracker, currentSubChapter));
             const nextchapter = await createMAINDOM(title, currentBaseName);
             currentDOM = nextchapter.dom;
             documentNew = nextchapter.document;
@@ -1734,12 +1314,14 @@ async function doTextContent(
   // ignore DOM's that are empty or only have the chapter header
   if (!isElementEmpty(mainElement) && !onlyhash1(mainElement)) {
     const xhtmlNameMain = `${currentBaseName}.xhtml`;
-    await finishDOMtoFile(currentDOM, baseOutputPath, xhtmlNameMain, FinishFileSubDir.Text, epubContextOutput, {
-      Id: xhtmlNameMain,
-      OriginalFilename: currentInputFile,
-      Main: currentSubChapter === 0 && sequenceCounter === 0,
-      IndexInSequence: sequenceCounter,
-      Title: title,
+    await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
+      id: xhtmlNameMain,
+      seqIndex: sequenceCounter,
+      title: title.fullTitle,
+      type: {
+        type: epubh.EpubContextFileXHTMLTypes.TEXT,
+      },
+      globalSeqIndex: globState,
     });
     sequenceCounter += 1;
   } else {

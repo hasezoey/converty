@@ -167,7 +167,7 @@ export class EpubContext<Trackers extends Record<string, number>> {
   }
 
   get cssPath() {
-    return path.resolve(FileDir.Styles, 'style.css');
+    return path.relative(this.contentPath, path.resolve(this.contentPath, FileDir.Styles, 'style.css'));
   }
 
   /**
@@ -212,7 +212,7 @@ export class EpubContext<Trackers extends Record<string, number>> {
     const containerBasePath = path.dirname(this.contentPath);
 
     const modXHTML = applyTemplate(await getTemplate('toc.xhtml'), {
-      '{{CSSPATH}}': path.resolve('..', this.cssPath),
+      '{{CSSPATH}}': path.join('..', this.cssPath),
       '{{TOC_XHTML_FILENAME}}': path.join(
         '..',
         path.relative(containerBasePath, path.resolve(containerBasePath, FileDir.Text, STATICS.TOCXHTMLPATH))

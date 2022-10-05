@@ -18,17 +18,10 @@ const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 const TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
-const XHTML_MIMETYPE = 'application/xhtml+xml';
-const XML_MIMETYPE = 'application/xml';
-const DC_XML_NAMESPACE = 'http://purl.org/dc/elements/1.1/';
-const OPF_XML_NAMESPACE = 'http://www.idpf.org/2007/opf';
-const NCX_XML_NAMESPACE = 'http://www.daisy.org/z3986/2005/ncx/';
-const XHTML_XML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 const TOC_XHTML_FILENAME = 'toc.xhtml';
 const COVER_XHTML_FILENAME = 'cover.xhtml';
-const XML_BEGINNING_OP = '<?xml version="1.0" encoding="utf-8"?>';
 const CSSPATH_FOR_XHTML = '../Styles/stylesheet.css';
-const JSDOM_XHTML_OPTIONS = { contentType: XHTML_MIMETYPE };
+const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
 
 // CODE
 
@@ -120,11 +113,11 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       // ignore css input files, because our own will be applied
       continue;
     }
-    if (mimetype === 'text/html' || mimetype === XHTML_MIMETYPE) {
+    if (mimetype === 'text/html' || mimetype === xh.STATICS.XHTML_MIMETYPE) {
       await processHTMLFile(file, epubContextInput, epubContextOutput, baseOutputPath);
       continue;
     }
-    if (mimetype === 'application/x-dtbncx+xml') {
+    if (mimetype === xh.STATICS.NCX_MIMETYPE) {
       utils.assertion(utils.isNullOrUndefined(epubContextInput.NCXPath), new Error('Expected "NCXPath" to still be undefined'));
       epubContextInput.NCXPath = file;
       continue;
@@ -289,39 +282,39 @@ async function generateContentOPF(
 
   // add extra nodes to the manifest
   {
-    const ncxNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    const ncxNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
     xh.applyAttributes(ncxNode, {
       id: 'ncx',
       href: 'toc.ncx',
-      'media-type': 'application/x-dtbncx+xml',
+      'media-type': xh.STATICS.NCX_MIMETYPE,
     });
     manifestElementNew.appendChild(ncxNode);
 
-    const tocXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    const tocXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
     xh.applyAttributes(tocXHTMLNode, {
       id: TOC_XHTML_FILENAME,
       href: `Text/${TOC_XHTML_FILENAME}`,
-      'media-type': XHTML_MIMETYPE,
+      'media-type': xh.STATICS.XHTML_MIMETYPE,
       properties: 'nav',
     });
     manifestElementNew.appendChild(tocXHTMLNode);
 
-    const coverXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    const coverXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
     xh.applyAttributes(coverXHTMLNode, {
       id: COVER_XHTML_FILENAME,
       href: `Text/${COVER_XHTML_FILENAME}`,
-      'media-type': XHTML_MIMETYPE,
+      'media-type': xh.STATICS.XHTML_MIMETYPE,
     });
     manifestElementNew.appendChild(coverXHTMLNode);
   }
 
   // add extra nodes to the spine
   {
-    const coverXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'itemref');
+    const coverXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'itemref');
     coverXHTMLNode.setAttribute('idref', COVER_XHTML_FILENAME);
     manifestElementNew.appendChild(coverXHTMLNode);
 
-    const tocXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'itemref');
+    const tocXHTMLNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'itemref');
     xh.applyAttributes(tocXHTMLNode, {
       idref: TOC_XHTML_FILENAME,
       linear: 'yes',
@@ -335,7 +328,7 @@ async function generateContentOPF(
   for (const elem of Array.from(metadataElementOld.children)) {
     // special handling for "cover", just to be sure
     if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
-      const coverImgId = epubContextOutput.Files.find((v) => v.Id.includes('cover') && v.MediaType != XHTML_MIMETYPE);
+      const coverImgId = epubContextOutput.Files.find((v) => v.Id.includes('cover') && v.MediaType != xh.STATICS.XHTML_MIMETYPE);
       utils.assertionDefined(coverImgId, new Error('Expected "coverImgId" to be defined'));
       const newCoverNode = documentNew.createElementNS(metadataElementNew.namespaceURI, 'meta');
       newCoverNode.setAttribute('name', 'cover');
@@ -347,29 +340,29 @@ async function generateContentOPF(
     let newNode: Element | undefined = undefined;
 
     if (elem.tagName === 'dc:title') {
-      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:title');
+      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:title');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
     } else if (elem.tagName === 'dc:publisher') {
-      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:publisher');
+      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:publisher');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
     } else if (elem.tagName === 'dc:language') {
-      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:language');
+      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:language');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
     } else if (elem.tagName === 'dc:creator') {
       idCount += 1;
-      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:creator');
+      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:creator');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
       newNode.setAttribute('id', `id-${idCount}`);
     } else if (elem.tagName === 'dc:date') {
-      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:date');
+      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:date');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
     } else if (elem.tagName === 'dc:identifier') {
-      newNode = documentNew.createElementNS(DC_XML_NAMESPACE, 'dc:identifier');
+      newNode = documentNew.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:identifier');
       utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
       newNode.appendChild(documentNew.createTextNode(elem.textContent));
       {
@@ -402,9 +395,9 @@ async function generateContentOPF(
 
       idCount += 1;
       const metaCollectionId = `id-${idCount}`;
-      const metaCollectionElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
-      const metaTypeElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
-      const metaPositionElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
+      const metaCollectionElem = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+      const metaTypeElem = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+      const metaPositionElem = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
 
       xh.applyAttributes(metaCollectionElem, {
         property: 'belongs-to-collection',
@@ -441,7 +434,7 @@ async function generateContentOPF(
       continue;
     }
 
-    const newNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
+    const newNode = documentNew.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
     xh.applyAttributes(newNode, {
       id: elem.Id,
       href: path.relative(baseOutputPath, elem.Path),
@@ -506,7 +499,7 @@ async function generateContentOPF(
   // generate the "<spine>" (eg. the play-order)
   for (const file of epubContextOutput.Files) {
     // only add xhtml types to the spine
-    if (file.MediaType !== XHTML_MIMETYPE) {
+    if (file.MediaType !== xh.STATICS.XHTML_MIMETYPE) {
       continue;
     }
     // ignore cover, because it already exists in the template
@@ -520,7 +513,7 @@ async function generateContentOPF(
     spineElementNew.appendChild(newNode);
   }
 
-  const serialized = `${XML_BEGINNING_OP}\n` + currentDOM.serialize();
+  const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + currentDOM.serialize();
 
   const writtenpath = path.resolve(baseOutputPath, 'content.opf');
   await utils.mkdir(path.dirname(writtenpath));
@@ -591,7 +584,7 @@ async function generateTocNCX(
   });
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, { contentType: XML_MIMETYPE });
+  const { document: documentNew, dom: currentDOM } = xh.newJSDOM(replacedOutputTemplate, { contentType: xh.STATICS.XML_MIMETYPE });
   const navMapElement = xh.queryDefinedElement(documentNew, 'ncx > navMap');
 
   const filesToLoop = epubContextOutput.Files.filter((v) => v.Main);
@@ -602,10 +595,10 @@ async function generateTocNCX(
     utils.assertionDefined(file.Title, new Error(`Expected Main file to have a Title (outpath: "${file.Path}")`));
     currentpoint += 1;
 
-    const navpointElement = documentNew.createElementNS(NCX_XML_NAMESPACE, 'navPoint');
-    const navlabelElement = documentNew.createElementNS(NCX_XML_NAMESPACE, 'navLabel');
-    const textElement = documentNew.createElementNS(NCX_XML_NAMESPACE, 'text');
-    const contentElement = documentNew.createElementNS(NCX_XML_NAMESPACE, 'content');
+    const navpointElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'navPoint');
+    const navlabelElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'navLabel');
+    const textElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'text');
+    const contentElement = documentNew.createElementNS(xh.STATICS.NCX_XML_NAMESPACE, 'content');
 
     textElement.appendChild(documentNew.createTextNode(file.Title.fullTitle));
     xh.applyAttributes(navpointElement, {
@@ -624,14 +617,14 @@ async function generateTocNCX(
   const filename = 'toc.ncx';
   const outPath = path.resolve(baseOutputPath, filename);
   await utils.mkdir(baseOutputPath);
-  await fspromises.writeFile(outPath, `${XML_BEGINNING_OP}\n` + currentDOM.serialize());
+  await fspromises.writeFile(outPath, `${xh.STATICS.XML_BEGINNING_OP}\n` + currentDOM.serialize());
   epubContextOutput.Files.push({
     Id: filename,
     IndexInSequence: 0,
     Main: false,
     OriginalFilename: '',
     Path: outPath,
-    MediaType: 'application/x-dtbncx+xml',
+    MediaType: xh.STATICS.NCX_MIMETYPE,
   });
 }
 
@@ -657,7 +650,7 @@ async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
  */
 async function getEpubContextForInput(usePath: string): Promise<{ context: EpubContext; contentBody: Document }> {
   const containerBuffer = await fspromises.readFile(path.resolve(usePath, 'META-INF/container.xml'));
-  const { document: containerBody } = xh.newJSDOM(containerBuffer, { contentType: XML_MIMETYPE });
+  const { document: containerBody } = xh.newJSDOM(containerBuffer, { contentType: xh.STATICS.XML_MIMETYPE });
 
   const contentPathNode = xh.queryDefinedElement(containerBody, 'container > rootfiles > rootfile');
 
@@ -666,7 +659,7 @@ async function getEpubContextForInput(usePath: string): Promise<{ context: EpubC
   utils.assertionDefined(contentPath, new Error('Expected "contentPath" to be defined'));
 
   const contentBuffer = await fspromises.readFile(path.resolve(usePath, contentPath));
-  const { document: contentBody } = xh.newJSDOM(contentBuffer, { contentType: XML_MIMETYPE });
+  const { document: contentBody } = xh.newJSDOM(contentBuffer, { contentType: xh.STATICS.XML_MIMETYPE });
 
   const titleNode = xh.queryDefinedElement(contentBody, 'package > metadata > dc\\:title');
 
@@ -905,7 +898,7 @@ async function finishDOMtoFile(
   epubContextOutput: OutputEpubContext,
   epubfileOptions: Omit<EpubFile, 'MediaType' | 'Path'>
 ): Promise<string> {
-  const serialized = `${XML_BEGINNING_OP}\n` + dom.serialize();
+  const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize();
 
   const writtenpath = path.resolve(basePath, subdir, filename);
   await utils.mkdir(path.dirname(writtenpath));
@@ -916,7 +909,7 @@ async function finishDOMtoFile(
     // this function creates the path, so it will be added here
     Path: writtenpath,
     // ensure it is the XHTML mimetype, because this function only writes the dom to file
-    MediaType: XHTML_MIMETYPE,
+    MediaType: xh.STATICS.XHTML_MIMETYPE,
     // ensure only the basename is added, not the full path
     OriginalFilename: path.basename(epubfileOptions.OriginalFilename),
   });
@@ -1459,7 +1452,7 @@ async function doChapter(
       utils.assertionDefined(title.chapterTitle, new Error('Expected "title.chapterTitle" to be defined'));
 
       h1Element.appendChild(document.createTextNode(`Chapter ${title.chapterNumber}:`));
-      h1Element.appendChild(document.createElementNS(XHTML_XML_NAMESPACE, 'br'));
+      h1Element.appendChild(document.createElementNS(xh.STATICS.XHTML_XML_NAMESPACE, 'br'));
       h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
     },
 
@@ -1528,7 +1521,7 @@ async function doGeneric(
     genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
       if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
         h1Element.appendChild(document.createTextNode(`${title.namedTitle}:`));
-        h1Element.appendChild(document.createElementNS(XHTML_XML_NAMESPACE, 'br'));
+        h1Element.appendChild(document.createElementNS(xh.STATICS.XHTML_XML_NAMESPACE, 'br'));
         h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
 
         return;

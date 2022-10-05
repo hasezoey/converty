@@ -290,22 +290,28 @@ async function generateContentOPF(
   // add extra nodes to the manifest
   {
     const ncxNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
-    ncxNode.setAttribute('id', 'ncx');
-    ncxNode.setAttribute('href', 'toc.ncx');
-    ncxNode.setAttribute('media-type', 'application/x-dtbncx+xml');
+    xh.applyAttributes(ncxNode, {
+      id: 'ncx',
+      href: 'toc.ncx',
+      'media-type': 'application/x-dtbncx+xml',
+    });
     manifestElementNew.appendChild(ncxNode);
 
     const tocXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
-    tocXHTMLNode.setAttribute('id', TOC_XHTML_FILENAME);
-    tocXHTMLNode.setAttribute('href', `Text/${TOC_XHTML_FILENAME}`);
-    tocXHTMLNode.setAttribute('media-type', XHTML_MIMETYPE);
-    tocXHTMLNode.setAttribute('properties', 'nav');
+    xh.applyAttributes(tocXHTMLNode, {
+      id: TOC_XHTML_FILENAME,
+      href: `Text/${TOC_XHTML_FILENAME}`,
+      'media-type': XHTML_MIMETYPE,
+      properties: 'nav',
+    });
     manifestElementNew.appendChild(tocXHTMLNode);
 
     const coverXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
-    coverXHTMLNode.setAttribute('id', COVER_XHTML_FILENAME);
-    coverXHTMLNode.setAttribute('href', `Text/${COVER_XHTML_FILENAME}`);
-    coverXHTMLNode.setAttribute('media-type', XHTML_MIMETYPE);
+    xh.applyAttributes(coverXHTMLNode, {
+      id: COVER_XHTML_FILENAME,
+      href: `Text/${COVER_XHTML_FILENAME}`,
+      'media-type': XHTML_MIMETYPE,
+    });
     manifestElementNew.appendChild(coverXHTMLNode);
   }
 
@@ -316,8 +322,10 @@ async function generateContentOPF(
     manifestElementNew.appendChild(coverXHTMLNode);
 
     const tocXHTMLNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'itemref');
-    tocXHTMLNode.setAttribute('idref', TOC_XHTML_FILENAME);
-    tocXHTMLNode.setAttribute('linear', 'yes');
+    xh.applyAttributes(tocXHTMLNode, {
+      idref: TOC_XHTML_FILENAME,
+      linear: 'yes',
+    });
     manifestElementNew.appendChild(tocXHTMLNode);
   }
 
@@ -398,16 +406,22 @@ async function generateContentOPF(
       const metaTypeElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
       const metaPositionElem = documentNew.createElementNS(OPF_XML_NAMESPACE, 'meta');
 
-      metaCollectionElem.setAttribute('property', 'belongs-to-collection');
-      metaCollectionElem.setAttribute('id', metaCollectionId);
+      xh.applyAttributes(metaCollectionElem, {
+        property: 'belongs-to-collection',
+        id: metaCollectionId,
+      });
       metaCollectionElem.appendChild(documentNew.createTextNode(seriesTitleNoVolume));
 
-      metaTypeElem.setAttribute('refines', `#${metaCollectionId}`);
-      metaTypeElem.setAttribute('property', 'collection-type');
+      xh.applyAttributes(metaTypeElem, {
+        refines: `#${metaCollectionId}`,
+        property: 'collection-type',
+      });
       metaTypeElem.appendChild(documentNew.createTextNode('series'));
 
-      metaPositionElem.setAttribute('refines', `#${metaCollectionId}`);
-      metaPositionElem.setAttribute('property', 'group-position');
+      xh.applyAttributes(metaPositionElem, {
+        refines: `#${metaCollectionId}`,
+        property: 'group-position',
+      });
       // default to "1" in case it does not have a volume id (like a spinoff)
       metaPositionElem.appendChild(documentNew.createTextNode(seriesPos ?? '1'));
 
@@ -428,9 +442,11 @@ async function generateContentOPF(
     }
 
     const newNode = documentNew.createElementNS(OPF_XML_NAMESPACE, 'item');
-    newNode.setAttribute('id', elem.Id);
-    newNode.setAttribute('href', path.relative(baseOutputPath, elem.Path));
-    newNode.setAttribute('media-type', elem.MediaType);
+    xh.applyAttributes(newNode, {
+      id: elem.Id,
+      href: path.relative(baseOutputPath, elem.Path),
+      'media-type': elem.MediaType,
+    });
     manifestElementNew.appendChild(newNode);
   }
 
@@ -592,8 +608,10 @@ async function generateTocNCX(
     const contentElement = documentNew.createElementNS(NCX_XML_NAMESPACE, 'content');
 
     textElement.appendChild(documentNew.createTextNode(file.Title.fullTitle));
-    navpointElement.setAttribute('id', `navPoint${currentpoint}`);
-    navpointElement.setAttribute('playOrder', currentpoint.toString());
+    xh.applyAttributes(navpointElement, {
+      id: `navPoint${currentpoint}`,
+      playOrder: currentpoint.toString(),
+    });
     contentElement.setAttribute('src', path.relative(baseOutputPath, file.Path));
 
     navlabelElement.appendChild(textElement);

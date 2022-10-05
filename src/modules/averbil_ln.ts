@@ -1068,16 +1068,16 @@ async function doFrontMatter(
     throw new Error(`Expected "title.titleType" to be a supported FONT_TYPE, got \"${TitleType[title.titleType]}\"`);
   }
 
-  const imgNodes = documentInput.querySelectorAll('img');
-
-  utils.assertionDefined(imgNodes.length > 0, new Error('Expected "imgNode" to have members'));
+  const imgNodes = utils.queryDefinedElementAll(documentInput, 'img');
 
   for (const elem of Array.from(imgNodes)) {
     epubContextOutput.LastStates.LastFrontNum += 1;
 
     /** Alias for better handling */
     const frontnum = epubContextOutput.LastStates.LastFrontNum;
-    const imgNodeSrc = elem.src;
+    const imgNodeSrc = elem.getAttribute('src');
+
+    utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
 
     const fromPath = path.resolve(path.dirname(currentInputFile), imgNodeSrc);
     const ext = path.extname(fromPath);

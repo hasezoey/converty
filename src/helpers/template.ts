@@ -27,7 +27,7 @@ export async function getTemplate(filename: string): Promise<string> {
     }
   }
 
-  const filePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', 'templates', filename);
+  const filePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../', 'templates', filename);
   const stat = await utils.statPath(filePath);
 
   if (utils.isNullOrUndefined(stat)) {

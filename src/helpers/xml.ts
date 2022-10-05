@@ -78,3 +78,14 @@ export function applyAttributes(elem: Element, attrs: Record<string, string>): v
     elem.setAttribute(attr, value);
   }
 }
+
+export const STATICS = {
+  XHTML_MIMETYPE: 'application/xhtml+xml',
+  XML_MIMETYPE: 'application/xml',
+  NCX_MIMETYPE: 'application/x-dtbncx+xml',
+  XML_BEGINNING_OP: '<?xml version="1.0" encoding="utf-8"?>',
+  DC_XML_NAMESPACE: 'http://purl.org/dc/elements/1.1/',
+  OPF_XML_NAMESPACE: 'http://www.idpf.org/2007/opf',
+  NCX_XML_NAMESPACE: 'http://www.daisy.org/z3986/2005/ncx/',
+  XHTML_XML_NAMESPACE: 'http://www.w3.org/1999/xhtml',
+};

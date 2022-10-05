@@ -18,6 +18,7 @@ const templates: Map<string, string> = new Map();
  * @throws {Error} If path is not a file
  */
 export async function getTemplate(filename: string): Promise<string> {
+  log(`Loading Template "${filename}"`);
   {
     const got = templates.get(filename);
 

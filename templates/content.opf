@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id" xml:lang="en">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"></metadata>
+  <manifest></manifest>
+  <spine toc="ncx" page-progression-direction="ltr"></spine>
+  <guide>
+    <reference type="toc" title="Table of Contents" href="Text/{{TOC_XHTML_FILENAME}}" />
+  </guide>
+</package>

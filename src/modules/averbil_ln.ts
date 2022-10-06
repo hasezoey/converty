@@ -257,23 +257,6 @@ interface LastStates {
   LastAfterwordNum: number;
 }
 
-interface EpubFile {
-  /** Path to the file, either absolute or relative to the container file */
-  Path: string;
-  /** The mimetype of the file */
-  MediaType: string;
-  /** The ID to use for this file in the container */
-  Id: string;
-  /** Filename of the original file (input file), later used for sorting in the spine to keep the flow */
-  OriginalFilename: string;
-  /** Indicate that this file is the start of a chapter (used for toc generation) */
-  Main: boolean;
-  /** The Index in which this should be sorted if being part of a sequence (like chapter, insert) */
-  IndexInSequence: number;
-  /** Store the Title for use in TOC */
-  Title?: Title;
-}
-
 /** Process a (X)HTML file from input to output */
 async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<EpubContextTrackers>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
@@ -398,7 +381,7 @@ async function copyImage(
   fromPath: string,
   epubctxOut: epubh.EpubContext<EpubContextTrackers>,
   filename: string,
-  epubfileOptions: Omit<EpubFile, 'MediaType' | 'Path'>
+  id: string
 ): Promise<string> {
   const copiedPath = path.resolve(path.dirname(epubctxOut.contentPath), epubh.FileDir.Images, filename);
   await utils.mkdir(path.dirname(copiedPath));
@@ -412,7 +395,7 @@ async function copyImage(
     new epubh.EpubContextFileBase({
       filePath: copiedPath,
       mediaType: mimetype,
-      id: epubfileOptions.Id,
+      id: id,
     })
   );
 
@@ -493,12 +476,7 @@ async function doCoverPage(
   const imgId = `cover${ext}`;
   const imgFilename = `Cover${ext}`;
 
-  await copyImage(fromPath, epubctxOut, imgFilename, {
-    Id: imgId,
-    OriginalFilename: fromPath,
-    Main: false,
-    IndexInSequence: 0,
-  });
+  await copyImage(fromPath, epubctxOut, imgFilename, imgId);
   const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Cover, `../Images/${imgFilename}`);
 
   await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentPath), COVER_XHTML_FILENAME, epubh.FileDir.Text, epubctxOut, {
@@ -554,12 +532,7 @@ async function doFrontMatter(
     const imgId = `frontmatter${frontnum}${ext}`;
     const imgFilename = `Frontmatter${frontnum}${ext}`;
 
-    await copyImage(fromPath, epubctxOut, imgFilename, {
-      Id: imgId,
-      OriginalFilename: fromPath,
-      Main: false,
-      IndexInSequence: 0,
-    });
+    await copyImage(fromPath, epubctxOut, imgFilename, imgId);
     const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Insert, `../Images/${imgFilename}`);
 
     const xhtmlName = `frontmatter${frontnum}.xhtml`;
@@ -1127,12 +1100,7 @@ async function doTextContent(
             xhtmlFilename: imgXHTMLFileName,
           } = options.genIMGID(epubctxOut.tracker, fromPath);
 
-          await copyImage(fromPath, epubctxOut, imgFilename, {
-            Id: imgid,
-            OriginalFilename: fromPath,
-            Main: false,
-            IndexInSequence: 0,
-          });
+          await copyImage(fromPath, epubctxOut, imgFilename, imgid);
           const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`);
 
           const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;

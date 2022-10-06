@@ -891,6 +891,18 @@ async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
   }
 }
 
+/**
+ * Normalize a id for epub use (only allow supported characters)
+ * @param input The String to normalize
+ * @returns The normalized String
+ */
+export function normalizeId(input: string): string {
+  const replacedid = input.replaceAll(/^[^a-zA-Z]+|[^a-zA-Z0-9-_.]/gim, '');
+  utils.assertion(replacedid.length > 0, new Error('Expected "replacedid" to have length > 0'));
+
+  return replacedid;
+}
+
 export const STATICS = {
   CONTENTOPFPATH: 'content.opf',
   ROOTPATH: 'OEBPS',

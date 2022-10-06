@@ -7,7 +7,8 @@ import { applyTemplate, getTemplate } from './template.js';
 import { createWriteStream, promises as fspromises } from 'fs';
 import { JSDOM } from 'jsdom';
 import yazl from 'yazl';
-// import yauzl from 'yauzl';
+import yauzl from 'yauzl';
+import * as mime from 'mime-types';
 
 const log = utils.createNameSpace('epubHelpers');
 
@@ -24,6 +25,8 @@ export class EpubContextFileBase {
   public readonly filePath: string;
   /** The mime-type of the File */
   public readonly mediaType: string;
+  /** Field to store custom data for caching for a specific file (like a spineIndex) */
+  public customData?: Record<string, any>;
 
   constructor(input: { id: string; mediaType: string; filePath: string }) {
     this.id = input.id;
@@ -129,7 +132,7 @@ export class EpubContextFileXHTML extends EpubContextFileBase {
 
 export type EpubFile = EpubContextFileBase | EpubContextFileXHTML;
 
-export class EpubContext<Trackers extends Record<string, number>> {
+export class EpubContext<Trackers extends Record<string, number>, CustomData extends Record<string, any> = never> {
   /** The Tmpdir where the epub files are stored */
   protected readonly _tmpdir: tmp.DirResult;
   /** The Title of the Story */
@@ -138,8 +141,10 @@ export class EpubContext<Trackers extends Record<string, number>> {
   protected _innerFiles: EpubFile[] = [];
   /** Tracker for sequence numbers */
   protected _tracker: Trackers;
+  /** Custom Data to store in the ctx for use */
+  public customData?: CustomData;
 
-  constructor(input: { title: string; trackers: Trackers }) {
+  constructor(input: { title: string; trackers: Trackers; customData?: CustomData }) {
     this.title = input.title;
 
     this._tmpdir = tmp.dirSync({
@@ -148,6 +153,8 @@ export class EpubContext<Trackers extends Record<string, number>> {
     });
     log('Tempdir path:', this.rootDir);
     this._tracker = input.trackers;
+
+    this.customData = input.customData ?? undefined;
   }
 
   get tracker() {
@@ -565,7 +572,7 @@ export async function finishDOMtoFile(
   basePath: string,
   filename: string,
   subdir: FileDir,
-  epubctx: EpubContext<any>,
+  epubctx: EpubContext<any, any>,
   epubfileOptions: Omit<ConstructorParameters<typeof EpubContextFileXHTML>[0], 'filePath'>
 ): Promise<string> {
   const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize();
@@ -600,6 +607,290 @@ export enum EPubType {
   BodyMatterChapter = 'bodymatter chapter',
 }
 
+/** The Values for the Input Epub's Tracker */
+export interface InputEpubTracker {
+  Global: number;
+}
+
+/** The Type for the Input Epub's first Generic  */
+export type InputEpubTrackerRecord = Record<keyof InputEpubTracker, number>;
+
+/** Custom Data the Input Epub provides */
+export interface InputEpubCustomData {
+  contentOPFDoc: Document;
+}
+
+/**
+ * Process the input path to a useable directory structure
+ * - If the input is a directory, copy it into a temp-directory
+ * - If the input is a epub / zip, extract it into a temp-directory
+ * @param inputPath The path to decide on
+ */
+export async function getInputContext(inputPath: string): Promise<EpubContext<InputEpubTrackerRecord, InputEpubCustomData>> {
+  const stat = await utils.statPath(inputPath);
+
+  if (utils.isNullOrUndefined(stat)) {
+    throw new Error(`Could not get stat of "${inputPath}"`);
+  }
+
+  if (!stat.isDirectory() && !stat.isFile()) {
+    throw new Error(`Input is not a directory or a file! Input: "${inputPath}"`);
+  }
+
+  const epubctx = new EpubContext<InputEpubTrackerRecord, InputEpubCustomData>({
+    title: '',
+    trackers: {
+      Global: 0,
+    },
+  });
+
+  /** alias for easier use */
+  const rootPath = epubctx.rootDir;
+
+  if (stat.isDirectory()) {
+    log(`Input is a directory`, inputPath);
+
+    // recursively copy the input to a temp path
+    for await (const file of recursiveDirRead(inputPath)) {
+      const relPath = path.relative(inputPath, file);
+      const newPath = path.resolve(rootPath, relPath);
+      await utils.mkdir(path.dirname(newPath));
+
+      await fspromises.copyFile(file, newPath, 0x755);
+
+      await addToCtx(epubctx, newPath);
+    }
+  }
+
+  if (stat.isFile()) {
+    log(`Input is a file`, inputPath);
+
+    if (!(inputPath.endsWith('zip') || inputPath.endsWith('epub'))) {
+      throw new Error(`File "${inputPath}" does not end with "zip" or "epub"`);
+    }
+
+    await new Promise((res, rej) => {
+      yauzl.open(inputPath, { lazyEntries: true }, (err, zip) => {
+        if (err) {
+          return rej(err);
+        }
+
+        zip.on('entry', (entry: yauzl.Entry) => {
+          if (/\/$/.test(entry.fileName)) {
+            // Diretories in a zip end with "/"
+            // ignore all directories, because they will get created when a file needs it
+            return zip.readEntry();
+          }
+
+          zip.openReadStream(entry, async (err, readStream) => {
+            if (err) {
+              return rej(err);
+            }
+
+            const outPath = path.resolve(rootPath, entry.fileName);
+
+            await utils.mkdir(path.dirname(outPath));
+
+            const writeStream = createWriteStream(outPath);
+
+            writeStream.on('close', async () => {
+              await addToCtx(epubctx, outPath);
+
+              zip.readEntry();
+            });
+            readStream.pipe(writeStream);
+          });
+        });
+        zip.once('error', rej);
+        zip.once('close', res);
+
+        zip.readEntry();
+      });
+    });
+  }
+
+  let contentOPFPath: string;
+
+  {
+    const containerXmlPath = path.resolve(rootPath, 'META-INF/container.xml');
+    const { document: containerXMLDoc } = xh.newJSDOM(await fspromises.readFile(containerXmlPath), {
+      contentType: xh.STATICS.XML_MIMETYPE,
+    });
+
+    const rootFileElem = xh.queryDefinedElement(containerXMLDoc, 'rootfiles > rootfile');
+    const contentOPFPathTMP = rootFileElem.getAttribute('full-path') ?? undefined;
+    utils.assertion(
+      !!contentOPFPathTMP,
+      new Error(
+        `Expected input container.xml to have a "rootfile" element with valid "full-path" attribute. Container.xml path: "${containerXmlPath}"`
+      )
+    );
+    contentOPFPath = path.resolve(rootPath, contentOPFPathTMP);
+  }
+
+  const { document } = xh.newJSDOM(await fspromises.readFile(contentOPFPath), { contentType: xh.STATICS.XML_MIMETYPE });
+
+  if (!utils.isNullOrUndefined(epubctx.customData)) {
+    epubctx.customData.contentOPFDoc = document;
+  } else {
+    epubctx.customData = { contentOPFDoc: document };
+  }
+
+  const metadataElem = xh.queryDefinedElement(document, 'package > metadata');
+  const manifestElem = xh.queryDefinedElement(document, 'package > manifest');
+  const spineElem = xh.queryDefinedElement(document, 'package > spine');
+
+  // get and set the title
+  {
+    const titleElem = xh.definedElement(
+      Array.from(metadataElem.childNodes).find((v) => v.nodeType === v.ELEMENT_NODE && (v as Element).tagName === 'dc:title') as
+        | Element
+        | undefined,
+      'metadata > dc:title'
+    );
+    const title = sh.stringFixSpaces(sh.xmlToString(titleElem.textContent ?? ''));
+    // @ts-expect-error "title" is readonly, but it is overwritten here because of the initial empty string
+    epubctx.title = title;
+  }
+
+  /** Storage for less often executing a function */
+  const contentOPFDir = path.dirname(contentOPFPath);
+  const spineChildren = Array.from(spineElem.childNodes);
+
+  // get and set all the id's
+  for (const item of Array.from(xh.queryDefinedElementAll(manifestElem, 'item'))) {
+    const hrefAttr = item.getAttribute('href');
+    utils.assertionDefined(hrefAttr, new Error(`Expected Attribute "href" to be on a "item" Element. Element: "${item.outerHTML}"`));
+    const found = epubctx.files.find((v) => path.relative(contentOPFDir, v.filePath) === hrefAttr);
+
+    if (!found) {
+      log(`Could not find a file in the epubctx matching the content.opf item, Item: "${item.outerHTML}"`);
+      continue;
+    }
+
+    // @ts-expect-error "id" is a read-only property, but has been defaulted to be empty
+    found.id = item.id;
+
+    const mediaTypeAttr = item.getAttribute('media-type');
+    utils.assertionDefined(
+      mediaTypeAttr,
+      new Error(`Expected Attribute "media-type" to be on a "item" Element. Element: "${item.outerHTML}"`)
+    );
+
+    if (mediaTypeAttr !== found.mediaType) {
+      log(`WARN: Guessed MimeType does not match content.opf MimeType! Guessed: "${found.mediaType}", ConentOPF: "${mediaTypeAttr}"`);
+      // @ts-expect-error "mediaType" is a read-only property, but it should get overwritten by the found mimetype
+      found.mediaType = mediaTypeAttr;
+    }
+
+    // the following is a helper so that sorting can be done with less "find"(loops)
+    const spineIndex =
+      spineChildren.findIndex((v) => v.nodeType === v.ELEMENT_NODE && (v as Element).getAttribute('idref') === found.id) + 1;
+
+    if (utils.isNullOrUndefined(found.customData)) {
+      found.customData = { spineIndex };
+    } else {
+      found.customData['spineIndex'] = spineIndex;
+    }
+  }
+
+  // sort the files in spine order
+  {
+    epubctx.files.sort(function sortContentSpineForInput(a: EpubFile, b: EpubFile) {
+      // ignore all non-xhtml files and move them to the front (before cover xhtml), they will be ignored for the spine and toc generation
+      if (!(a instanceof EpubContextFileXHTML)) {
+        // cannot be 0, otherwise other sorting will not apply correctly
+        return -1;
+      }
+      if (!(b instanceof EpubContextFileXHTML)) {
+        // cannot be 0, otherwise other sorting will not apply correctly
+        return 1;
+      }
+
+      // use the customData if available, otherwise default to 0
+      return (a.customData?.['spineIndex'] ?? 0) - (b.customData?.['spineIndex'] ?? 0);
+    });
+  }
+
+  return epubctx;
+}
+
+/**
+ * Add a file to the given epubctx
+ * Helper to deduplicate code
+ * @param epubctx The Epubctx to add the file to
+ * @param filePath The file path where the file can be found at
+ */
+async function addToCtx(epubctx: EpubContext<InputEpubTrackerRecord, InputEpubCustomData>, filePath: string): Promise<void> {
+  // ignore the "mimetype" file
+  if (path.basename(filePath) === 'mimetype') {
+    return;
+  }
+  // ignore the "container.xml"
+  if (path.basename(filePath) === 'container.xml') {
+    return;
+  }
+
+  let guessedMime = mime.lookup(filePath);
+  log(`addToCtx: guessedMime: "${guessedMime}"`);
+
+  // change "guessedMime" to always be a valid string
+  if (!guessedMime) {
+    guessedMime = 'application/octet-stream';
+  }
+
+  if (guessedMime === xh.STATICS.XHTML_MIMETYPE || guessedMime === STATICS.HTML_MIMETYPE) {
+    const { document } = xh.newJSDOM(await fspromises.readFile(filePath), { contentType: STATICS.HTML_MIMETYPE });
+
+    const titleElem = document.querySelector('head > title');
+
+    let title: string = '';
+
+    if (!utils.isNullOrUndefined(titleElem)) {
+      title = sh.stringFixSpaces(sh.xmlToString(titleElem.textContent ?? ''));
+    }
+
+    const globState = epubctx.incTracker('Global');
+    epubctx.addFile(
+      new EpubContextFileXHTML({
+        filePath: filePath,
+        globalSeqIndex: globState,
+        id: '',
+        seqIndex: 0, // always set to 0, because there is no sequencing that can be generically be done
+        title: title,
+        type: {
+          type: EpubContextFileXHTMLTypes.TEXT,
+        },
+      })
+    );
+  } else {
+    epubctx.addFile(
+      new EpubContextFileBase({
+        filePath: filePath,
+        id: '',
+        mediaType: guessedMime,
+      })
+    );
+  }
+
+  return;
+}
+
+/** Read a Directory recursively */
+async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
+  const entries = await fspromises.readdir(inputPath, { withFileTypes: true });
+
+  for (const ent of entries.sort()) {
+    const resPath = path.resolve(inputPath, ent.name);
+
+    if (ent.isDirectory()) {
+      yield* recursiveDirRead(resPath);
+    }
+
+    yield resPath;
+  }
+}
+
 export const STATICS = {
   CONTENTOPFPATH: 'content.opf',
   ROOTPATH: 'OEBPS',
@@ -607,4 +898,5 @@ export const STATICS = {
   TOCNCXPATH: 'toc.ncx',
   EPUB_MIMETYPE: 'application/epub+zip',
   CSS_MIMETYPE: 'text/css',
+  HTML_MIMETYPE: 'text/html',
 } as const;

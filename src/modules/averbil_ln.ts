@@ -1020,7 +1020,7 @@ async function doTextContent(
   options: DoTextContentOptions
 ): Promise<void> {
   let currentSubChapter = 0;
-  let currentBaseName = replaceID(options.genID(epubctxOut.tracker, currentSubChapter));
+  let currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, currentSubChapter));
   const globState = epubctxOut.incTracker('Global');
 
   let { dom: currentDOM, document: documentNew, mainElement } = await createMAINDOM(title, currentBaseName);
@@ -1119,7 +1119,7 @@ async function doTextContent(
 
           // dont create a new dom if the old one is still empty
           if (!skipSavingMainDOM) {
-            currentBaseName = replaceID(options.genID(epubctxOut.tracker, currentSubChapter));
+            currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, currentSubChapter));
             const nextchapter = await createMAINDOM(title, currentBaseName);
             currentDOM = nextchapter.dom;
             documentNew = nextchapter.document;
@@ -1502,16 +1502,4 @@ function regexMatchGroup(match: RegExpMatchArray, groupName: string): string | u
   const group = match.groups?.[groupName];
 
   return group;
-}
-
-/**
- * Normalize a id (only allow supported characters)
- * @param inputid
- * @returns
- */
-function replaceID(inputid: string): string {
-  const replacedid = inputid.replaceAll(/^[^a-zA-Z]+|[^a-zA-Z0-9-_.]/gim, '');
-  utils.assertion(replacedid.length > 0, new Error('Expected "replacedid" to have length > 0'));
-
-  return replacedid;
 }

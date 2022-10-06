@@ -38,8 +38,7 @@ async function load_modules(): Promise<utils.ConverterModuleStore[]> {
   return Promise.all(
     files
       .filter((file) => {
-        // DEBUG: ignore some modules
-        return file.endsWith('.js') && !(file.startsWith('nhentai') || file.startsWith('webtoons'));
+        return file.endsWith('.js');
       })
       .map((file) => {
         log(`Loading Module "${file}"`);

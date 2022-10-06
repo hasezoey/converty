@@ -8,7 +8,7 @@ import { getTemplate, applyTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
 import * as epubh from '../helpers/epub.js';
 
-const log = utils.createNameSpace('average_ln_original');
+const log = utils.createNameSpace('averbil_ln');
 
 tmp.setGracefulCleanup();
 
@@ -24,7 +24,7 @@ const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
 // CODE
 
 // EXPORTS
-export default function averageLnOriginal(): utils.ConverterModule {
+export default function averbil_ln(): utils.ConverterModule {
   return { matcher, process };
 }
 

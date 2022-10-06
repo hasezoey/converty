@@ -1,8 +1,7 @@
 import * as utils from '../utils.js';
-import { createWriteStream, promises as fspromises } from 'fs';
+import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as tmp from 'tmp';
-import yauzl from 'yauzl';
 import * as mime from 'mime-types';
 import { getTemplate, applyTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
@@ -39,12 +38,10 @@ export function matcher(name: string): boolean {
 type EpubContextTrackers = Record<keyof LastStates, number>;
 
 export async function process(options: utils.ConverterOptions): Promise<string> {
-  const { name: usePath, tmpdir: tmpdirInput } = await getInputPath(options.fileInputPath);
-
-  const { context: epubContextInput, contentBody: contentBodyInput } = await getEpubContextForInput(usePath);
+  const epubctxInput = await epubh.getInputContext(options.fileInputPath);
 
   const epubctxOut = new epubh.EpubContext<EpubContextTrackers>({
-    title: epubContextInput.Title,
+    title: epubctxInput.title,
     trackers: {
       Global: 0,
       LastBonusStoryNum: 0,
@@ -70,18 +67,25 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     })
   );
 
-  for await (const file of recursiveDirRead(path.dirname(path.resolve(usePath, epubContextInput.ContentPath)))) {
-    if (new RegExp(FILES_TO_FILTER_OUT_REGEX).test(file)) {
+  for (const file of epubctxInput.files) {
+    /** Alias to make it easier to handle */
+    const filePath = file.filePath;
+
+    if (new RegExp(FILES_TO_FILTER_OUT_REGEX).test(filePath)) {
       log(`Skipping file "${file}" because it is in the filter regex`);
       continue;
     }
 
     // skip "content.opf" file, because it is handled outside of this loop
-    if (/content\.opf/.test(file)) {
+    if (/content\.opf/.test(filePath)) {
+      continue;
+    }
+    // ignore all .ncx files (like toc.ncx)
+    if (/\.ncx/.test(filePath)) {
       continue;
     }
 
-    const mimetype = mime.lookup(file);
+    const mimetype = file.mediaType;
     log(`Processing file "${file}", ${mimetype}`);
 
     utils.assertion(typeof mimetype === 'string', new Error('Expected "mimetype" to be of string'));
@@ -90,26 +94,25 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       // ignore image files, because they will be copied when required
       continue;
     }
-    if (mimetype === 'text/css') {
+    if (mimetype === epubh.STATICS.CSS_MIMETYPE) {
       // ignore css input files, because our own will be applied
       continue;
     }
-    if (mimetype === 'text/html' || mimetype === xh.STATICS.XHTML_MIMETYPE) {
-      await processHTMLFile(file, epubctxOut);
-      continue;
-    }
-    if (mimetype === xh.STATICS.NCX_MIMETYPE) {
-      utils.assertion(utils.isNullOrUndefined(epubContextInput.NCXPath), new Error('Expected "NCXPath" to still be undefined'));
-      epubContextInput.NCXPath = file;
+    if (file instanceof epubh.EpubContextFileXHTML) {
+      await processHTMLFile(file.filePath, epubctxOut);
       continue;
     }
 
     console.error(`Unhandled "mimetype": ${mimetype}`.red);
   }
 
+  // check needs to be done, because it does not carry over from the function that defined it
+  utils.assertionDefined(epubctxInput.customData, new Error('Expected "epubctxInput.customData" to be defined at this point'));
+  const contentOPFInput = epubctxInput.customData.contentOPFDoc;
+
   function contentOPFHook({ document, idCounter, metadataElem }: Parameters<epubh.ContentOPFFn>[0]) {
-    const packageElementOld = xh.queryDefinedElement(contentBodyInput, 'package');
-    const metadataElementOld = xh.queryDefinedElement(contentBodyInput, 'metadata');
+    const packageElementOld = xh.queryDefinedElement(contentOPFInput, 'package');
+    const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
 
     // copy metadata from old to new
     // using "children" to exclude text nodes
@@ -222,12 +225,16 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
 
   await fspromises.copyFile(outPath, finishedEpubPath);
 
-  if (!utils.isNullOrUndefined(tmpdirInput)) {
-    tmpdirInput.removeCallback();
+  {
+    // somehow "tmp" is not reliable to remove the directory again
+    if (!utils.isNullOrUndefined(await utils.statPath(epubctxInput.rootDir))) {
+      log('"epubctxInput.rootDir" dir still existed after "removeCallback", manually cleaning');
+      await fspromises.rm(epubctxInput.rootDir, { recursive: true, maxRetries: 1 });
+    }
 
     // somehow "tmp" is not reliable to remove the directory again
     if (!utils.isNullOrUndefined(await utils.statPath(epubctxOut.rootDir))) {
-      log('"tmp" dir still existed after "removeCallback", manually cleaning');
+      log('"epubctxOut.rootDir" dir still existed after "removeCallback", manually cleaning');
       await fspromises.rm(epubctxOut.rootDir, { recursive: true, maxRetries: 1 });
     }
   }
@@ -236,18 +243,6 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
 }
 
 // LOCAL
-
-/** Context storing all important options */
-interface EpubContextInput {
-  /** Path to the "rootfile", relative to the root of the input file */
-  ContentPath: string;
-  /** Volume Title */
-  Title: string;
-  /** All files in the "content" */
-  Files: EpubFile[];
-  /** Path to the NCX Path, if existing */
-  NCXPath?: string;
-}
 
 interface LastStates {
   Global: number;
@@ -277,134 +272,6 @@ interface EpubFile {
   IndexInSequence: number;
   /** Store the Title for use in TOC */
   Title?: Title;
-}
-
-/** Read a Directory recursively */
-async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
-  const entries = await fspromises.readdir(inputPath, { withFileTypes: true });
-
-  for (const ent of entries.sort()) {
-    const resPath = path.resolve(inputPath, ent.name);
-
-    if (ent.isDirectory()) {
-      yield* recursiveDirRead(resPath);
-    }
-
-    yield resPath;
-  }
-}
-
-/**
- * Get the Context for the input file
- * @param usePath The input directory path
- * @returns the context and the body to query for later transfer
- */
-async function getEpubContextForInput(usePath: string): Promise<{ context: EpubContextInput; contentBody: Document }> {
-  const containerBuffer = await fspromises.readFile(path.resolve(usePath, 'META-INF/container.xml'));
-  const { document: containerBody } = xh.newJSDOM(containerBuffer, { contentType: xh.STATICS.XML_MIMETYPE });
-
-  const contentPathNode = xh.queryDefinedElement(containerBody, 'container > rootfiles > rootfile');
-
-  const contentPath = contentPathNode.getAttribute('full-path');
-
-  utils.assertionDefined(contentPath, new Error('Expected "contentPath" to be defined'));
-
-  const contentBuffer = await fspromises.readFile(path.resolve(usePath, contentPath));
-  const { document: contentBody } = xh.newJSDOM(contentBuffer, { contentType: xh.STATICS.XML_MIMETYPE });
-
-  const titleNode = xh.queryDefinedElement(contentBody, 'package > metadata > dc\\:title');
-
-  const volumeTitle = titleNode.textContent;
-
-  utils.assertionDefined(volumeTitle, new Error('Expected "volumeTitle" to be defined'));
-
-  const context: EpubContextInput = {
-    ContentPath: contentPath,
-    Title: volumeTitle,
-    Files: [],
-  };
-
-  return { context, contentBody };
-}
-
-/**
- * Get the Input path useable for reading (get directory and extract zips)
- * @param inputPath The Input path to check and convert
- * @returns a path that is useable to read from
- */
-async function getInputPath(inputPath: string): Promise<{ name: string; tmpdir: tmp.DirResult | undefined }> {
-  const stat = await utils.statPath(inputPath);
-
-  if (utils.isNullOrUndefined(stat)) {
-    throw new Error(`Could not get stat of "${inputPath}"`);
-  }
-
-  let usePath: string | undefined = undefined;
-  let tmpdir: tmp.DirResult | undefined = undefined;
-
-  if (stat.isDirectory()) {
-    usePath = inputPath;
-  } else if (stat.isFile()) {
-    if (!(inputPath.endsWith('zip') || inputPath.endsWith('epub'))) {
-      throw new Error(`File "${inputPath}" does not end with "zip" or "epub"`);
-    }
-
-    log('input is a epub/zip');
-
-    tmpdir = tmp.dirSync({
-      prefix: 'converty-in',
-      unsafeCleanup: true,
-    });
-
-    const tmpdirName = tmpdir.name;
-
-    await new Promise((res, rej) => {
-      yauzl.open(inputPath, { lazyEntries: true }, (err, zip) => {
-        if (err) {
-          return rej(err);
-        }
-
-        zip.on('entry', (entry: yauzl.Entry) => {
-          if (/\/$/.test(entry.fileName)) {
-            // Diretories in a zip end with "/"
-
-            // ignore all directories, because they will get created when a file needs it
-
-            return zip.readEntry();
-          }
-
-          zip.openReadStream(entry, async (err, readStream) => {
-            if (err) {
-              return rej(err);
-            }
-
-            await utils.mkdir(path.resolve(tmpdirName, path.dirname(entry.fileName)));
-
-            const writeStream = createWriteStream(path.resolve(tmpdirName, entry.fileName));
-
-            writeStream.on('close', () => {
-              zip.readEntry();
-            });
-            readStream.pipe(writeStream);
-          });
-        });
-        zip.once('error', rej);
-        zip.once('close', res);
-
-        zip.readEntry();
-      });
-    });
-
-    usePath = tmpdir.name;
-  } else {
-    throw new Error(`Path "${inputPath}" is not a Directory or a file!`);
-  }
-
-  if (utils.isNullOrUndefined(usePath)) {
-    throw new Error('Could not determine a path to use');
-  }
-
-  return { name: usePath, tmpdir };
 }
 
 /** Process a (X)HTML file from input to output */

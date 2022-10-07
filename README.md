@@ -44,7 +44,8 @@ yarn run run
 ls -al ~/Downloads/converty-out
 ```
 
-Note: The project can be run first to have it create the folders (like input and output).
+Note: The project can be run first to have it create the folders (like input and output).  
+Note: The inputs need to be named according to `INPUT_MATCH_REGEX` (defined in each module), this is done to easily match files to modules.
 
 ### Adding Modules
 

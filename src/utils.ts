@@ -459,3 +459,27 @@ export async function searchForFile(
 
   return undefined;
 }
+
+/**
+ * Helper to get regex match groups, which are required with consistent error
+ * @param match The Regex Match output Array
+ * @param groupName The Group to get
+ * @returns The Match from the Group, or throws a Error that the group is required
+ */
+export function regexMatchGroupRequired(match: RegExpMatchArray, groupName: string, context: string): string {
+  const group = regexMatchGroup(match, groupName);
+
+  assertionDefined(group, new Error(`Expected Regex Group "${groupName}" to be in the match (context: ${context})`));
+
+  return group;
+}
+
+/**
+ * Helper to match the "Required" version, just without error (basically a alias)
+ * @param match The Regex Match output Array
+ * @param groupName The Group to get
+ * @returns The Match from the Group, or undefined
+ */
+export function regexMatchGroup(match: RegExpMatchArray, groupName: string): string | undefined {
+  return match.groups?.[groupName];
+}

@@ -180,8 +180,8 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       const caps = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/gim.exec(epubctxOut.title);
 
       if (!utils.isNullOrUndefined(caps)) {
-        const seriesTitleNoVolume = regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
-        const seriesPos = regexMatchGroup(caps, 'num');
+        const seriesTitleNoVolume = utils.regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
+        const seriesPos = utils.regexMatchGroup(caps, 'num');
 
         idCounter += 1;
         const metaCollectionId = `id-${idCounter}`;
@@ -1389,9 +1389,9 @@ function getTitle(headTitle: string): Title {
 
   utils.assertionDefined(matches, new Error('Failed to get matches for Title'));
 
-  const type = regexMatchGroupRequired(matches, 'type', 'getTitle');
-  const numString = regexMatchGroup(matches, 'num');
-  const title = regexMatchGroup(matches, 'title');
+  const type = utils.regexMatchGroupRequired(matches, 'type', 'getTitle');
+  const numString = utils.regexMatchGroup(matches, 'num');
+  const title = utils.regexMatchGroup(matches, 'title');
 
   if (type === 'Copyrights and Credits') {
     return {
@@ -1486,20 +1486,4 @@ function getTitle(headTitle: string): Title {
         fullTitle: headTitle.trim(),
       };
   }
-}
-
-/** Helper to get regex match groups, which are required with consistent error */
-function regexMatchGroupRequired(match: RegExpMatchArray, groupName: string, context: string): string {
-  const group = match.groups?.[groupName];
-
-  utils.assertionDefined(group, new Error(`Expected Regex Group "${groupName}" to be in the match (context: ${context})`));
-
-  return group;
-}
-
-/** Helper to match the "Required" version, just without error (basically a alias) */
-function regexMatchGroup(match: RegExpMatchArray, groupName: string): string | undefined {
-  const group = match.groups?.[groupName];
-
-  return group;
 }

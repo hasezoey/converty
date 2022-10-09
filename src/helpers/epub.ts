@@ -187,10 +187,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
 
   /** Get the absolute path to the css style file */
   get cssPath() {
-    return path.relative(
-      path.dirname(this.contentOPFPath),
-      path.resolve(path.dirname(this.contentOPFPath), FileDir.Styles, this.cssFilename)
-    );
+    return path.relative(this.contentOPFDir, path.resolve(this.contentOPFDir, FileDir.Styles, this.cssFilename));
   }
 
   /**

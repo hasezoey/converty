@@ -169,7 +169,12 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
 
   /** Get the absolute path to where the content.opf file will be */
   get contentOPFPath() {
-    return path.resolve(this.rootDir, STATICS.ROOTPATH, STATICS.CONTENTOPFPATH);
+    return path.join(this.contentOPFDir, STATICS.CONTENTOPFPATH);
+  }
+
+  /** Get the absolute directory to where the content.opf file will be in */
+  get contentOPFDir() {
+    return path.resolve(this.rootDir, STATICS.ROOTPATH);
   }
 
   /** Get all currently registered files that will be included in the EPUB */

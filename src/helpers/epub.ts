@@ -187,7 +187,12 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
 
   /** Get the absolute path to the css style file */
   get cssPath() {
-    return path.relative(this.contentOPFDir, path.resolve(this.contentOPFDir, FileDir.Styles, this.cssFilename));
+    return path.resolve(this.contentOPFDir, FileDir.Styles, this.cssFilename);
+  }
+
+  /** Helper to get a relative path to the css-stylesheet for "relTo" */
+  public getRelCssPath(relTo: string): string {
+    return path.relative(relTo, this.cssPath);
   }
 
   /**
@@ -232,7 +237,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     const containerBasePath = path.dirname(this.contentOPFPath);
 
     const modXHTML = applyTemplate(await getTemplate('toc.xhtml'), {
-      '{{CSSPATH}}': path.join('..', this.cssPath),
+      '{{CSSPATH}}': path.join('..', this.getRelCssPath(this.contentOPFDir)),
       '{{TOC_XHTML_FILENAME}}': path.join(
         '..',
         path.relative(containerBasePath, path.resolve(containerBasePath, FileDir.Text, STATICS.TOCXHTMLPATH))

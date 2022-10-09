@@ -172,12 +172,12 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
 
   /** Get the absolute path to where the content.opf file will be */
   get contentOPFPath() {
-    return path.join(this.contentOPFDir, STATICS.CONTENTOPFPATH);
+    return path.join(this.contentOPFDir, STATICS.CONTENTOPF_FILENAME);
   }
 
   /** Get the absolute directory to where the content.opf file will be in */
   get contentOPFDir() {
-    return path.resolve(this.rootDir, STATICS.ROOTPATH);
+    return path.resolve(this.rootDir, STATICS.ROOT_PATH);
   }
 
   /** Get all currently registered files that will be included in the EPUB */
@@ -240,7 +240,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       '{{CSSPATH}}': path.join('..', this.getRelCssPath(this.contentOPFDir)),
       '{{TOC_XHTML_FILENAME}}': path.join(
         '..',
-        path.relative(containerBasePath, path.resolve(containerBasePath, FileDir.Text, STATICS.TOCXHTMLPATH))
+        path.relative(containerBasePath, path.resolve(containerBasePath, FileDir.Text, STATICS.TOC_XHTML_FILENAME))
       ),
     });
 
@@ -266,8 +266,8 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       listElem.appendChild(liElem);
     }
 
-    await finishDOMtoFile(dom, containerBasePath, STATICS.TOCXHTMLPATH, FileDir.Text, this, {
-      id: STATICS.TOCXHTMLPATH,
+    await finishDOMtoFile(dom, containerBasePath, STATICS.TOC_XHTML_FILENAME, FileDir.Text, this, {
+      id: STATICS.TOC_XHTML_FILENAME,
       globalSeqIndex: 0, // will be moved to the place automatically
       seqIndex: 0,
       title: 'Table Of Contents',
@@ -329,12 +329,12 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       navMapElem.appendChild(navpointElem);
     }
 
-    const outpath = path.resolve(containerBasePath, STATICS.TOCNCXPATH);
+    const outpath = path.resolve(containerBasePath, STATICS.TOC_NCX_FILENAME);
     await utils.mkdir(containerBasePath);
     await fspromises.writeFile(outpath, `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize());
     this.addFile(
       new EpubContextFileBase({
-        id: STATICS.TOCNCXPATH,
+        id: STATICS.TOC_NCX_FILENAME,
         mediaType: xh.STATICS.NCX_MIMETYPE,
         filePath: outpath,
       })
@@ -348,7 +348,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
    */
   protected async generateContentOPF(hookfn?: ContentOPFFn) {
     const modXML = applyTemplate(await getTemplate('content.opf'), {
-      '{{TOC_XHTML_FILENAME}}': STATICS.TOCXHTMLPATH,
+      '{{TOC_XHTML_FILENAME}}': STATICS.TOC_XHTML_FILENAME,
     });
 
     const { dom, document } = xh.newJSDOM(modXML, { contentType: xh.STATICS.XML_MIMETYPE });
@@ -367,7 +367,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     }
 
     // set the NCX toc to use
-    spineElem.setAttribute('toc', STATICS.TOCNCXPATH);
+    spineElem.setAttribute('toc', STATICS.TOC_NCX_FILENAME);
 
     // add all files to the manifest
     for (const file of this.files) {
@@ -378,7 +378,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
         'media-type': file.mediaType,
       });
 
-      if (file.id === STATICS.TOCXHTMLPATH) {
+      if (file.id === STATICS.TOC_XHTML_FILENAME) {
         newElem.setAttribute('properties', 'nav');
       }
 
@@ -458,14 +458,14 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       // explicitly add the following files manually
       zipfile.addBuffer(Buffer.from(STATICS.EPUB_MIMETYPE), 'mimetype');
       zipfile.addBuffer(Buffer.from(containerXMLFile), `META-INF/container.xml`);
-      zipfile.addFile(this.contentOPFPath, `${STATICS.ROOTPATH}/${STATICS.CONTENTOPFPATH}`);
+      zipfile.addFile(this.contentOPFPath, `${STATICS.ROOT_PATH}/${STATICS.CONTENTOPF_FILENAME}`);
 
       const containerPath = path.dirname(this.contentOPFPath);
 
       for (const file of this.files) {
         const filePath = path.resolve(containerPath, file.filePath);
         const relativePath = path.relative(containerPath, filePath);
-        zipfile.addFile(filePath, `${STATICS.ROOTPATH}/${relativePath}`);
+        zipfile.addFile(filePath, `${STATICS.ROOT_PATH}/${relativePath}`);
       }
 
       zipfile.end();
@@ -922,10 +922,10 @@ export function normalizeId(input: string): string {
 }
 
 export const STATICS = {
-  CONTENTOPFPATH: 'content.opf',
-  ROOTPATH: 'OEBPS',
-  TOCXHTMLPATH: 'toc.xhtml',
-  TOCNCXPATH: 'toc.ncx',
+  CONTENTOPF_FILENAME: 'content.opf',
+  ROOT_PATH: 'OEBPS',
+  TOC_XHTML_FILENAME: 'toc.xhtml',
+  TOC_NCX_FILENAME: 'toc.ncx',
   EPUB_MIMETYPE: 'application/epub+zip',
   CSS_MIMETYPE: 'text/css',
   HTML_MIMETYPE: 'text/html',

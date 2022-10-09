@@ -56,7 +56,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     },
   });
 
-  const stylesheetpath = path.resolve(path.dirname(epubctxOut.contentOPFPath), epubh.FileDir.Styles, 'stylesheet.css');
+  const stylesheetpath = path.resolve(epubctxOut.contentOPFDir, epubh.FileDir.Styles, 'stylesheet.css');
   await utils.mkdir(path.dirname(stylesheetpath));
   await fspromises.writeFile(stylesheetpath, await getTemplate('text-ln.css'));
   epubctxOut.addFile(
@@ -383,7 +383,7 @@ async function copyImage(
   filename: string,
   id: string
 ): Promise<string> {
-  const copiedPath = path.resolve(path.dirname(epubctxOut.contentOPFPath), epubh.FileDir.Images, filename);
+  const copiedPath = path.resolve(epubctxOut.contentOPFDir, epubh.FileDir.Images, filename);
   await utils.mkdir(path.dirname(copiedPath));
   await fspromises.copyFile(fromPath, copiedPath);
 
@@ -479,7 +479,7 @@ async function doCoverPage(
   await copyImage(fromPath, epubctxOut, imgFilename, imgId);
   const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Cover, `../Images/${imgFilename}`);
 
-  await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentOPFPath), COVER_XHTML_FILENAME, epubh.FileDir.Text, epubctxOut, {
+  await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, COVER_XHTML_FILENAME, epubh.FileDir.Text, epubctxOut, {
     seqIndex: 0,
     type: { type: epubh.EpubContextFileXHTMLTypes.IMG, imgClass: epubh.ImgClass.Cover, imgType: epubh.ImgType.Cover },
     id: COVER_XHTML_FILENAME,
@@ -536,7 +536,7 @@ async function doFrontMatter(
     const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Insert, `../Images/${imgFilename}`);
 
     const xhtmlName = `frontmatter${frontnum}.xhtml`;
-    await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentOPFPath), xhtmlName, epubh.FileDir.Text, epubctxOut, {
+    await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlName, epubh.FileDir.Text, epubctxOut, {
       id: xhtmlName,
       seqIndex: seq,
       title: title.fullTitle,
@@ -1078,22 +1078,15 @@ async function doTextContent(
           // dont save a empty dom
           if (!skipSavingMainDOM) {
             const xhtmlNameMain = `${currentBaseName}.xhtml`;
-            await epubh.finishDOMtoFile(
-              currentDOM,
-              path.dirname(epubctxOut.contentOPFPath),
-              xhtmlNameMain,
-              epubh.FileDir.Text,
-              epubctxOut,
-              {
-                id: xhtmlNameMain,
-                seqIndex: sequenceCounter,
-                title: title.fullTitle,
-                type: {
-                  type: epubh.EpubContextFileXHTMLTypes.TEXT,
-                },
-                globalSeqIndex: globState,
-              }
-            );
+            await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
+              id: xhtmlNameMain,
+              seqIndex: sequenceCounter,
+              title: title.fullTitle,
+              type: {
+                type: epubh.EpubContextFileXHTMLTypes.TEXT,
+              },
+              globalSeqIndex: globState,
+            });
             currentSubChapter += 1;
             sequenceCounter += 1;
           }
@@ -1111,7 +1104,7 @@ async function doTextContent(
           const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`);
 
           const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
-          await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentOPFPath), xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
+          await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
             id: xhtmlNameIMG,
             seqIndex: sequenceCounter,
             title: title.fullTitle,
@@ -1156,7 +1149,7 @@ async function doTextContent(
   // ignore DOM's that are empty or only have the chapter header
   if (!isElementEmpty(mainElement) && !onlyhash1(mainElement)) {
     const xhtmlNameMain = `${currentBaseName}.xhtml`;
-    await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentOPFPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
+    await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
       id: xhtmlNameMain,
       seqIndex: sequenceCounter,
       title: title.fullTitle,

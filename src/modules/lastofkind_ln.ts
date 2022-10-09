@@ -104,7 +104,7 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   });
 
   // apply the common stylesheet
-  const stylesheetpath = path.resolve(path.dirname(epubctxOut.contentPath), epubh.FileDir.Styles, 'stylesheet.css');
+  const stylesheetpath = path.resolve(path.dirname(epubctxOut.contentOPFPath), epubh.FileDir.Styles, 'stylesheet.css');
   await utils.mkdir(path.dirname(stylesheetpath));
   await fspromises.writeFile(stylesheetpath, await getTemplate('text-ln.css'));
   epubctxOut.addFile(
@@ -609,7 +609,7 @@ async function doTextContent(
         // dont save a empty dom
         if (!skipSavingMainDOM) {
           const xhtmlNameMain = `${currentBaseName}.xhtml`;
-          await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
+          await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentOPFPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
             id: xhtmlNameMain,
             seqIndex: epubctxOut.tracker['CurrentSeq'],
             title: entryType.title,
@@ -630,7 +630,7 @@ async function doTextContent(
         await copyImage(imgFromPath, epubctxOut, imgFilename, imgid);
         const { dom: imgDOM } = await createIMGDOM(entryType, imgid, imgtype, path.join('..', epubh.FileDir.Images, imgFilename));
         const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
-        await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentPath), xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
+        await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentOPFPath), xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
           id: xhtmlNameIMG,
           seqIndex: epubctxOut.tracker['CurrentSeq'],
           title: entryType.title,
@@ -684,7 +684,7 @@ async function doTextContent(
   // ignore DOM's that are empty or only have the chapter header
   if (!isElementEmpty(mainElem) && !onlyhash1(mainElem)) {
     const xhtmlNameMain = `${currentBaseName}.xhtml`;
-    await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
+    await epubh.finishDOMtoFile(currentDOM, path.dirname(epubctxOut.contentOPFPath), xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
       id: xhtmlNameMain,
       seqIndex: epubctxOut.tracker['CurrentSeq'],
       title: entryType.title,
@@ -943,7 +943,7 @@ async function doImagePage(
       };
     }
 
-    await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentPath), img.xhtmlName, epubh.FileDir.Text, epubctxOut, {
+    await epubh.finishDOMtoFile(imgDOM, path.dirname(epubctxOut.contentOPFPath), img.xhtmlName, epubh.FileDir.Text, epubctxOut, {
       id: img.xhtmlName,
       seqIndex: seq,
       title: altAttr,
@@ -978,7 +978,7 @@ async function copyImage(
   filename: string,
   id: string
 ): Promise<string> {
-  const copiedPath = path.resolve(path.dirname(epubctxOut.contentPath), epubh.FileDir.Images, filename);
+  const copiedPath = path.resolve(path.dirname(epubctxOut.contentOPFPath), epubh.FileDir.Images, filename);
   await utils.mkdir(path.dirname(copiedPath));
   await fspromises.copyFile(fromPath, copiedPath);
 

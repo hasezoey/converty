@@ -165,8 +165,9 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     return this._tmpdir.name;
   }
 
-  get contentPath() {
-    return path.join(this.rootDir, STATICS.ROOTPATH);
+  /** Get the absolute path to where the content.opf file will be */
+  get contentOPFPath() {
+    return path.resolve(this.rootDir, STATICS.ROOTPATH, STATICS.CONTENTOPFPATH);
   }
 
   get files() {
@@ -174,7 +175,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
   }
 
   get cssPath() {
-    return path.relative(this.contentPath, path.resolve(this.contentPath, FileDir.Styles, 'style.css'));
+    return path.relative(this.contentOPFPath, path.resolve(this.contentOPFPath, FileDir.Styles, 'style.css'));
   }
 
   /**
@@ -216,7 +217,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       this._innerFiles.splice(foundIndex, 1);
     }
 
-    const containerBasePath = path.dirname(this.contentPath);
+    const containerBasePath = path.dirname(this.contentOPFPath);
 
     const modXHTML = applyTemplate(await getTemplate('toc.xhtml'), {
       '{{CSSPATH}}': path.join('..', this.cssPath),
@@ -271,7 +272,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       this._innerFiles.splice(foundIndex, 1);
     }
 
-    const containerBasePath = path.dirname(this.contentPath);
+    const containerBasePath = path.dirname(this.contentOPFPath);
 
     const modXML = applyTemplate(await getTemplate('toc.ncx'), {
       '{{TITLE}}': this.title,
@@ -356,7 +357,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       const newElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'item');
       xh.applyAttributes(newElem, {
         id: file.id,
-        href: path.relative(path.dirname(this.contentPath), file.filePath),
+        href: path.relative(path.dirname(this.contentOPFPath), file.filePath),
         'media-type': file.mediaType,
       });
 
@@ -395,7 +396,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     }
 
     const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize();
-    const writtenPath = path.resolve(this.contentPath);
+    const writtenPath = this.contentOPFPath;
 
     {
       const stat = await utils.statPath(writtenPath);
@@ -440,9 +441,9 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       // explicitly add the following files manually
       zipfile.addBuffer(Buffer.from(STATICS.EPUB_MIMETYPE), 'mimetype');
       zipfile.addBuffer(Buffer.from(containerXMLFile), `META-INF/container.xml`);
-      zipfile.addFile(this.contentPath, `${STATICS.ROOTPATH}/${STATICS.CONTENTOPFPATH}`);
+      zipfile.addFile(this.contentOPFPath, `${STATICS.ROOTPATH}/${STATICS.CONTENTOPFPATH}`);
 
-      const containerPath = path.dirname(this.contentPath);
+      const containerPath = path.dirname(this.contentOPFPath);
 
       for (const file of this.files) {
         const filePath = path.resolve(containerPath, file.filePath);

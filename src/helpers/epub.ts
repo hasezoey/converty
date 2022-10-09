@@ -143,8 +143,10 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
   protected _tracker: Trackers;
   /** Custom Data to store in the ctx for use */
   public customData?: CustomData;
+  /** The filename of the css-stylesheet to be used */
+  public readonly cssFilename: string;
 
-  constructor(input: { title: string; trackers: Trackers; customData?: CustomData }) {
+  constructor(input: { title: string; trackers: Trackers; customData?: CustomData; cssName?: string }) {
     this.title = input.title;
 
     this._tmpdir = tmp.dirSync({
@@ -155,6 +157,7 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     this._tracker = input.trackers;
 
     this.customData = input.customData ?? undefined;
+    this.cssFilename = input.cssName ?? STATICS.DEFAULT_CSS_FILENAME;
   }
 
   /** Get all the trackers (get wrapper for "_tracker") */
@@ -184,7 +187,10 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
 
   /** Get the absolute path to the css style file */
   get cssPath() {
-    return path.relative(path.dirname(this.contentOPFPath), path.resolve(path.dirname(this.contentOPFPath), FileDir.Styles, 'style.css'));
+    return path.relative(
+      path.dirname(this.contentOPFPath),
+      path.resolve(path.dirname(this.contentOPFPath), FileDir.Styles, this.cssFilename)
+    );
   }
 
   /**
@@ -921,4 +927,5 @@ export const STATICS = {
   EPUB_MIMETYPE: 'application/epub+zip',
   CSS_MIMETYPE: 'text/css',
   HTML_MIMETYPE: 'text/html',
+  DEFAULT_CSS_FILENAME: 'stylesheet.css',
 } as const;

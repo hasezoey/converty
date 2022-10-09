@@ -157,10 +157,12 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     this.customData = input.customData ?? undefined;
   }
 
+  /** Get all the trackers (get wrapper for "_tracker") */
   get tracker() {
     return this._tracker;
   }
 
+  /** Get the working directory's root (tmpdir) */
   get rootDir() {
     return this._tmpdir.name;
   }
@@ -170,10 +172,12 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
     return path.resolve(this.rootDir, STATICS.ROOTPATH, STATICS.CONTENTOPFPATH);
   }
 
+  /** Get all currently registered files that will be included in the EPUB */
   get files() {
     return this._innerFiles;
   }
 
+  /** Get the absolute path to the css style file */
   get cssPath() {
     return path.relative(this.contentOPFPath, path.resolve(this.contentOPFPath, FileDir.Styles, 'style.css'));
   }

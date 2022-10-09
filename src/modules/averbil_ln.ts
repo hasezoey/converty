@@ -17,7 +17,6 @@ const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;
 const FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 const TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
 const COVER_XHTML_FILENAME = 'cover.xhtml';
-const CSSPATH_FOR_XHTML = '../Styles/stylesheet.css';
 const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
 
 // CODE
@@ -329,14 +328,15 @@ interface IcreateMAINDOM extends xh.INewJSDOMReturn {
  * Create a dom from the MAIN_BODY_TEMPLATE template easily
  * @param title The Title object
  * @param sectionid The id of the "section" element
+ * @param epubctx The Epub Context
  * @returns The DOM, document and mainelement
  */
-async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMAINDOM> {
+async function createMAINDOM(title: Title, sectionid: string, epubctx: epubh.EpubContext<any, any>): Promise<IcreateMAINDOM> {
   const modXHTML = applyTemplate(await getTemplate('xhtml-ln.xhtml'), {
     '{{TITLE}}': title.fullTitle,
     '{{SECTIONID}}': sectionid,
     '{{EPUBTYPE}}': epubh.EPubType.BodyMatterChapter,
-    '{{CSSPATH}}': CSSPATH_FOR_XHTML,
+    '{{CSSPATH}}': path.join('..', epubctx.getRelCssPath(epubctx.contentOPFDir)),
   });
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
@@ -355,13 +355,15 @@ async function createMAINDOM(title: Title, sectionid: string): Promise<IcreateMA
  * @param sectionid The id of the "section" element, will also be used for the "imgalt"
  * @param imgclass The class the "img" element should have
  * @param imgsrc The source of the "img" element
+ * @param epubctx The Epub Context
  * @returns The DOM, document and mainelement
  */
 async function createIMGDOM(
   title: Title,
   sectionid: string,
   imgclass: epubh.ImgClass,
-  imgsrc: string
+  imgsrc: string,
+  epubctx: epubh.EpubContext<any, any>
 ): Promise<ReturnType<typeof xh.newJSDOM>> {
   const modXHTML = applyTemplate(await getTemplate('img-ln.xhtml'), {
     '{{TITLE}}': title.fullTitle,
@@ -370,7 +372,7 @@ async function createIMGDOM(
     '{{IMGALT}}': sectionid,
     '{{IMGCLASS}}': imgclass,
     '{{IMGSRC}}': imgsrc,
-    '{{CSSPATH}}': CSSPATH_FOR_XHTML,
+    '{{CSSPATH}}': path.join('..', epubctx.getRelCssPath(epubctx.contentOPFDir)),
   });
 
   // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
@@ -477,7 +479,7 @@ async function doCoverPage(
   const imgFilename = `Cover${ext}`;
 
   await copyImage(fromPath, epubctxOut, imgFilename, imgId);
-  const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Cover, `../Images/${imgFilename}`);
+  const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Cover, `../Images/${imgFilename}`, epubctxOut);
 
   await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, COVER_XHTML_FILENAME, epubh.FileDir.Text, epubctxOut, {
     seqIndex: 0,
@@ -533,7 +535,7 @@ async function doFrontMatter(
     const imgFilename = `Frontmatter${frontnum}${ext}`;
 
     await copyImage(fromPath, epubctxOut, imgFilename, imgId);
-    const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Insert, `../Images/${imgFilename}`);
+    const { dom: imgDOM } = await createIMGDOM(title, imgId, epubh.ImgClass.Insert, `../Images/${imgFilename}`, epubctxOut);
 
     const xhtmlName = `frontmatter${frontnum}.xhtml`;
     await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlName, epubh.FileDir.Text, epubctxOut, {
@@ -1023,7 +1025,7 @@ async function doTextContent(
   let currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, currentSubChapter));
   const globState = epubctxOut.incTracker('Global');
 
-  let { dom: currentDOM, document: documentNew, mainElement } = await createMAINDOM(title, currentBaseName);
+  let { dom: currentDOM, document: documentNew, mainElement } = await createMAINDOM(title, currentBaseName, epubctxOut);
 
   // create initial "h1" (header) element and add it
   {
@@ -1101,7 +1103,7 @@ async function doTextContent(
           } = options.genIMGID(epubctxOut.tracker, fromPath);
 
           await copyImage(fromPath, epubctxOut, imgFilename, imgid);
-          const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`);
+          const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`, epubctxOut);
 
           const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
           await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
@@ -1120,7 +1122,7 @@ async function doTextContent(
           // dont create a new dom if the old one is still empty
           if (!skipSavingMainDOM) {
             currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, currentSubChapter));
-            const nextchapter = await createMAINDOM(title, currentBaseName);
+            const nextchapter = await createMAINDOM(title, currentBaseName, epubctxOut);
             currentDOM = nextchapter.dom;
             documentNew = nextchapter.document;
             mainElement = nextchapter.mainElement;

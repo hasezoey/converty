@@ -1188,7 +1188,8 @@ function generatePElement(origElem: Element, documentNew: Document): Element {
   if (
     (origElem.className.includes('P__STAR__STAR__STAR__page_break') ||
       origElem.className.includes('P_Prose_Formatting__And__Centre_Alignment') ||
-      origElem.className.includes('P__STAR__STAR__STAR__page_break__And__Page_Break')) &&
+      origElem.className.includes('P__STAR__STAR__STAR__page_break__And__Page_Break') ||
+      origElem.className.includes('P_TEXTBODY_CENTERALIGN_PAGEBREAK')) &&
     // only allow elements to have this class when not being empty of text
     (origElem.textContent?.trim().length ?? 0) > 0
   ) {
@@ -1304,6 +1305,7 @@ function generatePElementInner(origNode: Node, documentNew: Document): Node[] {
     'P__STAR__STAR__STAR__page_break',
     'P_Prose_Formatting__And__Centre_Alignment',
     'P__STAR__STAR__STAR__page_break__And__Page_Break',
+    'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
     // transform all text to uppercase, ignored because all text is already uppercase
     'C_Nanomachines__And__Times_New_Roman__And__Capitals',
     'C_Current__And__Times_New_Roman__And__Capitals',

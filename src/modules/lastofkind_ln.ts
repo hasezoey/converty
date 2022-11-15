@@ -45,37 +45,88 @@ function matcher(name: string): boolean {
 
 // LOCAL CODE
 
-interface Trackers {
-  /** global ordering tracker, stores the last used number */
-  Global: number;
-  /** tracker for what main chapter number currently on, stores the last used number */
-  Chapter: number;
-  /** tracker for what current insert (image) number is currently on, stores the last used number */
-  Insert: number;
-  /** tracker for what frontmatter number is currently on, stores the last used number  */
-  Frontmatter: number;
-  /** tracker for what backamtter number is currently on, stores the last used number  */
-  Backmatter: number;
-  /** tracker for the current sequence Index (ordering), stores the next to use number */
+export interface BaseTrackers extends epubh.BaseEpubContextTrackers {
+  /**
+   * Tracker for the Current Sequence number, stores the next to use number
+   * Used to sort the Chapter itself (text and images)
+   */
   CurrentSeq: number;
-  /** tracker for the current sub-chapter something is on (naming), stores the next to use number */
+  /**
+   * Tracker for what Chapter Number it currently is on, stores the last used number
+   * Used for Text File naming, this values is used for "X" in "chapterX_0"
+   */
+  Chapter: number;
+  /**
+   * Tracker for what Sub-Chapter Number it currently is on, stores the next to use number
+   * Used for Text File naming, this value is used for "X" in "chapter0_X"
+   */
   CurrentSubChapter: number;
   /**
-   * tracker to determine if a image is in a text area or not
-   * 0 = Frontmatter
-   * 1 = Insert
-   * 2 = Backmatter
+   * Tracker for what Insert (image) number it currently is on, stores the last used number
+   * Used for Image file naming for in-chapter images
    */
-  ImgType: number;
+  Insert: number;
   /**
-   * Indicate what the last type processed was (currently only indicates image)
-   * 0 = none
-   * 1 = image
+   * Tracker for what Frontmatter (image) number it currently is on, stores the last used number
+   * Used for Image file naming for Frontmatter images
    */
-  LastType: number;
+  Frontmatter: number;
+  /**
+   * Tracker for what Backmatter (image) number it currently is on, stores the last used number
+   * Used for Image file naming for Backmatter images
+   */
+  Backmatter: number;
 }
 
-type EpubContextTrackers = Record<keyof Trackers, number>;
+export enum LastProcessedType {
+  None,
+  Image,
+}
+
+export class TextProcessingECOptions<
+  ExtraTrackers extends string | keyof BaseTrackers = keyof BaseTrackers
+> extends epubh.BaseEpubOptions<ExtraTrackers> {
+  /** Stores the implicit image type to use */
+  protected _imgType: Omit<epubh.ImgType, 'Cover'> = epubh.ImgType.Frontmatter;
+  /** Stores the last type processed */
+  protected _lastType: LastProcessedType = LastProcessedType.None;
+
+  /**
+   * Get the Last Type Processed
+   */
+  get lastType() {
+    return this._lastType;
+  }
+
+  /**
+   * Get the Img Type to use if not explicit
+   */
+  get imgTypeImplicit() {
+    return this._imgType;
+  }
+
+  /**
+   * Set the "LastType" used
+   * @param toType The Type to set to
+   * @returns The type that was set
+   */
+  public setLastType(toType: TextProcessingECOptions['_lastType']) {
+    this._lastType = toType;
+
+    return this._lastType;
+  }
+
+  /**
+   * Set the "ImgType" to use for implicit images
+   * @param toType The Type to set to
+   * @returns The type that was set
+   */
+  public setImgTypeImplicit(toType: TextProcessingECOptions['_imgType']) {
+    this._imgType = toType;
+
+    return this._imgType;
+  }
+}
 
 /**
  * The Main Entry Point of this module to begin processing a file
@@ -87,19 +138,9 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   const epubctxInput = await epubh.getInputContext(options.fileInputPath);
 
   // create a output epubctx
-  const epubctxOut = new epubh.EpubContext<EpubContextTrackers>({
+  const epubctxOut = new epubh.EpubContext<TextProcessingECOptions>({
     title: epubctxInput.title,
-    trackers: {
-      Global: 0,
-      Chapter: 0,
-      Insert: 0,
-      CurrentSeq: 0,
-      CurrentSubChapter: 0,
-      ImgType: 0,
-      LastType: 0,
-      Backmatter: 0,
-      Frontmatter: 0,
-    },
+    optionsClass: new TextProcessingECOptions(),
   });
 
   // apply the common stylesheet
@@ -310,7 +351,7 @@ async function process(options: utils.ConverterOptions): Promise<string> {
  * @param filePath The file to process ((x)html)
  * @param epubctxOut The Epub Context to add new files to
  */
-async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<EpubContextTrackers>): Promise<void> {
+async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<TextProcessingECOptions>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
@@ -433,13 +474,13 @@ interface DoTextContentOptions {
    * @param trackers EpubContextOutput LastStates
    * @param subnum Current SubChapter number
    */
-  genID(trackers: Trackers, subnum: number): string;
+  genID(optionsClass: TextProcessingECOptions, subnum: number): string;
   /**
    * Generate the image id & filename
    * @param trackers EpubContextOutput LastStates
    * @param inputimg the full file path for the input image
    */
-  genIMGID(trackers: Trackers, inputimg: string): DoTextContentIMGID;
+  genIMGID(optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID;
   /**
    * Generate the "h1" element's content
    * @param document The Current DOM Document
@@ -471,17 +512,17 @@ interface DoTextContentOptions {
 async function doTextContent(
   documentInput: Document,
   entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string,
   options: DoTextContentOptions
 ): Promise<void> {
   // do resets because the last type was a image (type 1)
-  if (epubctxOut.tracker['LastType'] === 1) {
-    epubctxOut.tracker['LastType'] = 0; // reset the value
+  if (epubctxOut.optionsClass.lastType === LastProcessedType.Image) {
+    epubctxOut.optionsClass.setLastType(LastProcessedType.None); // reset the value
 
     // only increment "CurrentSubChapter" when "ImgType" is set to "Insert", because this indicates that it is still in a chapter
-    if (epubctxOut.tracker['ImgType'] === 1) {
-      epubctxOut.incTracker('CurrentSubChapter');
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
+      epubctxOut.optionsClass.incTracker('CurrentSubChapter');
     }
   }
 
@@ -518,15 +559,15 @@ async function doTextContent(
   let increasedChapter = false;
 
   // reset Trackers when either "hasTitle" (found a title in the body) or when "ImgType" is anything but "insert"
-  if (epubctxOut.tracker['ImgType'] !== 1 || hasTitle) {
-    epubctxOut.tracker['CurrentSeq'] = 0;
-    epubctxOut.tracker['CurrentSubChapter'] = 0;
-    epubctxOut.tracker['ImgType'] = 1;
+  if (epubctxOut.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasTitle) {
+    epubctxOut.optionsClass.resetTracker('CurrentSeq');
+    epubctxOut.optionsClass.resetTracker('CurrentSubChapter');
+    epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Insert);
 
     // only increment "Chapter" tracker if the current document has a heading detected in the body
     if (hasTitle) {
       increasedChapter = true;
-      epubctxOut.incTracker('Chapter');
+      epubctxOut.optionsClass.incTracker('Chapter');
     }
   }
 
@@ -538,10 +579,10 @@ async function doTextContent(
 
     // extra handling for when encountering a "copyright", because it is somewhere between the cover and the frontmatter
     if (lTitle.includes('copyright')) {
-      epubctxOut.tracker['ImgType'] = 0;
+      epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Frontmatter);
 
       if (increasedChapter) {
-        epubctxOut.tracker['Chapter'] -= 1; // decrement from that count again, because "copyright" should not count towards that
+        epubctxOut.optionsClass.decTracker('Chapter'); // decrement from that count again, because "copyright" should not count towards that
       }
 
       currentBaseName = 'copyright';
@@ -554,10 +595,10 @@ async function doTextContent(
       };
     }
     if (lTitle.includes('afterword')) {
-      epubctxOut.tracker['ImgType'] = 2;
+      epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Backmatter);
 
       if (increasedChapter) {
-        epubctxOut.tracker['Chapter'] -= 1; // decrement from that count again, because "copyright" should not count towards that
+        epubctxOut.optionsClass.decTracker('Chapter'); // decrement from that count again, because "copyright" should not count towards that
       }
 
       currentBaseName = 'afterword';
@@ -565,15 +606,15 @@ async function doTextContent(
   }
 
   if (utils.isNullOrUndefined(currentBaseName)) {
-    currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, epubctxOut.tracker['CurrentSubChapter']));
+    currentBaseName = epubh.normalizeId(options.genID(epubctxOut.optionsClass, epubctxOut.optionsClass.getTracker('CurrentSubChapter')));
   }
 
-  const globState = epubctxOut.incTracker('Global');
+  const globState = epubctxOut.optionsClass.incTracker('Global');
   let { dom: currentDOM, document: documentNew, mainElem } = await createMAINDOM(entryType, currentBaseName, epubctxOut);
   // create initial "h1" (header) element and add it
   {
     // dont add header if ImgType is "inChapter"
-    if (epubctxOut.tracker['CurrentSubChapter'] === 0) {
+    if (epubctxOut.optionsClass.getTracker('CurrentSubChapter') === 0) {
       const h1element = documentNew.createElement('h1');
       options.genChapterElementContent(documentNew, entryType, h1element);
       mainElem.appendChild(h1element);
@@ -610,13 +651,13 @@ async function doTextContent(
           const xhtmlNameMain = `${currentBaseName}.xhtml`;
           await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
             id: xhtmlNameMain,
-            seqIndex: epubctxOut.tracker['CurrentSeq'],
+            seqIndex: epubctxOut.optionsClass.getTracker('CurrentSeq'),
             title: entryType.title,
             type: useType,
             globalSeqIndex: globState,
           });
-          epubctxOut.incTracker('CurrentSubChapter');
-          epubctxOut.incTracker('CurrentSeq');
+          epubctxOut.optionsClass.incTracker('CurrentSubChapter');
+          epubctxOut.optionsClass.incTracker('CurrentSeq');
         }
 
         const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
@@ -625,7 +666,7 @@ async function doTextContent(
           id: imgid,
           imgFilename: imgFilename,
           xhtmlFilename: imgXHTMLFileName,
-        } = options.genIMGID(epubctxOut.tracker, imgFromPath);
+        } = options.genIMGID(epubctxOut.optionsClass, imgFromPath);
         await copyImage(imgFromPath, epubctxOut, imgFilename, imgid);
         const { dom: imgDOM } = await createIMGDOM(
           entryType,
@@ -637,7 +678,7 @@ async function doTextContent(
         const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
         await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
           id: xhtmlNameIMG,
-          seqIndex: epubctxOut.tracker['CurrentSeq'],
+          seqIndex: epubctxOut.optionsClass.getTracker('CurrentSeq'),
           title: entryType.title,
           type: {
             type: epubh.EpubContextFileXHTMLTypes.IMG,
@@ -646,11 +687,13 @@ async function doTextContent(
           },
           globalSeqIndex: globState,
         });
-        epubctxOut.incTracker('CurrentSeq');
+        epubctxOut.optionsClass.incTracker('CurrentSeq');
 
         // dont create a new dom if the old one is still empty
         if (!skipSavingMainDOM) {
-          currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, epubctxOut.tracker['CurrentSubChapter']));
+          currentBaseName = epubh.normalizeId(
+            options.genID(epubctxOut.optionsClass, epubctxOut.optionsClass.getTracker('CurrentSubChapter'))
+          );
           const nextchapter = await createMAINDOM(entryType, currentBaseName, epubctxOut);
           currentDOM = nextchapter.dom;
           documentNew = nextchapter.document;
@@ -666,7 +709,7 @@ async function doTextContent(
       }
 
       // extra fast checks, because "isTitle" requires much computing and does not need to be executed so often
-      const execIsTitle = epubctxOut.tracker['CurrentSubChapter'] === 0 && index < TITLE_CHECK_NUMBER;
+      const execIsTitle = epubctxOut.optionsClass.getTracker('CurrentSubChapter') === 0 && index < TITLE_CHECK_NUMBER;
 
       // skip the existing header elements
       if (execIsTitle && isTitle(documentInput, elem, entryType)) {
@@ -691,12 +734,12 @@ async function doTextContent(
     const xhtmlNameMain = `${currentBaseName}.xhtml`;
     await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
       id: xhtmlNameMain,
-      seqIndex: epubctxOut.tracker['CurrentSeq'],
+      seqIndex: epubctxOut.optionsClass.getTracker('CurrentSeq'),
       title: entryType.title,
       type: useType,
       globalSeqIndex: globState,
     });
-    epubctxOut.incTracker('CurrentSeq');
+    epubctxOut.optionsClass.incTracker('CurrentSeq');
   } else {
     log('Not saving final DOM, because main element is empty');
   }
@@ -788,14 +831,14 @@ function isElementEmpty(elem: Element): boolean {
 async function doGenericPage(
   documentInput: Document,
   entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string,
   skipElements?: number
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   await doTextContent(documentInput, entryType, epubctxOut, currentInputFile, {
-    genID: function (trackers: Trackers, subnum: number): string {
-      let baseName = 'chapter' + trackers.Chapter;
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+      let baseName = 'chapter' + optionsClass.getTracker('Chapter');
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -804,8 +847,8 @@ async function doGenericPage(
 
       return baseName;
     },
-    genIMGID: function (trackers: Trackers, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('Insert');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('Insert');
       const ext = path.extname(inputimg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
@@ -836,7 +879,7 @@ async function doGenericPage(
 async function doImagePage(
   documentInput: Document,
   entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   const imgNodes = Array.from(xh.queryDefinedElementAll(documentInput, 'img')) as HTMLImageElement[];
@@ -845,11 +888,11 @@ async function doImagePage(
 
   // only increment the "Global" tracker when image type is not "insert", otherwise only read it
   // use the "CurrentSeq" tracker when image type is "insert"
-  if (epubctxOut.tracker['ImgType'] === 1) {
-    globState = epubctxOut.tracker['Global'];
-    seq = epubctxOut.tracker['CurrentSeq'];
+  if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
+    globState = epubctxOut.optionsClass.getTracker('Global');
+    seq = epubctxOut.optionsClass.getTracker('CurrentSeq');
   } else {
-    globState = epubctxOut.incTracker('Global');
+    globState = epubctxOut.optionsClass.incTracker('Global');
   }
 
   for (const elem of imgNodes) {
@@ -864,13 +907,13 @@ async function doImagePage(
       isCover = true;
     } else {
       // increment and use the correct tracker
-      if (epubctxOut.tracker['ImgType'] === 0) {
-        numState = epubctxOut.incTracker('Frontmatter');
-      } else if (epubctxOut.tracker['ImgType'] === 2) {
-        numState = epubctxOut.incTracker('Backmatter');
+      if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
+        numState = epubctxOut.optionsClass.incTracker('Frontmatter');
+      } else if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
+        numState = epubctxOut.optionsClass.incTracker('Backmatter');
       } else {
         // in case of "1" and as fallback
-        numState = epubctxOut.incTracker('Insert');
+        numState = epubctxOut.optionsClass.incTracker('Insert');
       }
     }
 
@@ -890,13 +933,13 @@ async function doImagePage(
         xhtmlName: COVER_XHTML_FILENAME,
       };
     } else {
-      if (epubctxOut.tracker['ImgType'] === 0) {
+      if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
         img = {
           imgId: `frontmatter${numState}${ext}`,
           imgFilename: `Frontmatter${numState}${ext}`,
           xhtmlName: `frontmatter${numState}.xhtml`,
         };
-      } else if (epubctxOut.tracker['ImgType'] === 2) {
+      } else if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
         img = {
           imgId: `backmatter${numState}${ext}`,
           imgFilename: `Backmatter${numState}${ext}`,
@@ -934,14 +977,14 @@ async function doImagePage(
         imgType: epubh.ImgType.Cover,
       };
     }
-    if (epubctxOut.tracker['ImgType'] === 1) {
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
       useType = {
         type: epubh.EpubContextFileXHTMLTypes.IMG,
         imgClass: epubh.ImgClass.Insert,
         imgType: epubh.ImgType.Insert,
       };
     }
-    if (epubctxOut.tracker['ImgType'] === 2) {
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
       useType = {
         type: epubh.EpubContextFileXHTMLTypes.IMG,
         imgClass: epubh.ImgClass.Insert,
@@ -960,14 +1003,14 @@ async function doImagePage(
     seq += 1;
 
     // the following still needs to be done, because aliasing a number and adding to it does not change the alias'ed number
-    if (epubctxOut.tracker['ImgType'] === 1) {
-      epubctxOut.incTracker('CurrentSeq');
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
+      epubctxOut.optionsClass.incTracker('CurrentSeq');
     } else {
       seq += 1;
     }
   }
 
-  epubctxOut.tracker['LastType'] = 1;
+  epubctxOut.optionsClass.setLastType(LastProcessedType.Image);
 }
 
 /**
@@ -980,7 +1023,7 @@ async function doImagePage(
  */
 async function copyImage(
   fromPath: string,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   filename: string,
   id: string
 ): Promise<string> {

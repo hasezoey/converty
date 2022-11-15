@@ -34,25 +34,12 @@ export function matcher(name: string): boolean {
   return ret;
 }
 
-type EpubContextTrackers = Record<keyof LastStates, number>;
-
 export async function process(options: utils.ConverterOptions): Promise<string> {
   const epubctxInput = await epubh.getInputContext(options.fileInputPath);
 
-  const epubctxOut = new epubh.EpubContext<EpubContextTrackers>({
+  const epubctxOut = new epubh.EpubContext<TextProcessingECOptions>({
     title: epubctxInput.title,
-    trackers: {
-      Global: 0,
-      LastBonusStoryNum: 0,
-      LastChapterNum: 0,
-      LastFrontNum: 0,
-      LastInsertNum: 0,
-      LastInterludeNum: 0,
-      LastShortStoryNum: 0,
-      LastSideStoryNum: 0,
-      LastGenericNum: 0,
-      LastAfterwordNum: 0,
-    },
+    optionsClass: new TextProcessingECOptions(),
   });
 
   const stylesheetpath = path.resolve(epubctxOut.contentOPFDir, epubh.FileDir.Styles, 'stylesheet.css');
@@ -256,8 +243,17 @@ interface LastStates {
   LastAfterwordNum: number;
 }
 
+export enum LastProcessedType {
+  None,
+  Image,
+}
+
+export class TextProcessingECOptions<
+  ExtraTrackers extends string | keyof LastStates = keyof LastStates
+> extends epubh.BaseEpubOptions<ExtraTrackers> {}
+
 /** Process a (X)HTML file from input to output */
-async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<EpubContextTrackers>): Promise<void> {
+async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<TextProcessingECOptions>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
@@ -381,7 +377,7 @@ async function createIMGDOM(
 
 async function copyImage(
   fromPath: string,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   filename: string,
   id: string
 ): Promise<string> {
@@ -414,14 +410,14 @@ async function copyImage(
 async function doAfterword(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.Afterword, new Error('Expected TitleType to be "Afterword"'));
 
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
       let baseName = 'afterword';
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
@@ -431,8 +427,8 @@ async function doAfterword(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastAfterwordNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastAfterwordNum');
       const ext = path.extname(inputimg);
       const imgid = `afterword_img${newState}${ext}`;
       const imgfilename = `Afterword${newState}${ext}`;
@@ -461,7 +457,7 @@ async function doAfterword(
 async function doCoverPage(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
@@ -500,7 +496,7 @@ async function doCoverPage(
 async function doFrontMatter(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
@@ -519,12 +515,12 @@ async function doFrontMatter(
   }
 
   const imgNodes = xh.queryDefinedElementAll(documentInput, 'img');
-  const globState = epubctxOut.incTracker('Global');
+  const globState = epubctxOut.optionsClass.incTracker('Global');
 
   let seq = 0;
 
   for (const elem of Array.from(imgNodes)) {
-    const frontnum = epubctxOut.incTracker('LastFrontNum');
+    const frontnum = epubctxOut.optionsClass.incTracker('LastFrontNum');
     const imgNodeSrc = elem.getAttribute('src');
 
     utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
@@ -564,12 +560,12 @@ async function doFrontMatter(
 async function doShortStory(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.ShortStory, new Error('Expected TitleType to be "ShortStory"'));
-  epubctxOut.incTracker('LastShortStoryNum');
+  epubctxOut.optionsClass.incTracker('LastShortStoryNum');
 
   const bodyElement = xh.queryDefinedElement(documentInput, 'body');
   utils.assertionDefined(bodyElement, new Error('Expected "bodyElement" to exist'));
@@ -588,8 +584,8 @@ async function doShortStory(
   }
 
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'shortstory' + lastStates.LastShortStoryNum;
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+      let baseName = 'shortstory' + optionsClass.getTracker('LastShortStoryNum');
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -598,8 +594,8 @@ async function doShortStory(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastInsertNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
@@ -655,16 +651,16 @@ async function doShortStory(
 async function doSideStory(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.SideStory, new Error('Expected TitleType to be "SideStory"'));
-  epubctxOut.incTracker('LastSideStoryNum');
+  epubctxOut.optionsClass.incTracker('LastSideStoryNum');
 
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'sidestory' + lastStates.LastSideStoryNum;
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+      let baseName = 'sidestory' + optionsClass.getTracker('LastSideStoryNum');
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -673,8 +669,8 @@ async function doSideStory(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastInsertNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
@@ -715,16 +711,16 @@ async function doSideStory(
 async function doBonusStory(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.BonusStory, new Error('Expected TitleType to be "BonusStory"'));
-  epubctxOut.incTracker('LastBonusStoryNum');
+  epubctxOut.optionsClass.incTracker('LastBonusStoryNum');
 
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'bonusstory' + lastStates.LastBonusStoryNum;
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+      let baseName = 'bonusstory' + optionsClass.getTracker('LastBonusStoryNum');
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -733,8 +729,8 @@ async function doBonusStory(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastInsertNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
@@ -775,16 +771,16 @@ async function doBonusStory(
 async function doInterlude(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.Interlude, new Error('Expected TitleType to be "Interlude"'));
-  epubctxOut.incTracker('LastInterludeNum');
+  epubctxOut.optionsClass.incTracker('LastInterludeNum');
 
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'interlude' + lastStates.LastInterludeNum;
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+      let baseName = 'interlude' + optionsClass.getTracker('LastInterludeNum');
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -793,8 +789,8 @@ async function doInterlude(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastInsertNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
@@ -836,16 +832,16 @@ async function doInterlude(
 async function doChapter(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   utils.assertion(title.titleType === TitleType.Chapter, new Error('Expected TitleType to be "Chapter"'));
-  epubctxOut.incTracker('LastChapterNum');
+  epubctxOut.optionsClass.incTracker('LastChapterNum');
 
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
-      let baseName = 'chapter' + lastStates.LastChapterNum;
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+      let baseName = 'chapter' + optionsClass.getTracker('LastChapterNum');
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
@@ -854,8 +850,8 @@ async function doChapter(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastInsertNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
       const ext = path.extname(inputimg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
@@ -904,13 +900,13 @@ async function doChapter(
 async function doGeneric(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string,
   skipElements?: number
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (lastStates: LastStates, subnum: number): string {
+    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
       // transform fullTitle to spaceless lowercase version
       let baseName = title.fullTitle.trim().replaceAll(/ /gim, '').toLowerCase();
 
@@ -921,8 +917,8 @@ async function doGeneric(
 
       return baseName;
     },
-    genIMGID: function (lastStates: LastStates, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.incTracker('LastGenericNum');
+    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+      const newState = epubctxOut.optionsClass.incTracker('LastGenericNum');
       const ext = path.extname(inputimg);
       const imgid = `generic${newState}${ext}`;
       const imgfilename = `Generic${newState}${ext}`;
@@ -979,13 +975,13 @@ interface DoTextContentOptions {
    * @param lastStates EpubContextOutput LastStates
    * @param subnum Current SubChapter number
    */
-  genID(lastStates: LastStates, subnum: number): string;
+  genID(optionsClass: TextProcessingECOptions, subnum: number): string;
   /**
    * Generate the image id & filename
    * @param lastStates EpubContextOutput LastStates
    * @param inputimg the full file path for the input image
    */
-  genIMGID(lastStates: LastStates, inputimg: string): DoTextContentIMGID;
+  genIMGID(optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID;
   /**
    * Generate the "h1" element's content
    * @param document The Current DOM Document
@@ -1017,13 +1013,13 @@ interface DoTextContentOptions {
 async function doTextContent(
   documentInput: Document,
   title: Title,
-  epubctxOut: epubh.EpubContext<EpubContextTrackers>,
+  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
   currentInputFile: string,
   options: DoTextContentOptions
 ): Promise<void> {
   let currentSubChapter = 0;
-  let currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, currentSubChapter));
-  const globState = epubctxOut.incTracker('Global');
+  let currentBaseName = epubh.normalizeId(options.genID(epubctxOut.optionsClass, currentSubChapter));
+  const globState = epubctxOut.optionsClass.incTracker('Global');
 
   let { dom: currentDOM, document: documentNew, mainElement } = await createMAINDOM(title, currentBaseName, epubctxOut);
 
@@ -1100,7 +1096,7 @@ async function doTextContent(
             id: imgid,
             imgFilename: imgFilename,
             xhtmlFilename: imgXHTMLFileName,
-          } = options.genIMGID(epubctxOut.tracker, fromPath);
+          } = options.genIMGID(epubctxOut.optionsClass, fromPath);
 
           await copyImage(fromPath, epubctxOut, imgFilename, imgid);
           const { dom: imgDOM } = await createIMGDOM(title, imgid, imgtype, `../Images/${imgFilename}`, epubctxOut);
@@ -1121,7 +1117,7 @@ async function doTextContent(
 
           // dont create a new dom if the old one is still empty
           if (!skipSavingMainDOM) {
-            currentBaseName = epubh.normalizeId(options.genID(epubctxOut.tracker, currentSubChapter));
+            currentBaseName = epubh.normalizeId(options.genID(epubctxOut.optionsClass, currentSubChapter));
             const nextchapter = await createMAINDOM(title, currentBaseName, epubctxOut);
             currentDOM = nextchapter.dom;
             documentNew = nextchapter.document;

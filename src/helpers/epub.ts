@@ -132,21 +132,96 @@ export class EpubContextFileXHTML extends EpubContextFileBase {
 
 export type EpubFile = EpubContextFileBase | EpubContextFileXHTML;
 
-export class EpubContext<Trackers extends Record<string, number>, CustomData extends Record<string, any> = never> {
+export interface BaseEpubContextTrackers {
+  /**
+   * Global Ordering Index for all chapters, stores the last used number
+   * Used to sort chapters to the correct place
+   */
+  Global: number;
+}
+
+export class BaseEpubOptions<NumberTrackers extends string | keyof BaseEpubContextTrackers = keyof BaseEpubContextTrackers> {
+  protected _numberTrackers: Partial<Record<NumberTrackers, number>> = {};
+
+  /** Get all the trackers (get wrapper for "_numberTrackers") */
+  get tracker() {
+    return this._numberTrackers;
+  }
+
+  /**
+   * Get the current State of a Tracker
+   * @param trackerName The Tracker Name to get
+   * @returns The Number the tracker is currently at
+   */
+  public getTracker(trackerName: NumberTrackers): number {
+    // if this init is not done, the value would become "NaN"
+    if (utils.isNullOrUndefined(this._numberTrackers[trackerName])) {
+      // init tracker so that it is correctly incremented later
+      return (this._numberTrackers[trackerName] = 0);
+    }
+
+    // @ts-expect-error "undefined" is checked in the "if" above, so this is safe to ignore
+    return this._numberTrackers[trackerName];
+  }
+
+  /**
+   * Increment a tracker by 1 and return the new number
+   * If Tracker has not been used before, will be initialized with "0"
+   * @param trackerName The Tracker Name to increment
+   * @returns The Number the tracker is currently at
+   */
+  public incTracker(trackerName: NumberTrackers): number {
+    // if this init is not done, the value would become "NaN"
+    if (utils.isNullOrUndefined(this._numberTrackers[trackerName])) {
+      return (this._numberTrackers[trackerName] = 1);
+    }
+
+    // @ts-expect-error "undefined" is checked in the "if" above, so this is safe to ignore
+    return (this._numberTrackers[trackerName] += 1);
+  }
+
+  /**
+   * Decrement a tracker by 1 and return the new number
+   * If Tracker has not been used before, will be initialized with "0"
+   * @param trackerName The Tracker Name to decrement
+   * @returns The Number the tracker is currently at
+   */
+  public decTracker(trackerName: NumberTrackers): number {
+    // if this init is not done, the value would become "NaN"
+    if (utils.isNullOrUndefined(this._numberTrackers[trackerName])) {
+      return (this._numberTrackers[trackerName] = 0);
+    }
+
+    // @ts-expect-error "undefined" is checked in the "if" above, so this is safe to ignore
+    return (this._numberTrackers[trackerName] -= 1);
+  }
+
+  /**
+   * Reset a Tracker back to 0
+   * Will create the Tracker if it did not exist before
+   * @param trackerName The Tracker name to Reset
+   * @returns The Number the tracker is currently at
+   */
+  public resetTracker(trackerName: NumberTrackers): number {
+    return (this._numberTrackers[trackerName] = 0);
+  }
+}
+
+export class EpubContext<Options extends BaseEpubOptions, CustomData extends Record<string, any> = never> {
   /** The Tmpdir where the epub files are stored */
   protected readonly _tmpdir: tmp.DirResult;
   /** The Title of the Story */
   public readonly title: string;
   /** The Files of the Epub */
   protected _innerFiles: EpubFile[] = [];
-  /** Tracker for sequence numbers */
-  protected _tracker: Trackers;
+  /** The Options Class in use */
+  protected _optionsClass: Options;
   /** Custom Data to store in the ctx for use */
   public customData?: CustomData;
   /** The filename of the css-stylesheet to be used */
   public readonly cssFilename: string;
 
-  constructor(input: { title: string; trackers: Trackers; customData?: CustomData; cssName?: string }) {
+  constructor(input: { title: string; optionsClass: Options; customData?: CustomData; cssName?: string }) {
     this.title = input.title;
 
     this._tmpdir = tmp.dirSync({
@@ -154,15 +229,15 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
       unsafeCleanup: true,
     });
     log('Tempdir path:', this.rootDir);
-    this._tracker = input.trackers;
+    this._optionsClass = input.optionsClass;
 
     this.customData = input.customData ?? undefined;
     this.cssFilename = input.cssName ?? STATICS.DEFAULT_CSS_FILENAME;
   }
 
   /** Get all the trackers (get wrapper for "_tracker") */
-  get tracker() {
-    return this._tracker;
+  get optionsClass() {
+    return this._optionsClass;
   }
 
   /** Get the working directory's root (tmpdir) */
@@ -208,18 +283,6 @@ export class EpubContext<Trackers extends Record<string, number>, CustomData ext
    */
   public sortFilesForSpine() {
     this._innerFiles.sort(sortContentSpine);
-  }
-
-  /**
-   * Increment a tracker and return the new number
-   * @param trackerType The Type to increment
-   * @returns The incremented number
-   */
-  public incTracker(trackerType: keyof Trackers): number {
-    // @ts-expect-error see https://github.com/microsoft/TypeScript/issues/51069
-    this._tracker[trackerType] += 1;
-
-    return this._tracker[trackerType];
   }
 
   /**
@@ -644,7 +707,7 @@ export interface InputEpubCustomData {
  * - If the input is a epub / zip, extract it into a temp-directory
  * @param inputPath The path to decide on
  */
-export async function getInputContext(inputPath: string): Promise<EpubContext<InputEpubTrackerRecord, InputEpubCustomData>> {
+export async function getInputContext(inputPath: string): Promise<EpubContext<BaseEpubOptions, InputEpubCustomData>> {
   const stat = await utils.statPath(inputPath);
 
   if (utils.isNullOrUndefined(stat)) {
@@ -655,11 +718,9 @@ export async function getInputContext(inputPath: string): Promise<EpubContext<In
     throw new Error(`Input is not a directory or a file! Input: "${inputPath}"`);
   }
 
-  const epubctx = new EpubContext<InputEpubTrackerRecord, InputEpubCustomData>({
+  const epubctx = new EpubContext<BaseEpubOptions, InputEpubCustomData>({
     title: '',
-    trackers: {
-      Global: 0,
-    },
+    optionsClass: new BaseEpubOptions(),
   });
 
   /** alias for easier use */
@@ -839,7 +900,7 @@ export async function getInputContext(inputPath: string): Promise<EpubContext<In
  * @param epubctx The Epubctx to add the file to
  * @param filePath The file path where the file can be found at
  */
-async function addToCtx(epubctx: EpubContext<InputEpubTrackerRecord, InputEpubCustomData>, filePath: string): Promise<void> {
+async function addToCtx(epubctx: EpubContext<BaseEpubOptions, InputEpubCustomData>, filePath: string): Promise<void> {
   // ignore the "mimetype" file
   if (path.basename(filePath) === 'mimetype') {
     return;
@@ -868,7 +929,7 @@ async function addToCtx(epubctx: EpubContext<InputEpubTrackerRecord, InputEpubCu
       title = sh.stringFixSpaces(sh.xmlToString(titleElem.textContent ?? ''));
     }
 
-    const globState = epubctx.incTracker('Global');
+    const globState = epubctx.optionsClass.incTracker('Global');
     epubctx.addFile(
       new EpubContextFileXHTML({
         filePath: filePath,

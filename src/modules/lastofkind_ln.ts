@@ -1,12 +1,22 @@
 import * as utils from '../utils.js';
-import { getTemplate, applyTemplate } from '../helpers/template.js';
+import { getTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
 import * as epubh from '../helpers/epub.js';
 import * as sh from '../helpers/string.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as tmp from 'tmp';
-import * as mime from 'mime-types';
+import {
+  copyImage,
+  createIMGlnDOM,
+  createXHTMLlnDOM,
+  EntryInformation,
+  EntryType,
+  isElementEmpty,
+  LastProcessedType,
+  onlyhash1,
+  TextProcessingECOptions,
+} from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('lastofkind_ln');
 
@@ -44,89 +54,6 @@ function matcher(name: string): boolean {
 }
 
 // LOCAL CODE
-
-export interface BaseTrackers extends epubh.BaseEpubContextTrackers {
-  /**
-   * Tracker for the Current Sequence number, stores the next to use number
-   * Used to sort the Chapter itself (text and images)
-   */
-  CurrentSeq: number;
-  /**
-   * Tracker for what Chapter Number it currently is on, stores the last used number
-   * Used for Text File naming, this values is used for "X" in "chapterX_0"
-   */
-  Chapter: number;
-  /**
-   * Tracker for what Sub-Chapter Number it currently is on, stores the next to use number
-   * Used for Text File naming, this value is used for "X" in "chapter0_X"
-   */
-  CurrentSubChapter: number;
-  /**
-   * Tracker for what Insert (image) number it currently is on, stores the last used number
-   * Used for Image file naming for in-chapter images
-   */
-  Insert: number;
-  /**
-   * Tracker for what Frontmatter (image) number it currently is on, stores the last used number
-   * Used for Image file naming for Frontmatter images
-   */
-  Frontmatter: number;
-  /**
-   * Tracker for what Backmatter (image) number it currently is on, stores the last used number
-   * Used for Image file naming for Backmatter images
-   */
-  Backmatter: number;
-}
-
-export enum LastProcessedType {
-  None,
-  Image,
-}
-
-export class TextProcessingECOptions<
-  ExtraTrackers extends string | keyof BaseTrackers = keyof BaseTrackers
-> extends epubh.BaseEpubOptions<ExtraTrackers> {
-  /** Stores the implicit image type to use */
-  protected _imgType: Omit<epubh.ImgType, 'Cover'> = epubh.ImgType.Frontmatter;
-  /** Stores the last type processed */
-  protected _lastType: LastProcessedType = LastProcessedType.None;
-
-  /**
-   * Get the Last Type Processed
-   */
-  get lastType() {
-    return this._lastType;
-  }
-
-  /**
-   * Get the Img Type to use if not explicit
-   */
-  get imgTypeImplicit() {
-    return this._imgType;
-  }
-
-  /**
-   * Set the "LastType" used
-   * @param toType The Type to set to
-   * @returns The type that was set
-   */
-  public setLastType(toType: TextProcessingECOptions['_lastType']) {
-    this._lastType = toType;
-
-    return this._lastType;
-  }
-
-  /**
-   * Set the "ImgType" to use for implicit images
-   * @param toType The Type to set to
-   * @returns The type that was set
-   */
-  public setImgTypeImplicit(toType: TextProcessingECOptions['_imgType']) {
-    this._imgType = toType;
-
-    return this._imgType;
-  }
-}
 
 /**
  * The Main Entry Point of this module to begin processing a file
@@ -388,7 +315,7 @@ async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<T
     case EntryType.Image:
       await doImagePage(documentInput, entryType, epubctxOut, filePath);
       break;
-    case EntryType.GenericText:
+    case EntryType.Text:
       await doGenericPage(documentInput, entryType, epubctxOut, filePath);
       break;
     default:
@@ -396,19 +323,6 @@ async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<T
       await doGenericPage(documentInput, entryType, epubctxOut, filePath, 0);
       break;
   }
-}
-
-/** Represents the Type of the Current File */
-enum EntryType {
-  Ignore,
-  GenericText,
-  Image,
-}
-
-/** Information about the Current File */
-interface EntryInformation {
-  type: EntryType;
-  title: string;
 }
 
 /**
@@ -423,7 +337,7 @@ function determineType(document: Document): EntryInformation {
   const lTitle = title.toLowerCase();
 
   // generic covers
-  let type: EntryType = EntryType.GenericText;
+  let type: EntryType = EntryType.Text;
 
   // test for the TOC in TOC header element
   {
@@ -435,7 +349,7 @@ function determineType(document: Document): EntryInformation {
   }
 
   if (lTitle === 'copyright') {
-    type = EntryType.GenericText;
+    type = EntryType.Text;
   } else if (lTitle === 'table of contents') {
     type = EntryType.Ignore;
   } else {
@@ -610,7 +524,7 @@ async function doTextContent(
   }
 
   const globState = epubctxOut.optionsClass.incTracker('Global');
-  let { dom: currentDOM, document: documentNew, mainElem } = await createMAINDOM(entryType, currentBaseName, epubctxOut);
+  let { dom: currentDOM, document: documentNew, mainElem } = await createXHTMLlnDOM(entryType, currentBaseName, epubctxOut);
   // create initial "h1" (header) element and add it
   {
     // dont add header if ImgType is "inChapter"
@@ -668,7 +582,7 @@ async function doTextContent(
           xhtmlFilename: imgXHTMLFileName,
         } = options.genIMGID(epubctxOut.optionsClass, imgFromPath);
         await copyImage(imgFromPath, epubctxOut, imgFilename, imgid);
-        const { dom: imgDOM } = await createIMGDOM(
+        const { dom: imgDOM } = await createIMGlnDOM(
           entryType,
           imgid,
           imgtype,
@@ -694,7 +608,7 @@ async function doTextContent(
           currentBaseName = epubh.normalizeId(
             options.genID(epubctxOut.optionsClass, epubctxOut.optionsClass.getTracker('CurrentSubChapter'))
           );
-          const nextchapter = await createMAINDOM(entryType, currentBaseName, epubctxOut);
+          const nextchapter = await createXHTMLlnDOM(entryType, currentBaseName, epubctxOut);
           currentDOM = nextchapter.dom;
           documentNew = nextchapter.document;
           mainElem = nextchapter.mainElem;
@@ -803,21 +717,6 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
   }
 
   return false;
-}
-
-/**
- * Check if it only has one element and that one element is the "h1"
- * Only returns "true" if there is one element and that one element is a "h1"
- * @param elem The Element to check
- * @returns "true" if there is one element and that one element is a "h1"
- */
-function onlyhash1(elem: Element): boolean {
-  return elem.children.length === 1 && elem.children[0].localName === 'h1';
-}
-
-/** Small Helper functions to consistently tell if a node has no children */
-function isElementEmpty(elem: Element): boolean {
-  return elem.childNodes.length === 0;
 }
 
 /**
@@ -956,7 +855,7 @@ async function doImagePage(
     }
 
     await copyImage(fromPath, epubctxOut, img.imgFilename, img.imgId);
-    const { dom: imgDOM } = await createIMGDOM(
+    const { dom: imgDOM } = await createIMGlnDOM(
       entryType,
       img.imgId,
       epubh.ImgClass.Insert,
@@ -1011,102 +910,6 @@ async function doImagePage(
   }
 
   epubctxOut.optionsClass.setLastType(LastProcessedType.Image);
-}
-
-/**
- * Copy a Image from input to the output and add it to the epubctx
- * @param fromPath The Path to copy from
- * @param epubctxOut The epubctx to add it to
- * @param filename The filename to use for the image
- * @param id The id to use for this iamge
- * @returns The copied-path
- */
-async function copyImage(
-  fromPath: string,
-  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
-  filename: string,
-  id: string
-): Promise<string> {
-  const copiedPath = path.resolve(epubctxOut.contentOPFDir, epubh.FileDir.Images, filename);
-  await utils.mkdir(path.dirname(copiedPath));
-  await fspromises.copyFile(fromPath, copiedPath);
-
-  const mimetype = mime.lookup(filename) || undefined;
-
-  utils.assertionDefined(mimetype, new Error('Expected "mimetype" to be defined'));
-
-  epubctxOut.addFile(
-    new epubh.EpubContextFileBase({
-      filePath: copiedPath,
-      mediaType: mimetype,
-      id: id,
-    })
-  );
-
-  return copiedPath;
-}
-
-interface IcreateMAINDOM extends xh.INewJSDOMReturn {
-  mainElem: Element;
-}
-
-/**
- * Create a dom from "xhtml-ln.xhtml" template easily
- * @param entryType The Title object
- * @param sectionid The id of the "section" element
- * @param epubctx The Epub Context
- * @returns The DOM, document and mainelement
- */
-async function createMAINDOM(
-  entryType: EntryInformation,
-  sectionid: string,
-  epubctx: epubh.EpubContext<any, any>
-): Promise<IcreateMAINDOM> {
-  const modXHTML = applyTemplate(await getTemplate('xhtml-ln.xhtml'), {
-    '{{TITLE}}': entryType.title,
-    '{{SECTIONID}}': sectionid,
-    '{{EPUBTYPE}}': epubh.EPubType.BodyMatterChapter,
-    '{{CSSPATH}}': path.join('..', epubctx.getRelCssPath(epubctx.contentOPFDir)),
-  });
-
-  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  const ret = xh.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
-  const mainElement = xh.queryDefinedElement(ret.document, 'div.main');
-
-  return {
-    ...ret,
-    mainElem: mainElement,
-  };
-}
-
-/**
- * Create a dom from the "img-ln.xhtml" template easily
- * @param entryType The Title object
- * @param sectionid The id of the "section" element, will also be used for the "imgalt"
- * @param imgclass The class the "img" element should have
- * @param imgsrc The source of the "img" element
- * @param epubctx The Epub Context
- * @returns The DOM, document and mainelement
- */
-async function createIMGDOM(
-  entryType: EntryInformation,
-  sectionid: string,
-  imgclass: epubh.ImgClass,
-  imgsrc: string,
-  epubctx: epubh.EpubContext<any, any>
-): Promise<ReturnType<typeof xh.newJSDOM>> {
-  const modXHTML = applyTemplate(await getTemplate('img-ln.xhtml'), {
-    '{{TITLE}}': entryType.title,
-    '{{SECTIONID}}': sectionid,
-    '{{EPUBTYPE}}': epubh.EPubType.BodyMatterChapter,
-    '{{IMGALT}}': sectionid,
-    '{{IMGCLASS}}': imgclass,
-    '{{IMGSRC}}': imgsrc,
-    '{{CSSPATH}}': path.join('..', epubctx.getRelCssPath(epubctx.contentOPFDir)),
-  });
-
-  // set custom "contentType" to force it to output xhtml compliant html (like self-closing elements to have a "/")
-  return xh.newJSDOM(modXHTML, JSDOM_XHTML_OPTIONS);
 }
 
 /**

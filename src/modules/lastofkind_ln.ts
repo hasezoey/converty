@@ -10,6 +10,7 @@ import {
   copyImage,
   createIMGlnDOM,
   doTextContent,
+  DoTextContentOptionsGenImageData,
   EntryInformation,
   EntryType,
   LastProcessedType,
@@ -497,20 +498,7 @@ async function doGenericPage(
         useType,
       };
     },
-    genImageIdData(optionsClass, inputImg) {
-      const newState = epubctxOut.optionsClass.incTracker('Insert');
-      const ext = path.extname(inputImg);
-      const imgid = `insert${newState}${ext}`;
-      const imgfilename = `Insert${newState}${ext}`;
-      const xhtmlName = `insert${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        sectionId: imgid,
-        imgClass: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
+    genImageIdData: genImgIdData,
     genChapterHeaderContent(document, entryType, h1Element) {
       h1Element.appendChild(document.createTextNode(entryType.title));
     },
@@ -560,71 +548,38 @@ async function doImagePage(
   }
 
   for (const elem of imgNodes) {
-    let numState: number;
     let isCover = false;
 
     const altAttr = elem.getAttribute('alt') || entryType.title;
 
     // determine if the current image processing is for the cover
     if (imgNodes.length === 1 && altAttr.trim().toLowerCase() === 'cover') {
-      numState = 0;
       isCover = true;
-    } else {
-      // increment and use the correct tracker
-      if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
-        numState = epubctxOut.optionsClass.incTracker('Frontmatter');
-      } else if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
-        numState = epubctxOut.optionsClass.incTracker('Backmatter');
-      } else {
-        // in case of "1" and as fallback
-        numState = epubctxOut.optionsClass.incTracker('Insert');
-      }
     }
 
     const fromPath = path.resolve(path.dirname(currentInputFile), elem.src);
-    const ext = path.extname(fromPath);
 
-    let img: {
-      imgId: string;
-      imgFilename: string;
-      xhtmlName: string;
-    };
+    let imgData: DoTextContentOptionsGenImageData;
 
     if (isCover) {
-      img = {
-        imgId: `cover${ext}`,
+      const ext = path.extname(fromPath);
+      imgData = {
+        imgClass: epubh.ImgClass.Cover,
+        sectionId: `cover${ext}`,
         imgFilename: `Cover${ext}`,
-        xhtmlName: COVER_XHTML_FILENAME,
+        xhtmlFilename: COVER_XHTML_FILENAME,
       };
     } else {
-      if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
-        img = {
-          imgId: `frontmatter${numState}${ext}`,
-          imgFilename: `Frontmatter${numState}${ext}`,
-          xhtmlName: `frontmatter${numState}.xhtml`,
-        };
-      } else if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
-        img = {
-          imgId: `backmatter${numState}${ext}`,
-          imgFilename: `Backmatter${numState}${ext}`,
-          xhtmlName: `backmatter${numState}.xhtml`,
-        };
-      } else {
-        // in case of "1" and as fallback
-        img = {
-          imgId: `insert${numState}${ext}`,
-          imgFilename: `Insert${numState}${ext}`,
-          xhtmlName: `insert${numState}.xhtml`,
-        };
-      }
+      imgData = genImgIdData(epubctxOut.optionsClass, fromPath);
+      imgData.xhtmlFilename += '.xhtml';
     }
 
-    await copyImage(fromPath, epubctxOut, img.imgFilename, img.imgId);
+    await copyImage(fromPath, epubctxOut, imgData.imgFilename, imgData.sectionId);
     const { dom: imgDOM } = await createIMGlnDOM(
       entryType,
-      img.imgId,
+      imgData.sectionId,
       epubh.ImgClass.Insert,
-      path.join('..', epubh.FileDir.Images, img.imgFilename),
+      path.join('..', epubh.FileDir.Images, imgData.imgFilename),
       epubctxOut
     );
 
@@ -656,8 +611,8 @@ async function doImagePage(
       };
     }
 
-    await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, img.xhtmlName, epubh.FileDir.Text, epubctxOut, {
-      id: img.xhtmlName,
+    await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, imgData.xhtmlFilename, epubh.FileDir.Text, epubctxOut, {
+      id: imgData.xhtmlFilename,
       seqIndex: seq,
       title: altAttr,
       type: useType,
@@ -675,6 +630,41 @@ async function doImagePage(
   }
 
   epubctxOut.optionsClass.setLastType(LastProcessedType.Image);
+}
+
+/** Helper for consistent Image naming */
+function genImgIdData(optionsClass: LastOfKindECOptions, inputPath: string): DoTextContentOptionsGenImageData {
+  const ext = path.extname(inputPath);
+
+  if (optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
+    const frontmatterNum = optionsClass.incTracker('Frontmatter');
+
+    return {
+      imgClass: epubh.ImgClass.Insert,
+      sectionId: `frontmatter${frontmatterNum}${ext}`,
+      imgFilename: `Frontmatter${frontmatterNum}${ext}`,
+      xhtmlFilename: `frontmatter${frontmatterNum}`,
+    };
+  } else if (optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
+    const backmatterNum = optionsClass.incTracker('Backmatter');
+
+    return {
+      imgClass: epubh.ImgClass.Insert,
+      sectionId: `backmatter${backmatterNum}${ext}`,
+      imgFilename: `Backmatter${backmatterNum}${ext}`,
+      xhtmlFilename: `backmatter${backmatterNum}`,
+    };
+  }
+
+  const insertNum = optionsClass.incTracker('Insert');
+
+  // in case of "1" and as fallback
+  return {
+    imgClass: epubh.ImgClass.Insert,
+    sectionId: `insert${insertNum}${ext}`,
+    imgFilename: `Insert${insertNum}${ext}`,
+    xhtmlFilename: `insert${insertNum}`,
+  };
 }
 
 interface GeneratePElementInnerElem {

@@ -9,12 +9,10 @@ import * as tmp from 'tmp';
 import {
   copyImage,
   createIMGlnDOM,
-  createXHTMLlnDOM,
+  doTextContent,
   EntryInformation,
   EntryType,
-  isElementEmpty,
   LastProcessedType,
-  onlyhash1,
   TextProcessingECOptions,
 } from '../helpers/htmlTextProcessing.js';
 
@@ -55,6 +53,10 @@ function matcher(name: string): boolean {
 
 // LOCAL CODE
 
+class LastOfKindECOptions extends TextProcessingECOptions {
+  public titleCache?: IsTitleCache;
+}
+
 /**
  * The Main Entry Point of this module to begin processing a file
  * @param options The Options from the main module
@@ -65,9 +67,9 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   const epubctxInput = await epubh.getInputContext(options.fileInputPath);
 
   // create a output epubctx
-  const epubctxOut = new epubh.EpubContext<TextProcessingECOptions>({
+  const epubctxOut = new epubh.EpubContext<LastOfKindECOptions>({
     title: epubctxInput.title,
-    optionsClass: new TextProcessingECOptions(),
+    optionsClass: new LastOfKindECOptions(),
   });
 
   // apply the common stylesheet
@@ -278,7 +280,7 @@ async function process(options: utils.ConverterOptions): Promise<string> {
  * @param filePath The file to process ((x)html)
  * @param epubctxOut The Epub Context to add new files to
  */
-async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<TextProcessingECOptions>): Promise<void> {
+async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<LastOfKindECOptions>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
@@ -371,294 +373,6 @@ function determineType(document: Document): EntryInformation {
   };
 }
 
-interface DoTextContentIMGID {
-  /** id for sectionid, imgalt */
-  id: string;
-  /** Image Filename to store the file as (only basename) (the image itself, not the xhtml) */
-  imgFilename: string;
-  /** Filename (without extension) of the xhtml containing the image */
-  xhtmlFilename: string;
-  /** Image Type */
-  imgtype: epubh.ImgClass;
-}
-
-interface DoTextContentOptions {
-  /**
-   * Generate the id (for sectionid, filename)
-   * @param trackers EpubContextOutput LastStates
-   * @param subnum Current SubChapter number
-   */
-  genID(optionsClass: TextProcessingECOptions, subnum: number): string;
-  /**
-   * Generate the image id & filename
-   * @param trackers EpubContextOutput LastStates
-   * @param inputimg the full file path for the input image
-   */
-  genIMGID(optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID;
-  /**
-   * Generate the "h1" element's content
-   * @param document The Current DOM Document
-   * @param entryType The title object
-   * @param h1Element The h1 header element (eg chapter)
-   * @returns nothing, the "h1Element" input should be directly modified and that will be used
-   */
-  genChapterElementContent(document: Document, entryType: EntryInformation, h1Element: HTMLHeadingElement): void;
-
-  /**
-   * Custom define if a element should be skipped or kept
-   * @param elem The Element to check
-   * @returns "true" when it should be skipped
-   */
-  checkElement?(elem: Element): boolean;
-
-  /** Set custom number of elements to skip */
-  skipElements?: number;
-}
-
-/**
- * Handle everything related to the "Title.Chapter" type
- * @param documentInput The Input Document's "document.body"
- * @param entryType The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
- * @param currentInputFile Currently processing's Input file path
- */
-async function doTextContent(
-  documentInput: Document,
-  entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
-  currentInputFile: string,
-  options: DoTextContentOptions
-): Promise<void> {
-  // do resets because the last type was a image (type 1)
-  if (epubctxOut.optionsClass.lastType === LastProcessedType.Image) {
-    epubctxOut.optionsClass.setLastType(LastProcessedType.None); // reset the value
-
-    // only increment "CurrentSubChapter" when "ImgType" is set to "Insert", because this indicates that it is still in a chapter
-    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
-      epubctxOut.optionsClass.incTracker('CurrentSubChapter');
-    }
-  }
-
-  /** Used as a reset condition for "CurrentSubChapter" */
-  let hasTitle = false;
-
-  // determine if the first elements have a heading element, which would indicate that it is a new chapter and not a continuation
-  // if yes, it is used as a "reset condition"
-  {
-    const foundElem = Array.from(documentInput.querySelectorAll('body > p')).slice(0, TITLE_CHECK_NUMBER);
-
-    const window = documentInput.defaultView;
-    utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
-    const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(documentInput, 'body'));
-    const bodyFontSizePx = parseInt(bodyCompStyle.fontSize);
-
-    for (const elem of foundElem) {
-      const newTitle = isTitle(documentInput, elem, entryType, { bodyFontSizePx, window });
-
-      if (newTitle) {
-        hasTitle = true;
-
-        // in some cases, the "head>title" and the "body>heading" text do not match, in those cases use the "body>heading" text when available
-        if (typeof newTitle === 'string') {
-          entryType.title = newTitle;
-        }
-
-        break;
-      }
-    }
-  }
-
-  /** Flag to decrement the "Chapter" tracker again if later determined that it should not have (like copyright page) */
-  let increasedChapter = false;
-
-  // reset Trackers when either "hasTitle" (found a title in the body) or when "ImgType" is anything but "insert"
-  if (epubctxOut.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasTitle) {
-    epubctxOut.optionsClass.resetTracker('CurrentSeq');
-    epubctxOut.optionsClass.resetTracker('CurrentSubChapter');
-    epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Insert);
-
-    // only increment "Chapter" tracker if the current document has a heading detected in the body
-    if (hasTitle) {
-      increasedChapter = true;
-      epubctxOut.optionsClass.incTracker('Chapter');
-    }
-  }
-
-  let currentBaseName: string | undefined = undefined;
-  let useType: epubh.EpubContextNewFileXHTMLType;
-
-  {
-    const lTitle = entryType.title.toLowerCase();
-
-    // extra handling for when encountering a "copyright", because it is somewhere between the cover and the frontmatter
-    if (lTitle.includes('copyright')) {
-      epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Frontmatter);
-
-      if (increasedChapter) {
-        epubctxOut.optionsClass.decTracker('Chapter'); // decrement from that count again, because "copyright" should not count towards that
-      }
-
-      currentBaseName = 'copyright';
-      useType = {
-        type: epubh.EpubContextFileXHTMLTypes.CREDITS,
-      };
-    } else {
-      useType = {
-        type: epubh.EpubContextFileXHTMLTypes.TEXT,
-      };
-    }
-    if (lTitle.includes('afterword')) {
-      epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Backmatter);
-
-      if (increasedChapter) {
-        epubctxOut.optionsClass.decTracker('Chapter'); // decrement from that count again, because "copyright" should not count towards that
-      }
-
-      currentBaseName = 'afterword';
-    }
-  }
-
-  if (utils.isNullOrUndefined(currentBaseName)) {
-    currentBaseName = epubh.normalizeId(options.genID(epubctxOut.optionsClass, epubctxOut.optionsClass.getTracker('CurrentSubChapter')));
-  }
-
-  const globState = epubctxOut.optionsClass.incTracker('Global');
-  let { dom: currentDOM, document: documentNew, mainElem } = await createXHTMLlnDOM(entryType, currentBaseName, epubctxOut);
-  // create initial "h1" (header) element and add it
-  {
-    // dont add header if ImgType is "inChapter"
-    if (epubctxOut.optionsClass.getTracker('CurrentSubChapter') === 0) {
-      const h1element = documentNew.createElement('h1');
-      options.genChapterElementContent(documentNew, entryType, h1element);
-      mainElem.appendChild(h1element);
-    }
-  }
-  /** Tracker to skip elements unconditionally */
-  let toSkipNumber = 0;
-
-  if (typeof options.skipElements === 'number') {
-    toSkipNumber = options.skipElements;
-  }
-
-  const innerElements = Array.from(documentInput.querySelector('body')?.children ?? []);
-  const customChecker = options.checkElement;
-  for (const [index, elem] of innerElements.entries()) {
-    // for this series, it is safe to assume that the first element is the chapter "p" element
-    if (toSkipNumber > 0) {
-      toSkipNumber -= 1;
-      continue;
-    }
-
-    // skip elements when the customChecker deems it necessary
-    if (!utils.isNullOrUndefined(customChecker) && customChecker(elem)) {
-      continue;
-    }
-    if (elem.localName === 'p') {
-      const imgNode = elem.querySelector('img');
-      const skipSavingMainDOM = isElementEmpty(mainElem) || onlyhash1(mainElem);
-
-      // finish current dom and save the found image and start the next dom
-      if (!utils.isNullOrUndefined(imgNode)) {
-        // dont save a empty dom
-        if (!skipSavingMainDOM) {
-          const xhtmlNameMain = `${currentBaseName}.xhtml`;
-          await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
-            id: xhtmlNameMain,
-            seqIndex: epubctxOut.optionsClass.getTracker('CurrentSeq'),
-            title: entryType.title,
-            type: useType,
-            globalSeqIndex: globState,
-          });
-          epubctxOut.optionsClass.incTracker('CurrentSubChapter');
-          epubctxOut.optionsClass.incTracker('CurrentSeq');
-        }
-
-        const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
-        const {
-          imgtype,
-          id: imgid,
-          imgFilename: imgFilename,
-          xhtmlFilename: imgXHTMLFileName,
-        } = options.genIMGID(epubctxOut.optionsClass, imgFromPath);
-        await copyImage(imgFromPath, epubctxOut, imgFilename, imgid);
-        const { dom: imgDOM } = await createIMGlnDOM(
-          entryType,
-          imgid,
-          imgtype,
-          path.join('..', epubh.FileDir.Images, imgFilename),
-          epubctxOut
-        );
-        const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
-        await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
-          id: xhtmlNameIMG,
-          seqIndex: epubctxOut.optionsClass.getTracker('CurrentSeq'),
-          title: entryType.title,
-          type: {
-            type: epubh.EpubContextFileXHTMLTypes.IMG,
-            imgClass: epubh.ImgClass.Insert,
-            imgType: epubh.ImgType.Insert,
-          },
-          globalSeqIndex: globState,
-        });
-        epubctxOut.optionsClass.incTracker('CurrentSeq');
-
-        // dont create a new dom if the old one is still empty
-        if (!skipSavingMainDOM) {
-          currentBaseName = epubh.normalizeId(
-            options.genID(epubctxOut.optionsClass, epubctxOut.optionsClass.getTracker('CurrentSubChapter'))
-          );
-          const nextchapter = await createXHTMLlnDOM(entryType, currentBaseName, epubctxOut);
-          currentDOM = nextchapter.dom;
-          documentNew = nextchapter.document;
-          mainElem = nextchapter.mainElem;
-        }
-
-        continue;
-      }
-
-      // skip all elements that are empty when the mainElem does not contain anything yet or only the header
-      if (skipSavingMainDOM && sh.xmlToString(elem.textContent ?? '')?.trim().length === 0) {
-        continue;
-      }
-
-      // extra fast checks, because "isTitle" requires much computing and does not need to be executed so often
-      const execIsTitle = epubctxOut.optionsClass.getTracker('CurrentSubChapter') === 0 && index < TITLE_CHECK_NUMBER;
-
-      // skip the existing header elements
-      if (execIsTitle && isTitle(documentInput, elem, entryType)) {
-        continue;
-      }
-
-      mainElem.appendChild(generatePElement(elem, documentNew));
-      continue;
-    }
-    if (elem.localName === 'div') {
-      // ignore all empty div elements
-      if (elem.childNodes.length === 0) {
-        continue;
-      }
-    }
-
-    console.error(`Unhandled "localName": ${elem.localName}`.red);
-  }
-
-  // ignore DOM's that are empty or only have the chapter header
-  if (!isElementEmpty(mainElem) && !onlyhash1(mainElem)) {
-    const xhtmlNameMain = `${currentBaseName}.xhtml`;
-    await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
-      id: xhtmlNameMain,
-      seqIndex: epubctxOut.optionsClass.getTracker('CurrentSeq'),
-      title: entryType.title,
-      type: useType,
-      globalSeqIndex: globState,
-    });
-    epubctxOut.optionsClass.incTracker('CurrentSeq');
-  } else {
-    log('Not saving final DOM, because main element is empty');
-  }
-}
-
 /** Cache Object for {@link isTitle} */
 interface IsTitleCache {
   bodyFontSizePx: number;
@@ -673,7 +387,7 @@ interface IsTitleCache {
  * @param cache Optional Cache to not compute styles too often when not required
  * @returns A String with the detected content of the element if a title, "false" otherwise
  */
-function isTitle(document: Document, elem: Element, entryType: EntryInformation, cache?: IsTitleCache): boolean | string {
+function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: LastOfKindECOptions): boolean | string {
   const processedTitle = sh.xmlToString(elem.textContent ?? '');
 
   // basic fast test if the content matches the parsed title
@@ -688,9 +402,9 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
   let bodyFontSize: number;
   let window: Window;
 
-  if (!utils.isNullOrUndefined(cache)) {
-    bodyFontSize = cache.bodyFontSizePx;
-    window = cache.window;
+  if (!utils.isNullOrUndefined(optionsClass.titleCache)) {
+    bodyFontSize = optionsClass.titleCache.bodyFontSizePx;
+    window = optionsClass.titleCache.window;
   } else {
     const windowTMP = document.defaultView;
     utils.assertionDefined(windowTMP, new Error('Expected to get a "window" from "defaultView"'));
@@ -730,41 +444,92 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
 async function doGenericPage(
   documentInput: Document,
   entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
+  epubctxOut: epubh.EpubContext<LastOfKindECOptions>,
   currentInputFile: string,
   skipElements?: number
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
   await doTextContent(documentInput, entryType, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: TextProcessingECOptions, subnum: number): string {
+    genTextIdData(optionsClass, entryType, extra) {
       let baseName = 'chapter' + optionsClass.getTracker('Chapter');
+      const subnum = optionsClass.getTracker('CurrentSubChapter');
+      let useType: epubh.EpubContextNewFileXHTMLType;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
         baseName += `_${subnum}`;
       }
 
-      return baseName;
+      /** Keep track of wheter to decrement "Chapter" again (deduplicate) */
+      let decChapter = false;
+
+      {
+        const lTitle = entryType.title.toLowerCase();
+
+        // extra handling for when encountering a "copyright", because it is somewhere between the cover and the frontmatter
+        if (lTitle.includes('copyright')) {
+          epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Frontmatter);
+
+          decChapter = true;
+          baseName = 'copyright';
+          useType = {
+            type: epubh.EpubContextFileXHTMLTypes.CREDITS,
+          };
+        } else {
+          useType = {
+            type: epubh.EpubContextFileXHTMLTypes.TEXT,
+          };
+        }
+        if (lTitle.includes('afterword')) {
+          epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Backmatter);
+
+          decChapter = true;
+          baseName = 'afterword';
+        }
+      }
+
+      if (extra.increasedChapterWithTitle && decChapter) {
+        epubctxOut.optionsClass.decTracker('Chapter');
+      }
+
+      return {
+        sectionId: baseName,
+        useType,
+      };
     },
-    genIMGID: function (optionsClass: TextProcessingECOptions, inputimg: string): DoTextContentIMGID {
+    genImageIdData(optionsClass, inputImg) {
       const newState = epubctxOut.optionsClass.incTracker('Insert');
-      const ext = path.extname(inputimg);
+      const ext = path.extname(inputImg);
       const imgid = `insert${newState}${ext}`;
       const imgfilename = `Insert${newState}${ext}`;
       const xhtmlName = `insert${newState}`;
 
       return {
         imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
+        sectionId: imgid,
+        imgClass: epubh.ImgClass.Insert,
         xhtmlFilename: xhtmlName,
       };
     },
-    genChapterElementContent: function (document: Document, entryType: EntryInformation, h1Element: HTMLHeadingElement): void {
+    genChapterHeaderContent(document, entryType, h1Element) {
       h1Element.appendChild(document.createTextNode(entryType.title));
     },
+    genPElemText: generatePElementInner,
+    cachedIsTitleOptions(document, optionsClass) {
+      const window = documentInput.defaultView;
+      utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
+      const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(documentInput, 'body'));
+      const bodyFontSizePx = parseInt(bodyCompStyle.fontSize);
+
+      optionsClass.titleCache = {
+        bodyFontSizePx,
+        window,
+      };
+    },
+    isTitle: isTitle,
 
     skipElements,
+    headerSearchCount: TITLE_CHECK_NUMBER,
   });
 }
 
@@ -778,7 +543,7 @@ async function doGenericPage(
 async function doImagePage(
   documentInput: Document,
   entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<TextProcessingECOptions>,
+  epubctxOut: epubh.EpubContext<LastOfKindECOptions>,
   currentInputFile: string
 ): Promise<void> {
   const imgNodes = Array.from(xh.queryDefinedElementAll(documentInput, 'img')) as HTMLImageElement[];
@@ -910,22 +675,6 @@ async function doImagePage(
   }
 
   epubctxOut.optionsClass.setLastType(LastProcessedType.Image);
-}
-
-/**
- * Transform top-level "p" elements to new elements on the new document
- * @param origElem Original container element
- * @param documentNew The document to generate elements on
- * @returns The new Node to add
- */
-function generatePElement(origElem: Element, documentNew: Document): Element {
-  const topElem = documentNew.createElement('p');
-
-  for (const elem of generatePElementInner(origElem, documentNew, topElem)) {
-    topElem.appendChild(elem);
-  }
-
-  return topElem;
 }
 
 interface GeneratePElementInnerElem {

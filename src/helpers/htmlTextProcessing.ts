@@ -31,8 +31,8 @@ export interface DoTextContentOptionsGenImageData {
    */
   sectionId: string;
   /**
-   * Filename of the Image file itself to store the file as (without extension)
-   * @example This should output something like "Insert1" (which later becomes "Insert1.png")
+   * Filename of the Image file itself to store the file as (with extension)
+   * @example This should output something like "Insert1.png"
    */
   imgFilename: string;
   /**

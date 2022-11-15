@@ -696,7 +696,8 @@ function helperAssignElem(obj: GeneratePElementInnerElem, newNode: Element) {
  * @param parentElem The Element the new nodes are added to (will not be applied by this function), required for testing and applying styles
  * @returns The array of new Nodes
  */
-function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element): Node[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: LastOfKindECOptions): Node[] {
   // if node is text, return as text
   if (origNode.nodeType === documentNew.TEXT_NODE) {
     utils.assertionDefined(origNode.textContent, new Error('Expected "origElem.textContent" to be defined'));
@@ -764,19 +765,12 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
     }
   }
 
-  // ignore unhandled classes in this case, because they are generated with "could be different numbers"
-  // const classesToIgnore: string[] = [];
-
-  // if (origElem.className.length != 0 && !classesToIgnore.includes(origElem.className)) {
-  //   console.log('encountered unknown class'.red, origElem.className);
-  // }
-
   // if "currentElem" is not defined, loop over the original elements's children and return those children directly
   // because this means the current element is not needed
   if (utils.isNullOrUndefined(elemObj.currentElem)) {
     const listOfNodes: Node[] = [];
     for (const child of Array.from(origElem.childNodes)) {
-      listOfNodes.push(...generatePElementInner(child, documentNew, parentElem));
+      listOfNodes.push(...generatePElementInner(child, documentNew, parentElem, _optionsClass));
     }
 
     return listOfNodes;
@@ -784,7 +778,7 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
 
   // loop over all original Element's children and add them to the currentElem as a child
   for (const child of Array.from(origElem.childNodes)) {
-    for (const elem of generatePElementInner(child, documentNew, elemObj.currentElem)) {
+    for (const elem of generatePElementInner(child, documentNew, elemObj.currentElem, _optionsClass)) {
       elemObj.currentElem.appendChild(elem);
     }
   }

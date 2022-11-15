@@ -2,17 +2,19 @@ import * as utils from '../utils.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as tmp from 'tmp';
-import * as mime from 'mime-types';
 import { getTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
+import * as sh from '../helpers/string.js';
 import * as epubh from '../helpers/epub.js';
 import {
+  copyImage,
   createIMGlnDOM,
-  createXHTMLlnDOM,
+  EntryInformation,
   EntryType,
-  isElementEmpty,
-  onlyhash1,
+  LastProcessedType,
   TextProcessingECOptions,
+  doTextContent,
+  DoTextContentOptionsGenImageData,
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('averbil_ln');
@@ -238,21 +240,10 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
 
 // LOCAL
 
-interface LastStates {
-  Global: number;
-  LastInsertNum: number;
-  LastFrontNum: number;
-  LastGenericNum: number;
-  LastChapterNum: number;
-  LastBonusStoryNum: number;
-  LastInterludeNum: number;
-  LastSideStoryNum: number;
-  LastShortStoryNum: number;
-  LastAfterwordNum: number;
-}
-
 // extends, because otherwise it would complain about types being not correct in a alias
-class AverbnilECOptions extends TextProcessingECOptions<keyof LastStates> {}
+class AverbnilECOptions extends TextProcessingECOptions {
+  public titleCache?: IsTitleCache;
+}
 
 /** Process a (X)HTML file from input to output */
 async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<AverbnilECOptions>): Promise<void> {
@@ -275,890 +266,439 @@ async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<A
 
   switch (title.titleType) {
     case TitleType.CoverPage:
-      await doCoverPage(documentInput, title, epubctxOut, filePath);
+      await doImagePage(documentInput, { title: title.fullTitle, type: EntryType.Image }, epubctxOut, filePath);
       break;
     case TitleType.Afterword:
-      await doAfterword(documentInput, title, epubctxOut, filePath);
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
+        firstLine: title.fullTitle,
+      });
       break;
     case TitleType.TitlePage:
     case TitleType.ColorInserts:
     case TitleType.CopyrightsAndCredits:
     case TitleType.TocImage:
     case TitleType.CastOfCharacters:
-      await doFrontMatter(documentInput, title, epubctxOut, filePath);
+      await doImagePage(documentInput, { title: title.fullTitle, type: EntryType.Image }, epubctxOut, filePath);
       break;
     case TitleType.BonusStory:
-      await doBonusStory(documentInput, title, epubctxOut, filePath);
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
+        firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Bonus Story ${title.chapterNumber}:` : 'Bonus Story:',
+        secondLine: `${title.chapterTitle}`,
+      });
       break;
     case TitleType.ShortStory:
-      await doShortStory(documentInput, title, epubctxOut, filePath);
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
+        firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Short Story ${title.chapterNumber}:` : 'Short Story:',
+        secondLine: `${title.chapterTitle}`,
+      });
       break;
     case TitleType.SideStory:
-      await doSideStory(documentInput, title, epubctxOut, filePath);
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
+        firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Side Story ${title.chapterNumber}:` : 'Side Story:',
+        secondLine: `${title.chapterTitle}`,
+      });
       break;
     case TitleType.Chapter:
-      await doChapter(documentInput, title, epubctxOut, filePath);
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
+        firstLine: `Chapter ${title.chapterNumber}:`,
+        secondLine: `${title.chapterTitle}`,
+      });
       break;
     case TitleType.Interlude:
-      await doInterlude(documentInput, title, epubctxOut, filePath);
+      let titleUseInterlude;
+
+      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
+        titleUseInterlude = {
+          firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Interlude ${title.chapterNumber}:` : 'Interlude:',
+          secondLine: `${title.chapterTitle}`,
+        };
+      } else {
+        titleUseInterlude = {
+          firstLine: title.fullTitle,
+        };
+      }
+
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, titleUseInterlude);
       break;
     // the following will use the generic target
     case TitleType.Dedication:
     case TitleType.NamedSideStory:
-      await doGeneric(documentInput, title, epubctxOut, filePath, 0);
+      let titleUse2;
+
+      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
+        titleUse2 = {
+          firstLine: title.namedTitle,
+          secondLine: title.chapterTitle,
+        };
+      } else {
+        titleUse2 = {
+          firstLine: title.fullTitle,
+        };
+      }
+
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, titleUse2);
       break;
     case TitleType.Previously:
     case TitleType.AboutAuthorAndIllust:
-      await doGeneric(documentInput, title, epubctxOut, filePath);
+      let titleUse1;
+
+      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
+        titleUse1 = {
+          firstLine: title.namedTitle,
+          secondLine: title.chapterTitle,
+        };
+      } else {
+        titleUse1 = {
+          firstLine: title.fullTitle,
+        };
+      }
+
+      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, titleUse1);
       break;
     default:
       log(`Unhandled Type \"${title.titleType}\" + "${title.fullTitle}"`.red);
-      await doGeneric(documentInput, title, epubctxOut, filePath, 0);
       break;
   }
-}
-
-async function copyImage(
-  fromPath: string,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  filename: string,
-  id: string
-): Promise<string> {
-  const copiedPath = path.resolve(epubctxOut.contentOPFDir, epubh.FileDir.Images, filename);
-  await utils.mkdir(path.dirname(copiedPath));
-  await fspromises.copyFile(fromPath, copiedPath);
-
-  const mimetype = mime.lookup(filename) || undefined;
-
-  utils.assertionDefined(mimetype, new Error('Expected "mimetype" to be defined'));
-
-  epubctxOut.addFile(
-    new epubh.EpubContextFileBase({
-      filePath: copiedPath,
-      mediaType: mimetype,
-      id: id,
-    })
-  );
-
-  return copiedPath;
-}
-
-/**
- * Handle everything related to the "Title.CoverPage" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doAfterword(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.Afterword, new Error('Expected TitleType to be "Afterword"'));
-
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      let baseName = 'afterword';
-
-      // only add a subnumber when a subnumber is required (not in the first of the chapter)
-      if (subnum > 0) {
-        baseName += `_${subnum}`;
-      }
-
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastAfterwordNum');
-      const ext = path.extname(inputimg);
-      const imgid = `afterword_img${newState}${ext}`;
-      const imgfilename = `Afterword${newState}${ext}`;
-      const xhtmlName = `afterword_img${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      h1Element.appendChild(document.createTextNode(`Afterword`));
-    },
-  });
-}
-
-/**
- * Handle everything related to the "Title.CoverPage" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doCoverPage(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.CoverPage, new Error('Expected TitleType to be "CoverPage"'));
-
-  const imgNode = xh.queryDefinedElement(documentInput, 'img');
-
-  const imgNodeSrc = imgNode.getAttribute('src');
-
-  utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
-
-  const fromPath = path.resolve(path.dirname(currentInputFile), imgNodeSrc);
-  const ext = path.extname(fromPath);
-  const imgId = `cover${ext}`;
-  const imgFilename = `Cover${ext}`;
-
-  await copyImage(fromPath, epubctxOut, imgFilename, imgId);
-  const { dom: imgDOM } = await createIMGlnDOM(
-    { title: title.fullTitle, type: EntryType.Image },
-    imgId,
-    epubh.ImgClass.Cover,
-    `../Images/${imgFilename}`,
-    epubctxOut
-  );
-
-  await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, COVER_XHTML_FILENAME, epubh.FileDir.Text, epubctxOut, {
-    seqIndex: 0,
-    type: { type: epubh.EpubContextFileXHTMLTypes.IMG, imgClass: epubh.ImgClass.Cover, imgType: epubh.ImgType.Cover },
-    id: COVER_XHTML_FILENAME,
-    title: title.fullTitle,
-    globalSeqIndex: 0,
-  });
 }
 
 /**
  * Handle everything related to the Frontmatter Title types
  * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
+ * @param entryType The Title Object
  * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  */
-async function doFrontMatter(
+async function doImagePage(
   documentInput: Document,
-  title: Title,
+  entryType: EntryInformation,
   epubctxOut: epubh.EpubContext<AverbnilECOptions>,
   currentInputFile: string
 ): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertionDefined(title.titleType, new Error('Expected "title.titleType" to be defined'));
-
-  const FRONT_TYPES: TitleType[] = [
-    TitleType.ColorInserts,
-    TitleType.CopyrightsAndCredits,
-    TitleType.TitlePage,
-    TitleType.TocImage,
-    TitleType.CastOfCharacters,
-  ];
-
-  if (!FRONT_TYPES.includes(title.titleType)) {
-    throw new Error(`Expected "title.titleType" to be a supported FONT_TYPE, got \"${TitleType[title.titleType]}\"`);
-  }
-
-  const imgNodes = xh.queryDefinedElementAll(documentInput, 'img');
-  const globState = epubctxOut.optionsClass.incTracker('Global');
-
+  const imgNodes = Array.from(xh.queryDefinedElementAll(documentInput, 'img')) as HTMLImageElement[];
+  let globState: number;
   let seq = 0;
 
-  for (const elem of Array.from(imgNodes)) {
-    const frontnum = epubctxOut.optionsClass.incTracker('LastFrontNum');
-    const imgNodeSrc = elem.getAttribute('src');
+  // only increment the "Global" tracker when image type is not "insert", otherwise only read it
+  // use the "CurrentSeq" tracker when image type is "insert"
+  if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
+    globState = epubctxOut.optionsClass.getTracker('Global');
+    seq = epubctxOut.optionsClass.getTracker('CurrentSeq');
+  } else {
+    globState = epubctxOut.optionsClass.incTracker('Global');
+  }
 
-    utils.assertionDefined(imgNodeSrc, new Error('Expected "imgNodeSrc" to be defined'));
+  for (const elem of imgNodes) {
+    let isCover = false;
 
-    const fromPath = path.resolve(path.dirname(currentInputFile), imgNodeSrc);
-    const ext = path.extname(fromPath);
-    const imgId = `frontmatter${frontnum}${ext}`;
-    const imgFilename = `Frontmatter${frontnum}${ext}`;
+    const altAttr = elem.getAttribute('alt') || entryType.title;
 
-    await copyImage(fromPath, epubctxOut, imgFilename, imgId);
+    // determine if the current image processing is for the cover
+    if (imgNodes.length === 1 && altAttr.trim().toLowerCase() === 'cover') {
+      isCover = true;
+    }
+
+    const fromPath = path.resolve(path.dirname(currentInputFile), elem.src);
+
+    let imgData: DoTextContentOptionsGenImageData;
+
+    if (isCover) {
+      const ext = path.extname(fromPath);
+      imgData = {
+        imgClass: epubh.ImgClass.Cover,
+        sectionId: `cover${ext}`,
+        imgFilename: `Cover${ext}`,
+        xhtmlFilename: COVER_XHTML_FILENAME,
+      };
+    } else {
+      imgData = genImgIdData(epubctxOut.optionsClass, fromPath);
+      imgData.xhtmlFilename += '.xhtml';
+    }
+
+    await copyImage(fromPath, epubctxOut, imgData.imgFilename, imgData.sectionId);
     const { dom: imgDOM } = await createIMGlnDOM(
-      { title: title.fullTitle, type: EntryType.Image },
-      imgId,
+      entryType,
+      imgData.sectionId,
       epubh.ImgClass.Insert,
-      `../Images/${imgFilename}`,
+      path.join('..', epubh.FileDir.Images, imgData.imgFilename),
       epubctxOut
     );
 
-    const xhtmlName = `frontmatter${frontnum}.xhtml`;
-    await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlName, epubh.FileDir.Text, epubctxOut, {
-      id: xhtmlName,
-      seqIndex: seq,
-      title: title.fullTitle,
-      type: {
+    let useType = {
+      type: epubh.EpubContextFileXHTMLTypes.IMG,
+      imgClass: epubh.ImgClass.Insert,
+      imgType: epubh.ImgType.Frontmatter,
+    };
+
+    if (isCover) {
+      useType = {
+        type: epubh.EpubContextFileXHTMLTypes.IMG,
+        imgClass: epubh.ImgClass.Cover,
+        imgType: epubh.ImgType.Cover,
+      };
+    }
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
+      useType = {
         type: epubh.EpubContextFileXHTMLTypes.IMG,
         imgClass: epubh.ImgClass.Insert,
-        imgType: epubh.ImgType.Frontmatter,
-      },
-      globalSeqIndex: globState, // should be automatically sorted to the front
+        imgType: epubh.ImgType.Insert,
+      };
+    }
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
+      useType = {
+        type: epubh.EpubContextFileXHTMLTypes.IMG,
+        imgClass: epubh.ImgClass.Insert,
+        imgType: epubh.ImgType.Backmatter,
+      };
+    }
+
+    await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, imgData.xhtmlFilename, epubh.FileDir.Text, epubctxOut, {
+      id: imgData.xhtmlFilename,
+      seqIndex: seq,
+      title: altAttr,
+      type: useType,
+      globalSeqIndex: globState,
     });
 
     seq += 1;
-  }
-}
 
-/**
- * Handle everything related to the "Title.ShortStory" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doShortStory(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.ShortStory, new Error('Expected TitleType to be "ShortStory"'));
-  epubctxOut.optionsClass.incTracker('LastShortStoryNum');
-
-  const bodyElement = xh.queryDefinedElement(documentInput, 'body');
-  utils.assertionDefined(bodyElement, new Error('Expected "bodyElement" to exist'));
-
-  let indexOfFirstNonBreakElement = Array.from(bodyElement.children).findIndex(
-    (v) => !v.getAttribute('class')?.includes('P__STAR__STAR__STAR__page_break')
-  );
-
-  // fallback in case no index has been found
-  if (indexOfFirstNonBreakElement < 0) {
-    indexOfFirstNonBreakElement = 1;
+    // the following still needs to be done, because aliasing a number and adding to it does not change the alias'ed number
+    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
+      epubctxOut.optionsClass.incTracker('CurrentSeq');
+    } else {
+      seq += 1;
+    }
   }
 
-  if (indexOfFirstNonBreakElement > 3) {
-    console.log('Encountered more than 3 Elements to skip in Short Stories ('.red + currentInputFile + ')'.red);
-  }
-
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      let baseName = 'shortstory' + optionsClass.getTracker('LastShortStoryNum');
-
-      // only add a subnumber when a subnumber is required (not in the first of the chapter)
-      if (subnum > 0) {
-        baseName += `_${subnum}`;
-      }
-
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
-      const ext = path.extname(inputimg);
-      const imgid = `insert${newState}${ext}`;
-      const imgfilename = `Insert${newState}${ext}`;
-      const xhtmlName = `insert${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      utils.assertionDefined(title.chapterTitle, new Error('Expected "title.chapterTitle" to be defined'));
-
-      let chapterName: string;
-
-      if (!utils.isNullOrUndefined(title.chapterNumber)) {
-        chapterName = `Short Story ${title.chapterNumber}:`;
-      } else {
-        chapterName = `Short Story:`;
-      }
-
-      const firstElement = documentInput.querySelector('body > p');
-
-      utils.assertionDefined(firstElement, new Error('Expected "firstElement" to be defined'));
-
-      // for now it should be enough to just deal with 1 extra element
-      if (!firstElement.textContent?.includes('Short Story')) {
-        log('Encountered a Short Story which does not start with the chapter');
-
-        utils.assertionDefined(firstElement.textContent, new Error('Expected "firstElement.textContent" to be defined'));
-        h1Element.appendChild(document.createTextNode(firstElement.textContent));
-        h1Element.appendChild(document.createElement('br'));
-      }
-
-      h1Element.appendChild(document.createTextNode(chapterName));
-      h1Element.appendChild(document.createElement('br'));
-      h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
-    },
-
-    skipElements: indexOfFirstNonBreakElement,
-  });
-}
-
-/**
- * Handle everything related to the "Title.SideStory" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doSideStory(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.SideStory, new Error('Expected TitleType to be "SideStory"'));
-  epubctxOut.optionsClass.incTracker('LastSideStoryNum');
-
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      let baseName = 'sidestory' + optionsClass.getTracker('LastSideStoryNum');
-
-      // only add a subnumber when a subnumber is required (not in the first of the chapter)
-      if (subnum > 0) {
-        baseName += `_${subnum}`;
-      }
-
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
-      const ext = path.extname(inputimg);
-      const imgid = `insert${newState}${ext}`;
-      const imgfilename = `Insert${newState}${ext}`;
-      const xhtmlName = `insert${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      utils.assertionDefined(title.chapterTitle, new Error('Expected "title.chapterTitle" to be defined'));
-
-      let chapterName: string;
-
-      if (!utils.isNullOrUndefined(title.chapterNumber)) {
-        chapterName = `Side Story ${title.chapterNumber}:`;
-      } else {
-        chapterName = `Side Story:`;
-      }
-
-      h1Element.appendChild(document.createTextNode(chapterName));
-      h1Element.appendChild(document.createElement('br'));
-      h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
-    },
-  });
-}
-
-/**
- * Handle everything related to the "Title.BonusStory" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doBonusStory(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.BonusStory, new Error('Expected TitleType to be "BonusStory"'));
-  epubctxOut.optionsClass.incTracker('LastBonusStoryNum');
-
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      let baseName = 'bonusstory' + optionsClass.getTracker('LastBonusStoryNum');
-
-      // only add a subnumber when a subnumber is required (not in the first of the chapter)
-      if (subnum > 0) {
-        baseName += `_${subnum}`;
-      }
-
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
-      const ext = path.extname(inputimg);
-      const imgid = `insert${newState}${ext}`;
-      const imgfilename = `Insert${newState}${ext}`;
-      const xhtmlName = `insert${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      utils.assertionDefined(title.chapterTitle, new Error('Expected "title.chapterTitle" to be defined'));
-
-      let chapterName: string;
-
-      if (!utils.isNullOrUndefined(title.chapterNumber)) {
-        chapterName = `Bonus Story ${title.chapterNumber}:`;
-      } else {
-        chapterName = `Bonus Story:`;
-      }
-
-      h1Element.appendChild(document.createTextNode(chapterName));
-      h1Element.appendChild(document.createElement('br'));
-      h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
-    },
-  });
-}
-
-/**
- * Handle everything related to the "Title.Interlude" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doInterlude(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.Interlude, new Error('Expected TitleType to be "Interlude"'));
-  epubctxOut.optionsClass.incTracker('LastInterludeNum');
-
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      let baseName = 'interlude' + optionsClass.getTracker('LastInterludeNum');
-
-      // only add a subnumber when a subnumber is required (not in the first of the chapter)
-      if (subnum > 0) {
-        baseName += `_${subnum}`;
-      }
-
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
-      const ext = path.extname(inputimg);
-      const imgid = `insert${newState}${ext}`;
-      const imgfilename = `Insert${newState}${ext}`;
-      const xhtmlName = `insert${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      let chapterName: string;
-
-      if (!utils.isNullOrUndefined(title.chapterNumber)) {
-        chapterName = `Interlude ${title.chapterNumber}:`;
-      } else {
-        chapterName = `Interlude:`;
-      }
-
-      h1Element.appendChild(document.createTextNode(chapterName));
-
-      if (!utils.isNullOrUndefined(title.chapterTitle)) {
-        h1Element.appendChild(document.createElement('br'));
-        h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
-      }
-    },
-  });
-}
-
-/**
- * Handle everything related to the "Title.Chapter" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doChapter(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  // just to make sure that the type is defined and correctly assumed
-  utils.assertion(title.titleType === TitleType.Chapter, new Error('Expected TitleType to be "Chapter"'));
-  epubctxOut.optionsClass.incTracker('LastChapterNum');
-
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      let baseName = 'chapter' + optionsClass.getTracker('LastChapterNum');
-
-      // only add a subnumber when a subnumber is required (not in the first of the chapter)
-      if (subnum > 0) {
-        baseName += `_${subnum}`;
-      }
-
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastInsertNum');
-      const ext = path.extname(inputimg);
-      const imgid = `insert${newState}${ext}`;
-      const imgfilename = `Insert${newState}${ext}`;
-      const xhtmlName = `insert${newState}`;
-
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      utils.assertionDefined(title.chapterNumber, new Error('Expected "title.chapterNumber" to be defined'));
-      utils.assertionDefined(title.chapterTitle, new Error('Expected "title.chapterTitle" to be defined'));
-
-      h1Element.appendChild(document.createTextNode(`Chapter ${title.chapterNumber}:`));
-      h1Element.appendChild(document.createElementNS(xh.STATICS.XHTML_XML_NAMESPACE, 'br'));
-      h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
-    },
-
-    // skip all elements that have both "namedTitle" and "chapterTitle" in them, cannot be more easily done because the chapter header is contained like other text
-    checkElement: function (elem: Element): boolean {
-      return (
-        (!utils.isNullOrUndefined(title.chapterNumber) &&
-          !utils.isNullOrUndefined(title.chapterTitle) &&
-          elem.textContent?.includes(`Chapter ${title.chapterNumber}:`) &&
-          // the following has to be done, because the original has "br" directly without space, which will make it not matching
-          elem.textContent.replaceAll(' ', '').includes(title.chapterTitle.replaceAll(' ', ''))) ??
-        false
-      );
-    },
-
-    skipElements: 0,
-  });
+  epubctxOut.optionsClass.setLastType(LastProcessedType.Image);
 }
 
 /**
  * Handle Generic Title Types
  * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
+ * @param entryType The Title Object
  * @param epubctxOut EPUB Context of the Output file
  * @param currentInputFile Currently processing's Input file path
  * @param skipElements Set how many elements to initally skip
  */
-async function doGeneric(
+async function doGenericPage(
   documentInput: Document,
-  title: Title,
+  entryType: EntryInformation,
   epubctxOut: epubh.EpubContext<AverbnilECOptions>,
   currentInputFile: string,
+  title: Title2,
   skipElements?: number
 ): Promise<void> {
+  const checkElemIndex = 0;
+
   // just to make sure that the type is defined and correctly assumed
-  await doTextContent(documentInput, title, epubctxOut, currentInputFile, {
-    genID: function (optionsClass: AverbnilECOptions, subnum: number): string {
-      // transform fullTitle to spaceless lowercase version
-      let baseName = title.fullTitle.trim().replaceAll(/ /gim, '').toLowerCase();
+  await doTextContent(documentInput, entryType, epubctxOut, currentInputFile, {
+    genTextIdData(optionsClass, entryType, extra) {
+      let baseName = 'chapter' + optionsClass.getTracker('Chapter');
+      const subnum = optionsClass.getTracker('CurrentSubChapter');
+      let useType: epubh.EpubContextNewFileXHTMLType;
 
       // only add a subnumber when a subnumber is required (not in the first of the chapter)
       if (subnum > 0) {
         baseName += `_${subnum}`;
       }
 
-      return baseName;
-    },
-    genIMGID: function (optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID {
-      const newState = epubctxOut.optionsClass.incTracker('LastGenericNum');
-      const ext = path.extname(inputimg);
-      const imgid = `generic${newState}${ext}`;
-      const imgfilename = `Generic${newState}${ext}`;
-      const xhtmlName = `generic${newState}`;
+      /** Keep track of wheter to decrement "Chapter" again (deduplicate) */
+      let decChapter = false;
 
-      return {
-        imgFilename: imgfilename,
-        id: imgid,
-        imgtype: epubh.ImgClass.Insert,
-        xhtmlFilename: xhtmlName,
-      };
-    },
-    genChapterElementContent: function (document: Document, title: Title, h1Element: HTMLHeadingElement): void {
-      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
-        h1Element.appendChild(document.createTextNode(`${title.namedTitle}:`));
-        h1Element.appendChild(document.createElementNS(xh.STATICS.XHTML_XML_NAMESPACE, 'br'));
-        h1Element.appendChild(document.createTextNode(`${title.chapterTitle}`));
-
-        return;
-      }
-
-      h1Element.appendChild(document.createTextNode(title.fullTitle));
-    },
-
-    // skip all elements that have both "namedTitle" and "chapterTitle" in them, cannot be more easily done because the chapter header is contained like other text
-    checkElement: function (elem: Element): boolean {
-      return (
-        (!utils.isNullOrUndefined(title.namedTitle) &&
-          !utils.isNullOrUndefined(title.chapterTitle) &&
-          elem.textContent?.includes(title.namedTitle) &&
-          elem.textContent.includes(title.chapterTitle)) ??
-        false
-      );
-    },
-
-    skipElements,
-  });
-}
-
-interface DoTextContentIMGID {
-  /** id for sectionid, imgalt */
-  id: string;
-  /** Image Filename to store the file as (only basename) (the image itself, not the xhtml) */
-  imgFilename: string;
-  /** Filename (without extension) of the xhtml containing the image */
-  xhtmlFilename: string;
-  /** Image Type */
-  imgtype: epubh.ImgClass;
-}
-
-interface DoTextContentOptions {
-  /**
-   * Generate the id (for sectionid, filename)
-   * @param lastStates EpubContextOutput LastStates
-   * @param subnum Current SubChapter number
-   */
-  genID(optionsClass: AverbnilECOptions, subnum: number): string;
-  /**
-   * Generate the image id & filename
-   * @param lastStates EpubContextOutput LastStates
-   * @param inputimg the full file path for the input image
-   */
-  genIMGID(optionsClass: AverbnilECOptions, inputimg: string): DoTextContentIMGID;
-  /**
-   * Generate the "h1" element's content
-   * @param document The Current DOM Document
-   * @param title The title object
-   * @param h1Element The h1 header element (eg chapter)
-   * @returns nothing, the "h1Element" input should be directly modified and that will be used
-   */
-  genChapterElementContent(document: Document, title: Title, h1Element: HTMLHeadingElement): void;
-
-  /**
-   * Custom define if a element should be skipped or kept
-   * @param elem The Element to check
-   * @returns "true" when it should be skipped
-   */
-  checkElement?(elem: Element): boolean;
-
-  /** Set custom number of elements to skip */
-  skipElements?: number;
-}
-
-/**
- * Handle everything related to the "Title.Chapter" type
- * @param documentInput The Input Document's "document.body"
- * @param title The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param baseOutputPath Base Output path to output files to
- * @param currentInputFile Currently processing's Input file path
- */
-async function doTextContent(
-  documentInput: Document,
-  title: Title,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string,
-  options: DoTextContentOptions
-): Promise<void> {
-  let currentSubChapter = 0;
-  let currentBaseName = epubh.normalizeId(options.genID(epubctxOut.optionsClass, currentSubChapter));
-  const globState = epubctxOut.optionsClass.incTracker('Global');
-
-  let {
-    dom: currentDOM,
-    document: documentNew,
-    mainElem: mainElement,
-  } = await createXHTMLlnDOM({ title: title.fullTitle, type: EntryType.Text }, currentBaseName, epubctxOut);
-
-  // create initial "h1" (header) element and add it
-  {
-    const h1element = documentNew.createElement('h1');
-    options.genChapterElementContent(documentNew, title, h1element);
-    mainElement.appendChild(h1element);
-  }
-
-  // tracker to know if the initial "p" element for the chapter was already skipped
-  let toSkipNumber = 1;
-
-  if (typeof options.skipElements === 'number') {
-    toSkipNumber = options.skipElements;
-  }
-
-  const innerElements = documentInput.querySelector('body')?.children;
-
-  utils.assertionDefined(innerElements);
-
-  let sequenceCounter = 0;
-
-  const customChecker = options.checkElement;
-
-  for (const elem of Array.from(innerElements) as Element[]) {
-    // for this series, it is safe to assume that the first element is the chapter "p" element
-    if (toSkipNumber > 0) {
-      toSkipNumber -= 1;
-      continue;
-    }
-
-    // const innerTextTrimmed = elem.textContent?.trim() ?? '';
-
-    // // skip all elements that are empty or only contain spaces or is a "nbsp"
-    // if (innerTextTrimmed.length === 0) {
-    //   continue;
-    // }
-
-    // skip elements when the customChecker deems it necessary
-    if (!utils.isNullOrUndefined(customChecker) && customChecker(elem)) {
-      continue;
-    }
-
-    if (elem.localName === 'p') {
       {
-        const imgNode = elem.querySelector('img');
+        const lTitle = entryType.title.toLowerCase();
 
-        const skipSavingMainDOM = isElementEmpty(mainElement) || onlyhash1(mainElement);
+        // extra handling for when encountering a "copyright", because it is somewhere between the cover and the frontmatter
+        if (lTitle.includes('copyright')) {
+          epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Frontmatter);
 
-        if (!utils.isNullOrUndefined(imgNode)) {
-          const imgNodeSrc = imgNode.src;
+          decChapter = true;
+          baseName = 'copyright';
+          useType = {
+            type: epubh.EpubContextFileXHTMLTypes.CREDITS,
+          };
+        } else {
+          useType = {
+            type: epubh.EpubContextFileXHTMLTypes.TEXT,
+          };
+        }
+        if (lTitle.includes('afterword')) {
+          epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Backmatter);
 
-          // dont save a empty dom
-          if (!skipSavingMainDOM) {
-            const xhtmlNameMain = `${currentBaseName}.xhtml`;
-            await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
-              id: xhtmlNameMain,
-              seqIndex: sequenceCounter,
-              title: title.fullTitle,
-              type: {
-                type: epubh.EpubContextFileXHTMLTypes.TEXT,
-              },
-              globalSeqIndex: globState,
-            });
-            currentSubChapter += 1;
-            sequenceCounter += 1;
-          }
-
-          const fromPath = path.resolve(path.dirname(currentInputFile), imgNodeSrc);
-
-          const {
-            imgtype,
-            id: imgid,
-            imgFilename: imgFilename,
-            xhtmlFilename: imgXHTMLFileName,
-          } = options.genIMGID(epubctxOut.optionsClass, fromPath);
-
-          await copyImage(fromPath, epubctxOut, imgFilename, imgid);
-          const { dom: imgDOM } = await createIMGlnDOM(
-            { title: title.fullTitle, type: EntryType.Image },
-            imgid,
-            imgtype,
-            `../Images/${imgFilename}`,
-            epubctxOut
-          );
-
-          const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
-          await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, xhtmlNameIMG, epubh.FileDir.Text, epubctxOut, {
-            id: xhtmlNameIMG,
-            seqIndex: sequenceCounter,
-            title: title.fullTitle,
-            type: {
-              type: epubh.EpubContextFileXHTMLTypes.IMG,
-              imgClass: epubh.ImgClass.Insert,
-              imgType: epubh.ImgType.Insert,
-            },
-            globalSeqIndex: globState,
-          });
-          sequenceCounter += 1;
-
-          // dont create a new dom if the old one is still empty
-          if (!skipSavingMainDOM) {
-            currentBaseName = epubh.normalizeId(options.genID(epubctxOut.optionsClass, currentSubChapter));
-            const nextchapter = await createXHTMLlnDOM({ title: title.fullTitle, type: EntryType.Text }, currentBaseName, epubctxOut);
-            currentDOM = nextchapter.dom;
-            documentNew = nextchapter.document;
-            mainElement = nextchapter.mainElem;
-          }
-
-          continue;
+          decChapter = true;
+          baseName = 'afterword';
         }
       }
 
-      const newNode = generatePElement(elem, documentNew);
-
-      mainElement.appendChild(newNode);
-      continue;
-    }
-
-    if (elem.localName === 'div') {
-      // ignore all empty div elements
-      if (elem.childNodes.length === 0) {
-        continue;
+      if (extra.increasedChapterWithTitle && decChapter) {
+        epubctxOut.optionsClass.decTracker('Chapter');
       }
-    }
 
-    console.error(`Unhandled "localName": ${elem.localName}`.red);
-  }
+      return {
+        sectionId: baseName,
+        useType,
+      };
+    },
+    genImageIdData: genImgIdData,
+    genChapterHeaderContent(document, entryType, h1Element) {
+      // extra handling for double-headings, see Volume 1 Short-Stories
+      if (title.firstLine.includes('Short Story')) {
+        const firstElement = documentInput.querySelector('body > p');
 
-  // ignore DOM's that are empty or only have the chapter header
-  if (!isElementEmpty(mainElement) && !onlyhash1(mainElement)) {
-    const xhtmlNameMain = `${currentBaseName}.xhtml`;
-    await epubh.finishDOMtoFile(currentDOM, epubctxOut.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOut, {
-      id: xhtmlNameMain,
-      seqIndex: sequenceCounter,
-      title: title.fullTitle,
-      type: {
-        type: epubh.EpubContextFileXHTMLTypes.TEXT,
-      },
-      globalSeqIndex: globState,
-    });
-    sequenceCounter += 1;
-  } else {
-    log('Not saving final DOM, because main element is empty');
-  }
+        utils.assertionDefined(firstElement, new Error('Expected "firstElement" to be defined'));
+
+        // for now it should be enough to just deal with 1 extra element
+        if (!firstElement.textContent?.includes('Short Story')) {
+          log('Encountered a Short Story which does not start with the chapter');
+
+          utils.assertionDefined(firstElement.textContent, new Error('Expected "firstElement.textContent" to be defined'));
+          h1Element.appendChild(document.createTextNode(firstElement.textContent));
+          h1Element.appendChild(document.createElement('br'));
+        }
+      }
+
+      h1Element.appendChild(document.createTextNode(title.firstLine));
+
+      if (!utils.isNullOrUndefined(title.secondLine)) {
+        h1Element.appendChild(document.createElement('br'));
+        h1Element.appendChild(document.createTextNode(title.secondLine));
+      }
+    },
+    genPElemText: generatePElementInner,
+    cachedIsTitleOptions(document, optionsClass) {
+      const window = documentInput.defaultView;
+      utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
+      const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(documentInput, 'body'));
+      const bodyFontSizePx = parseInt(bodyCompStyle.fontSize);
+      optionsClass.titleCache = {
+        bodyFontSizePx,
+        window,
+      };
+    },
+    isTitle: isTitle,
+    // custom checkElem to skip multi-"p" headers, see Volume 1 Short-Stories
+    checkElement(elem) {
+      if (checkElemIndex < 3 && title.firstLine.includes('Short Story')) {
+        if (elem.className.includes('P__STAR__STAR__STAR__page_break')) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+
+    skipElements,
+    // headerSearchCount: TITLE_CHECK_NUMBER,
+  });
 }
 
-/** Generate "p" elements, with text and inner text */
-function generatePElement(origElem: Element, documentNew: Document): Element {
-  const topElem = documentNew.createElement('p');
+/** Cache Object for {@link isTitle} */
+interface IsTitleCache {
+  bodyFontSizePx: number;
+  window: Window;
+}
 
-  if (
-    (origElem.className.includes('P__STAR__STAR__STAR__page_break') ||
-      origElem.className.includes('P_Prose_Formatting__And__Centre_Alignment') ||
-      origElem.className.includes('P__STAR__STAR__STAR__page_break__And__Page_Break') ||
-      origElem.className.includes('P_TEXTBODY_CENTERALIGN_PAGEBREAK')) &&
-    // only allow elements to have this class when not being empty of text
-    (origElem.textContent?.trim().length ?? 0) > 0
-  ) {
-    topElem.setAttribute('class', 'centerp section-marking');
-  } else if (
-    origElem.className.includes('P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before') ||
-    origElem.className.includes('P_Prose_Formatting__And__Right_Alignment')
-  ) {
-    topElem.setAttribute('class', 'signature');
-  } else if (origElem.className.includes('P_Prose_Formatting__And__Left_Indent')) {
-    topElem.setAttribute('class', 'extra-indent');
+/**
+ * Determine if the element is a Heading
+ * @param document The Document to work on
+ * @param elem The Element to check
+ * @param entryType The Entry Information
+ * @param cache Optional Cache to not compute styles too often when not required
+ * @returns A String with the detected content of the element if a title, "false" otherwise
+ */
+function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: AverbnilECOptions): boolean | string {
+  const processedTitle = sh.xmlToString(elem.textContent ?? '');
+
+  // basic fast test if the content matches the parsed title
+  // not using just "includes" because it is slower than directly checking
+  if (processedTitle === entryType.title || processedTitle.includes(entryType.title)) {
+    return processedTitle;
   }
 
-  for (const elem of generatePElementInner(origElem, documentNew)) {
-    topElem.appendChild(elem);
+  if (processedTitle.replaceAll(' ', '').includes(entryType.title.replaceAll(' ', ''))) {
+    return true;
   }
 
-  return topElem;
+  // all headers have a "auto_bookmark_toc_top" id, in most books - the other checks are fallbacks
+  if (elem.id.includes('auto_bookmark_toc_top')) {
+    return true;
+  }
+
+  // below is a alternative way of detecting a heading by using fontsize
+  // works in this case because fonsize is 150% (1.5 the size)
+
+  let bodyFontSize: number;
+  let window: Window;
+
+  if (!utils.isNullOrUndefined(optionsClass.titleCache)) {
+    bodyFontSize = optionsClass.titleCache.bodyFontSizePx;
+    window = optionsClass.titleCache.window;
+  } else {
+    const windowTMP = document.defaultView;
+    utils.assertionDefined(windowTMP, new Error('Expected to get a "window" from "defaultView"'));
+    window = windowTMP;
+    const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(document, 'body'));
+    bodyFontSize = parseInt(bodyCompStyle.fontSize);
+  }
+
+  const innerElem = elem.querySelector(':first-child');
+
+  // use first inner elements, because headers are wrapped in a span that has the font-size style
+  const useElem = innerElem ? innerElem : elem;
+
+  const elemCompStyle = window.getComputedStyle(useElem);
+  let elemFontSizePx: number;
+
+  {
+    const elemFontSizePxTMP = parseInt(elemCompStyle.fontSize);
+    elemFontSizePx = Number.isNaN(elemFontSizePxTMP) ? bodyFontSize : elemFontSizePxTMP;
+  }
+
+  if (elemFontSizePx >= bodyFontSize * 1.1) {
+    return sh.xmlToString(useElem.textContent ?? '') || false;
+  }
+
+  return false;
+}
+
+/** Helper for consistent Image naming */
+function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTextContentOptionsGenImageData {
+  const ext = path.extname(inputPath);
+
+  if (optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
+    const frontmatterNum = optionsClass.incTracker('Frontmatter');
+
+    return {
+      imgClass: epubh.ImgClass.Insert,
+      sectionId: `frontmatter${frontmatterNum}${ext}`,
+      imgFilename: `Frontmatter${frontmatterNum}${ext}`,
+      xhtmlFilename: `frontmatter${frontmatterNum}`,
+    };
+  } else if (optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
+    const backmatterNum = optionsClass.incTracker('Backmatter');
+
+    return {
+      imgClass: epubh.ImgClass.Insert,
+      sectionId: `backmatter${backmatterNum}${ext}`,
+      imgFilename: `Backmatter${backmatterNum}${ext}`,
+      xhtmlFilename: `backmatter${backmatterNum}`,
+    };
+  }
+
+  const insertNum = optionsClass.incTracker('Insert');
+
+  // in case of "1" and as fallback
+  return {
+    imgClass: epubh.ImgClass.Insert,
+    sectionId: `insert${insertNum}${ext}`,
+    imgFilename: `Insert${insertNum}${ext}`,
+    xhtmlFilename: `insert${insertNum}`,
+  };
 }
 
 interface GeneratePElementInnerElem {
-  topElem?: Node;
-  currentElem?: Node;
+  topElem?: Element;
+  currentElem?: Element;
 }
 
 /**
@@ -1167,7 +707,7 @@ interface GeneratePElementInnerElem {
  * @param obj The Object to modify
  * @param newNode The new Node to add
  */
-function helperAssignElem(obj: GeneratePElementInnerElem, newNode: Node) {
+function helperAssignElem(obj: GeneratePElementInnerElem, newNode: Element) {
   if (utils.isNullOrUndefined(obj.currentElem)) {
     obj.currentElem = newNode;
     obj.topElem = newNode;
@@ -1178,7 +718,8 @@ function helperAssignElem(obj: GeneratePElementInnerElem, newNode: Node) {
 }
 
 /** Return formatted and only elements that are required */
-function generatePElementInner(origNode: Node, documentNew: Document): Node[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: AverbnilECOptions): Node[] {
   if (origNode.nodeType === documentNew.TEXT_NODE) {
     utils.assertionDefined(origNode.textContent, new Error('Expected "origElem.textContent" to be defined'));
 
@@ -1192,6 +733,26 @@ function generatePElementInner(origNode: Node, documentNew: Document): Node[] {
   }
 
   const origElem = origNode as Element;
+
+  if (origElem.localName === 'p') {
+    if (
+      (origElem.className.includes('P__STAR__STAR__STAR__page_break') ||
+        origElem.className.includes('P_Prose_Formatting__And__Centre_Alignment') ||
+        origElem.className.includes('P__STAR__STAR__STAR__page_break__And__Page_Break') ||
+        origElem.className.includes('P_TEXTBODY_CENTERALIGN_PAGEBREAK')) &&
+      // only allow elements to have this class when not being empty of text
+      (origElem.textContent?.trim().length ?? 0) > 0
+    ) {
+      parentElem.setAttribute('class', 'centerp section-marking');
+    } else if (
+      origElem.className.includes('P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before') ||
+      origElem.className.includes('P_Prose_Formatting__And__Right_Alignment')
+    ) {
+      parentElem.setAttribute('class', 'signature');
+    } else if (origElem.className.includes('P_Prose_Formatting__And__Left_Indent')) {
+      parentElem.setAttribute('class', 'extra-indent');
+    }
+  }
 
   if (origElem.localName === 'br') {
     return [documentNew.createElement('br')];
@@ -1271,18 +832,20 @@ function generatePElementInner(origNode: Node, documentNew: Document): Node[] {
     console.log('encountered unknown class'.red, origElem.className);
   }
 
+  // if "currentElem" is not defined, loop over the original elements's children and return those children directly
+  // because this means the current element is not needed
   if (utils.isNullOrUndefined(elemObj.currentElem)) {
     const listOfNodes: Node[] = [];
-
     for (const child of Array.from(origElem.childNodes)) {
-      listOfNodes.push(...generatePElementInner(child, documentNew));
+      listOfNodes.push(...generatePElementInner(child, documentNew, parentElem, _optionsClass));
     }
 
     return listOfNodes;
   }
 
+  // loop over all original Element's children and add them to the currentElem as a child
   for (const child of Array.from(origElem.childNodes)) {
-    for (const elem of generatePElementInner(child, documentNew)) {
+    for (const elem of generatePElementInner(child, documentNew, elemObj.currentElem, _optionsClass)) {
       elemObj.currentElem.appendChild(elem);
     }
   }
@@ -1322,6 +885,11 @@ interface Title {
   fullTitle: string;
   /** Name of the Chapter, like unique named things */
   namedTitle?: string;
+}
+
+interface Title2 {
+  firstLine: string;
+  secondLine?: string;
 }
 
 const GENERIC_TITLE_REGEX = /^\s*(?<type>.+?)(?: (?<num>\d+))?(?:: (?<title>.+?))?\s*$/gim;

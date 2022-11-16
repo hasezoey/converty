@@ -42,6 +42,11 @@ export interface DoTextContentOptionsGenImageData {
   xhtmlFilename: string;
   /** The Image Class to use */
   imgClass: epubh.ImgClass;
+  /**
+   * Set a custom ImgType
+   * @default Insert
+   */
+  useType?: epubh.EpubContextFileXHTMLImgType;
 }
 
 export interface DoTextContentOptionsGenSectionId {
@@ -87,8 +92,10 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    * Generate Image data, like image id and filenames
    * @param optionsClass The Options class with all Context
    * @param inputImg the full file path for the input image
+   * @param imgNode The Image Element node for that needs the data generated
+   * @param entryType The Entry Type with title
    */
-  genImageIdData(optionsClass: Options, inputImg: string): DoTextContentOptionsGenImageData;
+  genImageIdData(optionsClass: Options, inputImg: string, imgNode: Element, entryType: EntryInformation): DoTextContentOptionsGenImageData;
   /**
    * Generate the "h1" element's content
    * @param document The Current DOM Document
@@ -293,10 +300,11 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
   if (epubctx.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasTitle) {
     epubctx.optionsClass.resetTracker('CurrentSeq');
     epubctx.optionsClass.resetTracker('CurrentSubChapter');
-    epubctx.optionsClass.setImgTypeImplicit(epubh.ImgType.Insert);
 
     // only increment "Chapter" tracker if the current document has a heading detected in the body
     if (hasTitle) {
+      epubctx.optionsClass.setImgTypeImplicit(epubh.ImgType.Insert);
+
       increasedChapter = true;
       epubctx.optionsClass.incTracker('Chapter');
     }
@@ -355,39 +363,34 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
           });
           epubctx.optionsClass.incTracker('CurrentSubChapter');
           epubctx.optionsClass.incTracker('CurrentSeq');
+          epubctx.optionsClass.setLastType(LastProcessedType.None);
         }
 
         const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
-        const {
-          imgClass: imgtype,
-          sectionId: imgid,
-          imgFilename: imgFilename,
-          xhtmlFilename: imgXHTMLFileName,
-        } = options.genImageIdData(epubctx.optionsClass, imgFromPath);
-        await copyImage(imgFromPath, epubctx, imgFilename, imgid);
+        const imgIdData = options.genImageIdData(epubctx.optionsClass, imgFromPath, imgNode, entryType);
+        await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId);
         const { dom: imgDOM } = await createIMGlnDOM(
           entryType,
-          imgid,
-          imgtype,
-          path.join('..', epubh.FileDir.Images, imgFilename),
+          imgIdData.sectionId,
+          imgIdData.imgClass,
+          path.join('..', epubh.FileDir.Images, imgIdData.imgFilename),
           epubctx
         );
-        const xhtmlNameIMG = `${imgXHTMLFileName}.xhtml`;
+        const xhtmlNameIMG = `${imgIdData.xhtmlFilename}.xhtml`;
         await epubh.finishDOMtoFile(imgDOM, epubctx.contentOPFDir, xhtmlNameIMG, epubh.FileDir.Text, epubctx, {
           id: xhtmlNameIMG,
           seqIndex: epubctx.optionsClass.getTracker('CurrentSeq'),
           title: entryType.title,
-          type:
-            // use "textIdData.useType" over static, because this might define a cover
-            textIdData.useType.type === epubh.EpubContextFileXHTMLTypes.IMG
-              ? textIdData.useType
-              : {
-                  type: epubh.EpubContextFileXHTMLTypes.IMG,
-                  imgClass: epubh.ImgClass.Insert,
-                  imgType: epubh.ImgType.Insert,
-                },
+          type: !utils.isNullOrUndefined(imgIdData.useType)
+            ? imgIdData.useType
+            : {
+                type: epubh.EpubContextFileXHTMLTypes.IMG,
+                imgClass: epubh.ImgClass.Insert,
+                imgType: epubh.ImgType.Insert,
+              },
           globalSeqIndex: globState,
         });
+        epubctx.optionsClass.setLastType(LastProcessedType.Image);
         epubctx.optionsClass.incTracker('CurrentSeq');
 
         // dont create a new dom if the old one is still empty
@@ -439,6 +442,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
       globalSeqIndex: globState,
     });
     epubctx.optionsClass.incTracker('CurrentSeq');
+    epubctx.optionsClass.setLastType(LastProcessedType.None);
   } else {
     log('Not saving final DOM, because main element is empty');
   }

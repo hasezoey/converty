@@ -11,5 +11,5 @@ List of currently Supported inputs with current modules:
 | `genericSevenSeas_ln` |                         `Reincarnated as a Sword`                          | Supports all volumes from 1 to 1; Output is EPUB3              |
 
 Notes:
-- All Convertions that process a EPUB output a EPUB3 and use html elements over css styles (like instead of `font-style: italic`, html element `em` is used)
+- All Conversions that process a EPUB output a EPUB3 and use html elements over css styles (like instead of `font-style: italic`, html element `em` is used)
   They also mostly use the same [templates](./templates/)

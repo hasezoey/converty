@@ -50,6 +50,7 @@
   "dependencies": {
     "colors": "^1.4.0",
     "debug": "^4.3.4",
+    "downloads-folder": "^3.0.3",
     "jsdom": "^20.0.2",
     "mime-types": "^2.1.35",
     "mkdirp": "^1.0.4",

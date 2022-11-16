@@ -26,7 +26,7 @@ const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 const TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
-const COVER_XHTML_FILENAME = 'cover.xhtml';
+const COVER_XHTML_FILENAME = 'cover';
 const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
 
 // CODE
@@ -309,24 +309,13 @@ async function doImagePage(
     // determine if the current image processing is for the cover
     if (imgNodes.length === 1 && altAttr.trim().toLowerCase() === 'cover') {
       isCover = true;
+      epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Cover);
     }
 
     const fromPath = path.resolve(path.dirname(currentInputFile), elem.src);
 
-    let imgData: DoTextContentOptionsGenImageData;
-
-    if (isCover) {
-      const ext = path.extname(fromPath);
-      imgData = {
-        imgClass: epubh.ImgClass.Cover,
-        sectionId: `cover${ext}`,
-        imgFilename: `Cover${ext}`,
-        xhtmlFilename: COVER_XHTML_FILENAME,
-      };
-    } else {
-      imgData = genImgIdData(epubctxOut.optionsClass, fromPath);
-      imgData.xhtmlFilename += '.xhtml';
-    }
+    const imgData = genImgIdData(epubctxOut.optionsClass, fromPath);
+    imgData.xhtmlFilename += '.xhtml';
 
     await copyImage(fromPath, epubctxOut, imgData.imgFilename, imgData.sectionId);
     const { dom: imgDOM } = await createIMGlnDOM(
@@ -596,6 +585,13 @@ function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTex
       sectionId: `backmatter${backmatterNum}${ext}`,
       imgFilename: `Backmatter${backmatterNum}${ext}`,
       xhtmlFilename: `backmatter${backmatterNum}`,
+    };
+  } else if (optionsClass.imgTypeImplicit === epubh.ImgType.Cover) {
+    return {
+      imgClass: epubh.ImgClass.Cover,
+      sectionId: `cover${ext}`,
+      imgFilename: `Cover${ext}`,
+      xhtmlFilename: COVER_XHTML_FILENAME,
     };
   }
 

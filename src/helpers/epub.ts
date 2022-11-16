@@ -952,6 +952,150 @@ export function normalizeId(input: string): string {
   return replacedid;
 }
 
+/**
+ * Interface for the "idCounter" for {@link copyMetadata}
+ * Exists because primitives are copied and does not modify the input, so it needs to be a object
+ */
+export interface IdCounter {
+  /** The Counter, shortend to "c" */
+  c: number;
+}
+
+/**
+ * Copy Metadata from the old metadata elements to the new metadata element
+ * @param document The OUTPUT ContentOPF document
+ * @param children The children of the INPUT "<metadata>" element
+ * @param epubctx The OUTPUT EpubContext
+ * @param metadataElem The OUTPUT "<metadata>" element
+ * @param packageElementOld The INPUT "<package>" element
+ * @param idCounter The "id" counter to keep track of id's
+ */
+export function copyMetadata(
+  document: Document,
+  children: Element[],
+  epubctx: EpubContext<any, any>,
+  metadataElem: Element,
+  packageElementOld: Element,
+  idCounter: IdCounter
+) {
+  // copy most metadata from old to new
+  // using "children" to exclude text nodes
+  for (const elem of children) {
+    // special handling for "cover", just to be sure
+    if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
+      const coverImgId = epubctx.files.find((v) => v.id.includes('cover') && v.mediaType != xh.STATICS.XHTML_MIMETYPE);
+      utils.assertionDefined(coverImgId, new Error('Expected "coverImgId" to be defined'));
+      const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
+      newCoverNode.setAttribute('name', 'cover');
+      newCoverNode.setAttribute('content', coverImgId.id);
+      metadataElem.appendChild(newCoverNode);
+      continue;
+    }
+
+    let newNode: Element | undefined = undefined;
+
+    if (elem.tagName === 'dc:title') {
+      // ignore title element, because its already added in generateContentOPF
+      continue;
+    } else if (elem.tagName === 'dc:publisher') {
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:publisher');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+    } else if (elem.tagName === 'dc:language') {
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:language');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+    } else if (elem.tagName === 'dc:creator') {
+      idCounter.c += 1;
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:creator');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+      newNode.setAttribute('id', `id-${idCounter.c}`);
+    } else if (elem.tagName === 'dc:date') {
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:date');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+    } else if (elem.tagName === 'dc:rights') {
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:rights');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+    } else if (elem.tagName === 'dc:description') {
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:description');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+    } else if (elem.tagName === 'dc:identifier') {
+      newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:identifier');
+      utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
+      newNode.appendChild(document.createTextNode(elem.textContent));
+      {
+        const packageUniqueID = packageElementOld.getAttribute('unique-identifier');
+        const elemID = elem.getAttribute('id');
+
+        if (!utils.isNullOrUndefined(packageUniqueID) && !utils.isNullOrUndefined(elemID) && packageUniqueID === elemID) {
+          newNode.setAttribute('id', 'pub-id');
+        }
+      }
+
+      if (elem.getAttribute('opf:scheme') === 'calibre') {
+        newNode.setAttribute('opf:scheme', 'calibre');
+      }
+    }
+
+    if (!utils.isNullOrUndefined(newNode)) {
+      metadataElem.appendChild(newNode);
+    }
+  }
+}
+
+/** Data to describe a volume in a series */
+export interface SeriesData {
+  /** The name of the Series */
+  name: string;
+  /** The volume in the Series */
+  volume: string;
+}
+
+/**
+ * Apply "belongs-to-collection" metadata
+ * NOTE: the regex needs to have a required group "series" and a optional "num" (defaults to 1)
+ * @param document The OUTPUT ContentOPF document
+ * @param metadataElem The OUTPUT "<metadata>" element
+ * @param idCounter The "id" counter to keep track of id's
+ * @param seriesData The Data of the series to add as a collection
+ */
+export function applySeriesMetadata(document: Document, metadataElem: Element, idCounter: IdCounter, seriesData: SeriesData) {
+  // apply series metadata (to have automatic sorting already in things like calibre)
+
+  idCounter.c += 1;
+  const metaCollectionId = `id-${idCounter.c}`;
+  const metaCollectionElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+  const metaTypeElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+  const metaPositionElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
+
+  xh.applyAttributes(metaCollectionElem, {
+    property: 'belongs-to-collection',
+    id: metaCollectionId,
+  });
+  metaCollectionElem.appendChild(document.createTextNode(seriesData.name));
+
+  xh.applyAttributes(metaTypeElem, {
+    refines: `#${metaCollectionId}`,
+    property: 'collection-type',
+  });
+  metaTypeElem.appendChild(document.createTextNode('series'));
+
+  xh.applyAttributes(metaPositionElem, {
+    refines: `#${metaCollectionId}`,
+    property: 'group-position',
+  });
+  // default to "1" in case it does not have a volume id (like a spinoff)
+  metaPositionElem.appendChild(document.createTextNode(seriesData.volume));
+
+  metadataElem.appendChild(metaCollectionElem);
+  metadataElem.appendChild(metaTypeElem);
+  metadataElem.appendChild(metaPositionElem);
+}
+
 export const STATICS = {
   CONTENTOPF_FILENAME: 'content.opf',
   ROOT_PATH: 'OEBPS',

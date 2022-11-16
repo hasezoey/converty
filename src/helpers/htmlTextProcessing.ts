@@ -136,6 +136,15 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    * @param optionsClass The Options class with all Context
    */
   cachedIsTitleOptions?(document: Document, optionsClass: Options): void;
+  /**
+   * Define a custom function to check if a reset should be done in addition to other values
+   * "reset" refers to resetting "CurrentSeq", "CurrentSubChapter" and increasing "Chapter" (if title node is present)
+   * @param document The INPUT document
+   * @param entryType The Entry Type with title already parsed from somewhere else
+   * @param optionsClass The Options class with all Context
+   * @returns "true" if a element is a title, or a string with a updated title (if string it always means "true")
+   */
+  determineReset?(document: Document, entryType: EntryInformation, optionsClass: Options): boolean;
 
   /**
    * Set a static number of elements to skip in the beginning regardless of what it is
@@ -296,8 +305,13 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
   /** Flag to decrement the "Chapter" tracker again if later determined that it should not have (like copyright page) */
   let increasedChapter = false;
 
+  const resetFn = !utils.isNullOrUndefined(options.determineReset) ? options.determineReset : () => true;
+
   // reset Trackers when either "hasTitle" (found a title in the body) or when "ImgType" is anything but "insert"
-  if (epubctx.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasTitle) {
+  if (
+    (epubctx.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasTitle) &&
+    resetFn(documentInput, entryType, epubctx.optionsClass)
+  ) {
     epubctx.optionsClass.resetTracker('CurrentSeq');
     epubctx.optionsClass.resetTracker('CurrentSubChapter');
 

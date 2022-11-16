@@ -233,6 +233,23 @@ export async function statPath(path: string): Promise<Stats | undefined> {
 }
 
 /**
+ * Run "fs.promises.lstat", but return "undefined" if error is "ENOENT" or "EACCES"
+ * follows symlinks
+ * @param path The Path to Stat
+ * @throws if the error is not "ENOENT" or "EACCES"
+ */
+export async function lstatPath(path: string): Promise<Stats | undefined> {
+  return fspromises.lstat(path).catch((err) => {
+    // catch the error if the directory doesn't exist or permission is denied, without throwing an error
+    if (['ENOENT', 'EACCES'].includes(err.code)) {
+      return undefined;
+    }
+
+    throw err;
+  });
+}
+
+/**
  * Like "fs.existsSync" but async
  * uses "utils.statPath"
  * follows symlinks

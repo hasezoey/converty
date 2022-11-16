@@ -12,6 +12,8 @@ import {
   TextProcessingECOptions,
   doTextContent,
   DoTextContentOptionsGenImageData,
+  processCommonStyle,
+  PElemTracker,
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('averbil_ln');
@@ -163,6 +165,21 @@ class AverbnilECOptions extends TextProcessingECOptions {
 async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<AverbnilECOptions>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
+
+  // inject stylesheet as style, this is to ensure that no external resource aside from stylesheets are loaded
+  // JSDOM actually provides a way to load the file directly (via the link element) and option "resources: 'usable'", but it does not seem to work
+  {
+    const linkElem = documentInput.querySelector('head > link[rel="stylesheet"]') as HTMLLinkElement | undefined;
+
+    if (!utils.isNullOrUndefined(linkElem)) {
+      const stylePath = path.resolve(path.dirname(filePath), linkElem.href);
+
+      const styleElem = documentInput.createElement('style');
+      styleElem.innerHTML = (await fspromises.readFile(stylePath)).toString();
+      const headElem = xh.queryDefinedElement(documentInput, 'head');
+      headElem.appendChild(styleElem);
+    }
+  }
 
   const title = getTitle(documentInput.title);
 
@@ -453,27 +470,6 @@ function genImgIdData(
   };
 }
 
-interface GeneratePElementInnerElem {
-  topElem?: Element;
-  currentElem?: Element;
-}
-
-/**
- * Helper Function for "generatePElementInner" to consistently update the elements
- * Updates the "obj" with the topElement if unset, and adds "newNode" to "currentElem" and re-assigns the "currentElem"
- * @param obj The Object to modify
- * @param newNode The new Node to add
- */
-function helperAssignElem(obj: GeneratePElementInnerElem, newNode: Element) {
-  if (utils.isNullOrUndefined(obj.currentElem)) {
-    obj.currentElem = newNode;
-    obj.topElem = newNode;
-  } else {
-    obj.currentElem.appendChild(newNode);
-    obj.currentElem = newNode;
-  }
-}
-
 /** Return formatted and only elements that are required */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: AverbnilECOptions): Node[] {
@@ -491,53 +487,19 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
 
   const origElem = origNode as Element;
 
-  if (origElem.localName === 'p') {
-    if (
-      (origElem.className.includes('P__STAR__STAR__STAR__page_break') ||
-        origElem.className.includes('P_Prose_Formatting__And__Centre_Alignment') ||
-        origElem.className.includes('P__STAR__STAR__STAR__page_break__And__Page_Break') ||
-        origElem.className.includes('P_TEXTBODY_CENTERALIGN_PAGEBREAK')) &&
-      // only allow elements to have this class when not being empty of text
-      (origElem.textContent?.trim().length ?? 0) > 0
-    ) {
-      parentElem.setAttribute('class', 'centerp section-marking');
-    } else if (
-      origElem.className.includes('P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before') ||
-      origElem.className.includes('P_Prose_Formatting__And__Right_Alignment')
-    ) {
-      parentElem.setAttribute('class', 'signature');
-    } else if (origElem.className.includes('P_Prose_Formatting__And__Left_Indent')) {
-      parentElem.setAttribute('class', 'extra-indent');
-    }
+  const elemObj = new PElemTracker();
+  const { elemCompStyle } = processCommonStyle(elemObj, parentElem, documentNew, origElem);
+
+  // cover extra indentations, (P_Prose_Formatting__And__Left_Indent)
+  if (parseInt(elemCompStyle.marginLeft) > 0) {
+    parentElem.setAttribute('class', 'extra-indent');
   }
 
   if (origElem.localName === 'br') {
     return [documentNew.createElement('br')];
   }
 
-  const elemObj: GeneratePElementInnerElem = {};
-
   const origElemStyle = origElem.getAttribute('style');
-
-  if (
-    origElem.className.includes('C_Current__And__Times_New_Roman__And__Italic') ||
-    origElem.className.includes('C_Current__And__Times_New_Roman__And__Bold__And__Italic') ||
-    origElemStyle?.includes('font-style: italic')
-  ) {
-    helperAssignElem(elemObj, documentNew.createElement('em'));
-  }
-  if (
-    origElemStyle?.includes('font-weight: bold') ||
-    origElem.className.includes('C_Current__And__Times_New_Roman__And__Bold__And__Italic')
-  ) {
-    helperAssignElem(elemObj, documentNew.createElement('strong'));
-  }
-  if (origElemStyle?.includes('vertical-align: super') && origElemStyle?.includes('font-size')) {
-    helperAssignElem(elemObj, documentNew.createElement('sup'));
-  }
-  if (origElemStyle?.includes('vertical-align: sub') && origElemStyle?.includes('font-size')) {
-    helperAssignElem(elemObj, documentNew.createElement('sub'));
-  }
 
   const styleList = origElemStyle
     ?.split(';')

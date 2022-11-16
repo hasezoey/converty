@@ -253,110 +253,24 @@ async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<A
   const title = getTitle(documentInput.title);
 
   // ignore the TOC, because a new one will be generated
-  if (title.fullTitle.toLowerCase() === 'table of contents') {
+  if (title.firstLine.toLowerCase() === 'table of contents') {
     return;
   }
 
   // ignore everything that matches the regex
-  if (new RegExp(TITLES_TO_FILTER_OUT_REGEX).test(title.fullTitle)) {
+  if (new RegExp(TITLES_TO_FILTER_OUT_REGEX).test(title.firstLine)) {
     log(`Skipping file "${filePath}" because it is in the filter regex (titles)`);
 
     return;
   }
 
-  switch (title.titleType) {
-    case TitleType.CoverPage:
-      await doImagePage(documentInput, { title: title.fullTitle, type: EntryType.Image }, epubctxOut, filePath);
+  switch (title.type) {
+    case EntryType.Image:
+      await doImagePage(documentInput, title, epubctxOut, filePath);
       break;
-    case TitleType.Afterword:
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
-        firstLine: title.fullTitle,
-      });
-      break;
-    case TitleType.TitlePage:
-    case TitleType.ColorInserts:
-    case TitleType.CopyrightsAndCredits:
-    case TitleType.TocImage:
-    case TitleType.CastOfCharacters:
-      await doImagePage(documentInput, { title: title.fullTitle, type: EntryType.Image }, epubctxOut, filePath);
-      break;
-    case TitleType.BonusStory:
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
-        firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Bonus Story ${title.chapterNumber}:` : 'Bonus Story:',
-        secondLine: `${title.chapterTitle}`,
-      });
-      break;
-    case TitleType.ShortStory:
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
-        firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Short Story ${title.chapterNumber}:` : 'Short Story:',
-        secondLine: `${title.chapterTitle}`,
-      });
-      break;
-    case TitleType.SideStory:
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
-        firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Side Story ${title.chapterNumber}:` : 'Side Story:',
-        secondLine: `${title.chapterTitle}`,
-      });
-      break;
-    case TitleType.Chapter:
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, {
-        firstLine: `Chapter ${title.chapterNumber}:`,
-        secondLine: `${title.chapterTitle}`,
-      });
-      break;
-    case TitleType.Interlude:
-      let titleUseInterlude;
-
-      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
-        titleUseInterlude = {
-          firstLine: !utils.isNullOrUndefined(title.chapterNumber) ? `Interlude ${title.chapterNumber}:` : 'Interlude:',
-          secondLine: `${title.chapterTitle}`,
-        };
-      } else {
-        titleUseInterlude = {
-          firstLine: title.fullTitle,
-        };
-      }
-
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, titleUseInterlude);
-      break;
-    // the following will use the generic target
-    case TitleType.Dedication:
-    case TitleType.NamedSideStory:
-      let titleUse2;
-
-      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
-        titleUse2 = {
-          firstLine: title.namedTitle,
-          secondLine: title.chapterTitle,
-        };
-      } else {
-        titleUse2 = {
-          firstLine: title.fullTitle,
-        };
-      }
-
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, titleUse2);
-      break;
-    case TitleType.Previously:
-    case TitleType.AboutAuthorAndIllust:
-      let titleUse1;
-
-      if (!utils.isNullOrUndefined(title.namedTitle) && !utils.isNullOrUndefined(title.chapterTitle)) {
-        titleUse1 = {
-          firstLine: title.namedTitle,
-          secondLine: title.chapterTitle,
-        };
-      } else {
-        titleUse1 = {
-          firstLine: title.fullTitle,
-        };
-      }
-
-      await doGenericPage(documentInput, { title: title.fullTitle, type: EntryType.Text }, epubctxOut, filePath, titleUse1);
-      break;
+    case EntryType.Text:
     default:
-      log(`Unhandled Type \"${title.titleType}\" + "${title.fullTitle}"`.red);
+      await doGenericPage(documentInput, title, epubctxOut, filePath);
       break;
   }
 }
@@ -482,13 +396,13 @@ async function doImagePage(
  */
 async function doGenericPage(
   documentInput: Document,
-  entryType: EntryInformation,
+  entryType: Title2,
   epubctxOut: epubh.EpubContext<AverbnilECOptions>,
   currentInputFile: string,
-  title: Title2,
   skipElements?: number
 ): Promise<void> {
   const checkElemIndex = 0;
+  const title = entryType;
 
   // just to make sure that the type is defined and correctly assumed
   await doTextContent(documentInput, entryType, epubctxOut, currentInputFile, {
@@ -855,55 +769,20 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
   return [elemObj.topElem];
 }
 
-enum TitleType {
-  Chapter,
-  BonusStory,
-  ShortStory,
-  SideStory,
-  Interlude,
-  Afterword,
-  CoverPage,
-  ColorInserts,
-  TitlePage,
-  CopyrightsAndCredits,
-  TocImage,
-  Dedication,
-  Previously,
-  CastOfCharacters,
-  AboutAuthorAndIllust,
-  NamedSideStory,
-}
-
-interface Title {
-  /** Title Number, if existing */
-  chapterNumber?: number;
-  /** Unique Title, if existing */
-  chapterTitle?: string;
-  /** Type of Title, undefined if not matching a title */
-  titleType?: TitleType;
-  /** Full Title, on one line */
-  fullTitle: string;
-  /** Name of the Chapter, like unique named things */
-  namedTitle?: string;
-}
-
-interface Title2 {
+interface Title2 extends EntryInformation {
   firstLine: string;
   secondLine?: string;
 }
 
-const GENERIC_TITLE_REGEX = /^\s*(?<type>.+?)(?: (?<num>\d+))?(?:: (?<title>.+?))?\s*$/gim;
+const GENERIC_TITLE_REGEX = /^\s*(?<type>.+?)(?: (?<num>\d+))?(?:: (?<title>.+?))?\s*$/im;
 
 /**
  * Function to get the title accurately
  * @param headTitle The Title to parse
  * @returns The Processed title
  */
-function getTitle(headTitle: string): Title {
+function getTitle(headTitle: string): Title2 {
   const matches = GENERIC_TITLE_REGEX.exec(headTitle);
-
-  // reset regex after use, because they have a state
-  GENERIC_TITLE_REGEX.lastIndex = 0;
 
   utils.assertionDefined(matches, new Error('Failed to get matches for Title'));
 
@@ -911,97 +790,28 @@ function getTitle(headTitle: string): Title {
   const numString = utils.regexMatchGroup(matches, 'num');
   const title = utils.regexMatchGroup(matches, 'title');
 
-  if (type === 'Copyrights and Credits') {
-    return {
-      fullTitle: headTitle.trim(),
-      titleType: TitleType.CopyrightsAndCredits,
-    };
-  } else if (type === 'Table of Contents Page') {
-    return {
-      fullTitle: headTitle.trim(),
-      titleType: TitleType.TocImage,
-    };
-  } else if (type === 'Cast of Characters') {
-    return {
-      fullTitle: headTitle.trim(),
-      titleType: TitleType.CastOfCharacters,
-    };
-  } else if (type === 'About the Author and Illustrator') {
-    return {
-      fullTitle: headTitle.trim(),
-      titleType: TitleType.AboutAuthorAndIllust,
-    };
-  } else if (type === 'Interlude' || type === 'Interludes') {
-    let numMixed: number | undefined = undefined;
+  let firstLine: string;
+  let secondLine: string | undefined = undefined;
 
-    if (!utils.isNullOrUndefined(numString)) {
-      numMixed = parseInt(numString);
-    }
-
-    return {
-      fullTitle: headTitle.trim(),
-      titleType: TitleType.Interlude,
-      chapterNumber: numMixed,
-      chapterTitle: title,
-    };
-  } else if (/lenny recaps/gim.test(type)) {
-    return {
-      fullTitle: headTitle.trim(),
-      titleType: TitleType.NamedSideStory,
-      chapterTitle: title,
-      namedTitle: type,
-    };
+  if (!utils.isNullOrUndefined(numString)) {
+    firstLine = type + ` ${numString}`;
+  } else {
+    firstLine = type;
   }
 
-  const TypeForSwitch = TitleType[type.replaceAll(/\s/gim, '')];
-  switch (TypeForSwitch) {
-    case TitleType.Chapter:
-      utils.assertionDefined(numString, new Error("Expected Regex Group 'num' to be defined for Type 'Chapter'"));
-      utils.assertionDefined(title, new Error("Expected Regex Group 'title' to be defined for Type 'Chapter'"));
-
-      const numChapter = parseInt(numString);
-
-      return {
-        fullTitle: headTitle.trim(),
-        titleType: TitleType.Chapter,
-        chapterNumber: numChapter,
-        chapterTitle: title,
-      };
-    case TitleType.Dedication:
-    case TitleType.Previously:
-    case TitleType.Afterword:
-    case TitleType.ColorInserts:
-    case TitleType.CoverPage:
-    case TitleType.TitlePage:
-      return {
-        fullTitle: headTitle.trim(),
-        titleType: TypeForSwitch,
-      };
-    case TitleType.BonusStory:
-    case TitleType.ShortStory:
-    case TitleType.SideStory:
-      utils.assertionDefined(title, new Error("Expected Regex Group 'title' to be defined for Type 'Chapter'"));
-      let numMixed: number | undefined = undefined;
-
-      if (!utils.isNullOrUndefined(numString)) {
-        numMixed = parseInt(numString);
-      }
-
-      return {
-        fullTitle: headTitle.trim(),
-        titleType: TypeForSwitch,
-        chapterNumber: numMixed,
-        chapterTitle: title,
-      };
-    case TitleType.Interlude:
-    case TitleType.CopyrightsAndCredits:
-    case TitleType.TocImage:
-    case TitleType.CastOfCharacters:
-    case TitleType.AboutAuthorAndIllust:
-      throw new Error('Unreachable');
-    default:
-      return {
-        fullTitle: headTitle.trim(),
-      };
+  if (!utils.isNullOrUndefined(title)) {
+    firstLine += ':';
+    secondLine = title;
   }
+
+  const titleType = type === 'Cover Page' ? EntryType.Image : EntryType.Text;
+
+  const fullTitle = !utils.isNullOrUndefined(secondLine) ? firstLine + ' ' + secondLine : firstLine;
+
+  return {
+    title: fullTitle,
+    firstLine,
+    secondLine,
+    type: titleType,
+  };
 }

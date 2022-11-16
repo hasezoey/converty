@@ -6,7 +6,8 @@ List of currently Supported inputs with current modules:
 | :--------------------: | :------------------------------------------------------------------------: | :------------------------------------------------------------- |
 |      `averbil_ln`      | `Didn't I Say to Make My Abilities Average in the Next Life?! Light Novel` | Supports all volumes from 1 to 14 and spinoff; Output is EPUB3 |
 |    `lastofkind_ln`     |                   `Reincarnated as the Last of My Kind`                    | Supports all volumes from 1 to 4; Output is EPUB3              |
-| `evilIntergalactic_ln` |              `I’m the Evil Lord of an Intergalactic Empire!`               | Supports all Volume from 1 to 1; Output is EPUB3               |
+| `evilIntergalactic_ln` |              `I’m the Evil Lord of an Intergalactic Empire!`               | Supports all volumes from 1 to 1; Output is EPUB3              |
+|   `trappeddating_ln`   |   `Trapped in a Dating Sim: The World of Otome Games is Tough for Mobs`    | Supports all volumes from 1 to 1; Output is EPUB3              |
 
 Notes:
 - All Convertions that process a EPUB output a EPUB3 and use html elements over css styles (like instead of `font-style: italic`, html element `em` is used)

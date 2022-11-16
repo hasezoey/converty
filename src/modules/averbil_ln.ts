@@ -23,6 +23,7 @@ const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 const TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
+const SERIES_MATCH_REGEX = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/im;
 const COVER_XHTML_FILENAME = 'cover';
 const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
 
@@ -107,106 +108,22 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     const packageElementOld = xh.queryDefinedElement(contentOPFInput, 'package');
     const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
 
-    // copy metadata from old to new
-    // using "children" to exclude text nodes
-    for (const elem of Array.from(metadataElementOld.children)) {
-      // special handling for "cover", just to be sure
-      if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
-        const coverImgId = epubctxOut.files.find((v) => v.id.includes('cover') && v.mediaType != xh.STATICS.XHTML_MIMETYPE);
-        utils.assertionDefined(coverImgId, new Error('Expected "coverImgId" to be defined'));
-        const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
-        newCoverNode.setAttribute('name', 'cover');
-        newCoverNode.setAttribute('content', coverImgId.id);
-        metadataElem.appendChild(newCoverNode);
-        continue;
-      }
+    const idCounterO: epubh.IdCounter = { c: idCounter };
+    epubh.copyMetadata(document, Array.from(metadataElementOld.children), epubctxOut, metadataElem, packageElementOld, idCounterO);
 
-      let newNode: Element | undefined = undefined;
+    // Regex to extract the series title and if available the volume position
+    const caps = SERIES_MATCH_REGEX.exec(epubctxOut.title);
 
-      if (elem.tagName === 'dc:title') {
-        // ignore title element, because its already added in generateContentOPF
-        continue;
-      } else if (elem.tagName === 'dc:publisher') {
-        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:publisher');
-        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-        newNode.appendChild(document.createTextNode(elem.textContent));
-      } else if (elem.tagName === 'dc:language') {
-        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:language');
-        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-        newNode.appendChild(document.createTextNode(elem.textContent));
-      } else if (elem.tagName === 'dc:creator') {
-        idCounter += 1;
-        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:creator');
-        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-        newNode.appendChild(document.createTextNode(elem.textContent));
-        newNode.setAttribute('id', `id-${idCounter}`);
-      } else if (elem.tagName === 'dc:date') {
-        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:date');
-        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-        newNode.appendChild(document.createTextNode(elem.textContent));
-      } else if (elem.tagName === 'dc:identifier') {
-        newNode = document.createElementNS(xh.STATICS.DC_XML_NAMESPACE, 'dc:identifier');
-        utils.assertionDefined(elem.textContent, new Error('Expected "elem.textContent" to be defined'));
-        newNode.appendChild(document.createTextNode(elem.textContent));
-        {
-          const packageUniqueID = packageElementOld.getAttribute('unique-identifier');
-          const elemID = elem.getAttribute('id');
+    if (!utils.isNullOrUndefined(caps)) {
+      const seriesTitleNoVolume = utils.regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
+      const seriesPos = utils.regexMatchGroup(caps, 'num');
 
-          if (!utils.isNullOrUndefined(packageUniqueID) && !utils.isNullOrUndefined(elemID) && packageUniqueID === elemID) {
-            newNode.setAttribute('id', 'pub-id');
-          }
-        }
-
-        if (elem.getAttribute('opf:scheme') === 'calibre') {
-          newNode.setAttribute('opf:scheme', 'calibre');
-        }
-      }
-
-      if (!utils.isNullOrUndefined(newNode)) {
-        metadataElem.appendChild(newNode);
-      }
-    }
-
-    // apply series metadata (to have automatic sorting already)
-    {
-      // Regex to extract the series title and if available the volume position
-      const caps = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/gim.exec(epubctxOut.title);
-
-      if (!utils.isNullOrUndefined(caps)) {
-        const seriesTitleNoVolume = utils.regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
-        const seriesPos = utils.regexMatchGroup(caps, 'num');
-
-        idCounter += 1;
-        const metaCollectionId = `id-${idCounter}`;
-        const metaCollectionElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
-        const metaTypeElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
-        const metaPositionElem = document.createElementNS(xh.STATICS.OPF_XML_NAMESPACE, 'meta');
-
-        xh.applyAttributes(metaCollectionElem, {
-          property: 'belongs-to-collection',
-          id: metaCollectionId,
-        });
-        metaCollectionElem.appendChild(document.createTextNode(seriesTitleNoVolume));
-
-        xh.applyAttributes(metaTypeElem, {
-          refines: `#${metaCollectionId}`,
-          property: 'collection-type',
-        });
-        metaTypeElem.appendChild(document.createTextNode('series'));
-
-        xh.applyAttributes(metaPositionElem, {
-          refines: `#${metaCollectionId}`,
-          property: 'group-position',
-        });
-        // default to "1" in case it does not have a volume id (like a spinoff)
-        metaPositionElem.appendChild(document.createTextNode(seriesPos ?? '1'));
-
-        metadataElem.appendChild(metaCollectionElem);
-        metadataElem.appendChild(metaTypeElem);
-        metadataElem.appendChild(metaPositionElem);
-      } else {
-        log('Found no series captures for: "'.red + epubctxOut.title.grey + '"'.red);
-      }
+      epubh.applySeriesMetadata(document, metadataElem, idCounterO, {
+        name: seriesTitleNoVolume,
+        volume: seriesPos ?? '1',
+      });
+    } else {
+      log('Found no series captures for: "'.red + epubctxOut.title.grey + '"'.red);
     }
   }
 

@@ -3,12 +3,17 @@ import * as tmp from 'tmp';
 import * as ssc from '../common/sevenseascommon.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _log = utils.createNameSpace('trappeddating_ln');
+const _log = utils.createNameSpace('genericSevenSeas_ln');
 
 tmp.setGracefulCleanup();
 
 // STATIC OPTIONS
-const INPUT_MATCH_REGEX = /Trapped in a Dating Sim.{1} The World of Otome Games is Tough for Mobs/gim;
+const VERIFIED_MATCH_LIST = [
+  'I.{1}m the Evil Lord of an Intergalactic Empire!',
+  'Trapped in a Dating Sim.{1} The World of Otome Games is Tough for Mobs',
+  'Reincarnated as a Sword',
+];
+const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_FILES_TO_FILTER_OUT_REGEX;
 const TITLES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_TITLES_TO_FILTER_OUT_REGEX;

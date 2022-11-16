@@ -11,6 +11,8 @@ import {
   DoTextContentOptionsGenImageData,
   EntryInformation,
   EntryType,
+  PElemTracker,
+  processCommonStyle,
   TextProcessingECOptions,
 } from '../helpers/htmlTextProcessing.js';
 
@@ -501,28 +503,6 @@ function genImgIdData(
   };
 }
 
-interface GeneratePElementInnerElem {
-  topElem?: Node;
-  currentElem?: Element;
-}
-
-/**
- * Helper Function for "generatePElementInner" to consistently update the elements
- * Updates the "obj" with the topElement if unset, and adds "newNode" to "currentElem" and re-assigns the "currentElem"
- * @param obj The Object to modify
- * @param newNode The new Node to add
- */
-function helperAssignElem(obj: GeneratePElementInnerElem, newNode: Element) {
-  // if "currentElem" is undefined, we can safely assume "topElem" is also undefined
-  if (utils.isNullOrUndefined(obj.currentElem)) {
-    obj.currentElem = newNode;
-    obj.topElem = newNode;
-  } else {
-    obj.currentElem.appendChild(newNode);
-    obj.currentElem = newNode;
-  }
-}
-
 /**
  * Return formatted and only elements that are required
  * @param origNode The original node to process
@@ -553,30 +533,9 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
     return [documentNew.createElement('br')];
   }
 
-  const elemObj: GeneratePElementInnerElem = {};
   const origElemStyle = origElem.getAttribute('style');
-  const window = origElem.ownerDocument.defaultView;
-  utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
-  const elemCompStyle = window.getComputedStyle(origElem);
-
-  if (!parentHas(parentElem, 'strong') && elemCompStyle.fontWeight === 'bold') {
-    helperAssignElem(elemObj, documentNew.createElement('strong'));
-  }
-  if (!parentHas(parentElem, 'em') && elemCompStyle.fontStyle === 'italic') {
-    helperAssignElem(elemObj, documentNew.createElement('em'));
-  }
-  if (!parentHas(parentElem, 'sup') && elemCompStyle.verticalAlign === 'super') {
-    helperAssignElem(elemObj, documentNew.createElement('sup'));
-  }
-  if (!parentHas(parentElem, 'sub') && elemCompStyle.verticalAlign === 'sub') {
-    helperAssignElem(elemObj, documentNew.createElement('sub'));
-  }
-  if (elemCompStyle.textAlign === 'center') {
-    parentElem.setAttribute('class', 'centerp section-marking');
-  }
-  if (elemCompStyle.textAlign === 'right') {
-    parentElem.setAttribute('class', 'signature');
-  }
+  const elemObj = new PElemTracker();
+  processCommonStyle(elemObj, parentElem, documentNew, origElem);
 
   // warn on unhandled styles that are set on the element directly, unless they are ignored ones
   const styleList = origElemStyle
@@ -619,41 +578,4 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
   utils.assertionDefined(elemObj.topElem, new Error('Expected "elemObj.topElem" to be defined at this point'));
 
   return [elemObj.topElem];
-}
-
-/**
- * Check for a given element "tagName" upwards, until "until" is encountered upwards
- * @param startElem The element to start searching on
- * @param tagName The element name (tagName) to search for
- * @param until Search for "tagName" until "until" is encountered
- * @returns "true" if the given "tagName" is found, "false" otherwise
- */
-function parentHas(startElem: Element, tagName: keyof HTMLElementTagNameMap, until: keyof HTMLElementTagNameMap = 'body'): boolean {
-  for (const elem of traverseParent(startElem)) {
-    // return if requested element is found
-    if (elem.tagName === tagName) {
-      return true;
-    }
-    // early return "false" if "until" has been found
-    else if (elem.tagName === until) {
-      return false;
-    }
-
-    continue;
-  }
-
-  return false; // base case
-}
-
-/**
- * Traverse a given "initElem" upwards (through "parentElement") until there is no parent anymore
- * @param initElem The Starting Element (will not be given as a output)
- * @returns A Generator to traverse a given element upwards
- */
-function* traverseParent(initElem: Element): Generator<Element> {
-  let currentElem: Element | null = initElem;
-
-  while (!utils.isNullOrUndefined((currentElem = currentElem.parentElement))) {
-    yield currentElem;
-  }
 }

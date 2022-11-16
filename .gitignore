@@ -177,3 +177,6 @@ chapters/
 
 # Files for Testing random input files
 test_files/
+
+# The Project config file
+converterrc.json

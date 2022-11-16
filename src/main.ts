@@ -1,8 +1,8 @@
 import * as utils from './utils.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
-import { homedir } from 'os';
 import { fileURLToPath } from 'url';
+import downloadsFolder from 'downloads-folder';
 
 const log = utils.createNameSpace('main');
 const currentModulePath = path.dirname(fileURLToPath(import.meta.url));
@@ -12,16 +12,26 @@ const currentModulePath = path.dirname(fileURLToPath(import.meta.url));
 /** Project name, which will be used for paths */
 const PROJECT_NAME = 'converty';
 
-/** Converter input path */
-const CONVERTER_READ_PATH = path.resolve(homedir(), 'Downloads', `${PROJECT_NAME}-in`);
-/** Converter output path */
-const CONVERTER_OUT_PATH = path.resolve(homedir(), 'Downloads', `${PROJECT_NAME}-out`);
+/** Set the output path of where to store outputs (and in some cases also inputs) */
+const CONVERTER_BASE_PATH_FALLBACK = path.resolve(downloadsFolder(), PROJECT_NAME);
+/** Create a link in the Downloads-Folder to the path where "CONVERTER_BASE_PATH" is, only if they are not the same */
+const CREATE_DOWNLOADS_LINK = true;
+/** Path to the config file, if relative will be resolved relative to the project root */
+const CONFIG_PATH = './converterrc.json';
 /** Overwrite files to process instead of finding all */
 const OVERWRITE_FILES: undefined | string[] = undefined;
 /** Set "No Module for File" Errors to be Silent */
 const SILENT_NO_MODULE_FOR_FILE: boolean = false;
 /** Set to allow Directories as input to modules, instead of just files */
 const ALLOW_DIR_AS_INPUT: boolean = true;
+
+/** The Loaded Config of the Project */
+let config: ConverterPConfig | undefined = undefined;
+
+interface ConverterPConfig {
+  /** The Absolute path to the Base Converter Dir to use, the Project-name will be appended */
+  baseConverterPath?: string;
+}
 
 // CODE
 
@@ -62,15 +72,90 @@ async function load_modules(): Promise<utils.ConverterModuleStore[]> {
   );
 }
 
+/**
+ * Helper function to get the DownloadBasePath
+ * @returns The download base path
+ */
+function getConverterBasePath(): string {
+  if (!utils.isNullOrUndefined(config) && !!config.baseConverterPath) {
+    return path.resolve(config.baseConverterPath, PROJECT_NAME);
+  }
+
+  return CONVERTER_BASE_PATH_FALLBACK;
+}
+
+/**
+ * Helper function to out-source the creation of a symlink in the downloads folder to the base-path
+ */
+async function createDownloadsSymlink() {
+  if (CREATE_DOWNLOADS_LINK) {
+    const converterBasePath = getConverterBasePath();
+    const downloadsFolderPath = path.resolve(downloadsFolder(), PROJECT_NAME);
+    // using "lstat" because otherwise it will read the link's content instead of the link itself
+    const downloadsFolderPathStat = await utils.lstatPath(downloadsFolderPath);
+
+    if (downloadsFolderPath !== converterBasePath) {
+      log('Checking / Creating symlink at (symlink, target)', downloadsFolderPath, converterBasePath);
+
+      // extra if, because of the "else"
+      if (utils.isNullOrUndefined(downloadsFolderPathStat)) {
+        // try to create a symlink in the downloads folder, dont throw a error if it does not work
+        await fspromises.symlink(converterBasePath, downloadsFolderPath, 'dir').catch((err) => {
+          console.log('Creating Symlink in downloads folder failed:', err);
+        });
+      } else {
+        // check if the existing path is already a symlink and if that symlink points to the same point already
+        if (downloadsFolderPathStat.isSymbolicLink()) {
+          const symlinkTo = await fspromises.readlink(downloadsFolderPath);
+
+          // dont say anything if the symlink already exists and points to the correct path
+          if (symlinkTo === converterBasePath) {
+            return;
+          }
+
+          console.log('A Symlink already exists in the downloads folder!'.red);
+
+          return;
+        }
+
+        console.log('Failed to create Symlink in downloads folder because path already exists!'.red);
+      }
+    }
+  }
+}
+
 async function main_loop() {
+  // multiple "../" because "import.meta.url" resolves to "lib/main.js"
+  const configPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', CONFIG_PATH);
+
+  if (await utils.pathExists(configPath)) {
+    log('Trying to load config at path', configPath);
+    try {
+      const read = (await fspromises.readFile(configPath)).toString();
+      config = JSON.parse(read);
+      log('Loaded config at path', configPath);
+    } catch (err) {
+      console.log('Failed to load Config:'.red, err);
+    }
+  } else {
+    log('No Config found at', configPath);
+  }
+
+  const converterBasePath = getConverterBasePath();
+  const converterINPUTPath = path.join(converterBasePath, 'input');
+  const converterOUTPUTPath = path.join(converterBasePath, 'output');
+
+  // create directories in case they do not exist for future use
+  utils.mkdir(converterINPUTPath);
+  utils.mkdir(converterOUTPUTPath);
+  await createDownloadsSymlink();
+
   log('Starting Main Loop');
   const modules = await load_modules();
 
   if (modules.length === 0) {
     throw new Error('No Modules');
   }
-
-  await utils.mkdir(CONVERTER_READ_PATH);
 
   const finished: string[] = [];
 
@@ -82,16 +167,12 @@ async function main_loop() {
   }
 
   console.log('Starting to Process'.grey);
-  log(`READ & OUTPUT Path: "${CONVERTER_READ_PATH}", "${CONVERTER_OUT_PATH}"`);
-
-  // create directories in case they do not exist for future use
-  utils.mkdir(CONVERTER_READ_PATH);
-  utils.mkdir(CONVERTER_OUT_PATH);
+  log(`READ & OUTPUT Path: "${converterINPUTPath}", "${converterOUTPUTPath}"`);
 
   const waitingFiles: Set<string> = new Set();
 
-  for (const foundPath of await fspromises.readdir(CONVERTER_READ_PATH)) {
-    const fullPath = path.resolve(CONVERTER_READ_PATH, foundPath);
+  for (const foundPath of await fspromises.readdir(converterINPUTPath)) {
+    const fullPath = path.resolve(converterINPUTPath, foundPath);
     const stat = await utils.statPath(fullPath);
 
     // ignore all paths that are not possible to read or are not a file
@@ -115,7 +196,7 @@ async function main_loop() {
 
   for (const file of waitingFiles) {
     // the following paths are made relative, to have less verbose output in the log
-    console.log('Processing "'.green + path.relative(CONVERTER_READ_PATH, file).grey + '"'.green);
+    console.log('Processing "'.green + path.relative(converterINPUTPath, file).grey + '"'.green);
 
     let processingModel: utils.ConverterModule | undefined = undefined;
     for (const module of modules) {
@@ -135,17 +216,17 @@ async function main_loop() {
     }
 
     const finishedPath = await processingModel.process({
-      converterInputPath: CONVERTER_READ_PATH,
-      converterOutputPath: CONVERTER_OUT_PATH,
+      converterInputPath: converterINPUTPath,
+      converterOutputPath: converterOUTPUTPath,
       fileInputPath: file,
     });
 
     // the following paths are made relative, to have less verbose output in the log
     console.log(
       'Finished Processing File "'.green +
-        path.relative(CONVERTER_READ_PATH, file).toString().grey +
+        path.relative(converterINPUTPath, file).toString().grey +
         '" into "'.green +
-        path.relative(CONVERTER_OUT_PATH, finishedPath).grey +
+        path.relative(converterOUTPUTPath, finishedPath).grey +
         '"'.green
     );
     finished.push(file);

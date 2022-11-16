@@ -377,11 +377,15 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
           id: xhtmlNameIMG,
           seqIndex: epubctx.optionsClass.getTracker('CurrentSeq'),
           title: entryType.title,
-          type: {
-            type: epubh.EpubContextFileXHTMLTypes.IMG,
-            imgClass: epubh.ImgClass.Insert,
-            imgType: epubh.ImgType.Insert,
-          },
+          type:
+            // use "textIdData.useType" over static, because this might define a cover
+            textIdData.useType.type === epubh.EpubContextFileXHTMLTypes.IMG
+              ? textIdData.useType
+              : {
+                  type: epubh.EpubContextFileXHTMLTypes.IMG,
+                  imgClass: epubh.ImgClass.Insert,
+                  imgType: epubh.ImgType.Insert,
+                },
           globalSeqIndex: globState,
         });
         epubctx.optionsClass.incTracker('CurrentSeq');

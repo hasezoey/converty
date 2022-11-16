@@ -23,7 +23,7 @@ const INPUT_MATCH_REGEX = /Reincarnated as the Last of My Kind/gim;
 const SERIES_MATCH_REGEX = /^(?<series>.+?)(?: (?:Vol\.|Volume) (?<num>\d+))?$/gim;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /^$/gim;
-const COVER_XHTML_FILENAME = 'cover.xhtml';
+const COVER_XHTML_FILENAME = 'cover';
 const TITLES_TO_FILTER_OUT_REGEX = /other series/gim;
 const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
 /** How many elements to check at the beginning to be a title */

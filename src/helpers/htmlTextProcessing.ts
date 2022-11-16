@@ -186,7 +186,7 @@ export class TextProcessingECOptions<
   ExtraTrackers extends string | keyof BaseTrackers = keyof BaseTrackers
 > extends epubh.BaseEpubOptions<ExtraTrackers> {
   /** Stores the implicit image type to use */
-  protected _imgType: Omit<epubh.ImgType, 'Cover'> = epubh.ImgType.Frontmatter;
+  protected _imgType: epubh.ImgType = epubh.ImgType.Frontmatter;
   /** Stores the last type processed */
   protected _lastType: LastProcessedType = LastProcessedType.None;
 

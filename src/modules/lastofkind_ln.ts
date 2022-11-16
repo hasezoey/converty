@@ -501,6 +501,16 @@ async function doGenericPage(
       };
     },
     isTitle: isTitle,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    determineReset(document, entryType, _optionsClass) {
+      // custom reset-condition for multiple frontmatter pages
+      // for example for "Character Page X" to be grouped into just one "Character Page" TOC entry
+      if (/character page \d+/im.test(entryType.title)) {
+        return false;
+      }
+
+      return true;
+    },
 
     skipElements,
     headerSearchCount: TITLE_CHECK_NUMBER,

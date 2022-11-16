@@ -7,11 +7,8 @@ import * as xh from '../helpers/xml.js';
 import * as sh from '../helpers/string.js';
 import * as epubh from '../helpers/epub.js';
 import {
-  copyImage,
-  createIMGlnDOM,
   EntryInformation,
   EntryType,
-  LastProcessedType,
   TextProcessingECOptions,
   doTextContent,
   DoTextContentOptionsGenImageData,
@@ -264,115 +261,7 @@ async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<A
     return;
   }
 
-  switch (title.type) {
-    case EntryType.Image:
-      await doImagePage(documentInput, title, epubctxOut, filePath);
-      break;
-    case EntryType.Text:
-    default:
-      await doGenericPage(documentInput, title, epubctxOut, filePath);
-      break;
-  }
-}
-
-/**
- * Handle everything related to the Frontmatter Title types
- * @param documentInput The Input Document's "document.body"
- * @param entryType The Title Object
- * @param epubctxOut EPUB Context of the Output file
- * @param currentInputFile Currently processing's Input file path
- */
-async function doImagePage(
-  documentInput: Document,
-  entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<AverbnilECOptions>,
-  currentInputFile: string
-): Promise<void> {
-  const imgNodes = Array.from(xh.queryDefinedElementAll(documentInput, 'img')) as HTMLImageElement[];
-  let globState: number;
-  let seq = 0;
-
-  // only increment the "Global" tracker when image type is not "insert", otherwise only read it
-  // use the "CurrentSeq" tracker when image type is "insert"
-  if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
-    globState = epubctxOut.optionsClass.getTracker('Global');
-    seq = epubctxOut.optionsClass.getTracker('CurrentSeq');
-  } else {
-    globState = epubctxOut.optionsClass.incTracker('Global');
-  }
-
-  for (const elem of imgNodes) {
-    let isCover = false;
-
-    const altAttr = elem.getAttribute('alt') || entryType.title;
-
-    // determine if the current image processing is for the cover
-    if (imgNodes.length === 1 && altAttr.trim().toLowerCase() === 'cover') {
-      isCover = true;
-      epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Cover);
-    }
-
-    const fromPath = path.resolve(path.dirname(currentInputFile), elem.src);
-
-    const imgData = genImgIdData(epubctxOut.optionsClass, fromPath);
-    imgData.xhtmlFilename += '.xhtml';
-
-    await copyImage(fromPath, epubctxOut, imgData.imgFilename, imgData.sectionId);
-    const { dom: imgDOM } = await createIMGlnDOM(
-      entryType,
-      imgData.sectionId,
-      epubh.ImgClass.Insert,
-      path.join('..', epubh.FileDir.Images, imgData.imgFilename),
-      epubctxOut
-    );
-
-    let useType = {
-      type: epubh.EpubContextFileXHTMLTypes.IMG,
-      imgClass: epubh.ImgClass.Insert,
-      imgType: epubh.ImgType.Frontmatter,
-    };
-
-    if (isCover) {
-      useType = {
-        type: epubh.EpubContextFileXHTMLTypes.IMG,
-        imgClass: epubh.ImgClass.Cover,
-        imgType: epubh.ImgType.Cover,
-      };
-    }
-    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
-      useType = {
-        type: epubh.EpubContextFileXHTMLTypes.IMG,
-        imgClass: epubh.ImgClass.Insert,
-        imgType: epubh.ImgType.Insert,
-      };
-    }
-    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
-      useType = {
-        type: epubh.EpubContextFileXHTMLTypes.IMG,
-        imgClass: epubh.ImgClass.Insert,
-        imgType: epubh.ImgType.Backmatter,
-      };
-    }
-
-    await epubh.finishDOMtoFile(imgDOM, epubctxOut.contentOPFDir, imgData.xhtmlFilename, epubh.FileDir.Text, epubctxOut, {
-      id: imgData.xhtmlFilename,
-      seqIndex: seq,
-      title: altAttr,
-      type: useType,
-      globalSeqIndex: globState,
-    });
-
-    seq += 1;
-
-    // the following still needs to be done, because aliasing a number and adding to it does not change the alias'ed number
-    if (epubctxOut.optionsClass.imgTypeImplicit === epubh.ImgType.Insert) {
-      epubctxOut.optionsClass.incTracker('CurrentSeq');
-    } else {
-      seq += 1;
-    }
-  }
-
-  epubctxOut.optionsClass.setLastType(LastProcessedType.Image);
+  await doGenericPage(documentInput, title, epubctxOut, filePath);
 }
 
 /**
@@ -425,6 +314,7 @@ async function doGenericPage(
             type: epubh.EpubContextFileXHTMLTypes.TEXT,
           };
         }
+
         if (lTitle.includes('afterword')) {
           epubctxOut.optionsClass.setImgTypeImplicit(epubh.ImgType.Backmatter);
 
@@ -512,6 +402,11 @@ interface IsTitleCache {
 function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: AverbnilECOptions): boolean | string {
   const processedTitle = sh.xmlToString(elem.textContent ?? '');
 
+  // dont try to detect a title in a empty string
+  if (processedTitle.length === 0) {
+    return false;
+  }
+
   // basic fast test if the content matches the parsed title
   // not using just "includes" because it is slower than directly checking
   if (processedTitle === entryType.title || processedTitle.includes(entryType.title)) {
@@ -565,8 +460,23 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
 }
 
 /** Helper for consistent Image naming */
-function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTextContentOptionsGenImageData {
+function genImgIdData(
+  optionsClass: AverbnilECOptions,
+  inputPath: string,
+  imgNode: Element,
+  entryType: EntryInformation
+): DoTextContentOptionsGenImageData {
   const ext = path.extname(inputPath);
+
+  // reset to frontmatter in case type is already set to cover
+  if (optionsClass.imgTypeImplicit === epubh.ImgType.Cover) {
+    optionsClass.setImgTypeImplicit(epubh.ImgType.Frontmatter);
+  }
+
+  // determine if the current image processing is for the cover
+  if (entryType.title.trim().toLowerCase().includes('cover')) {
+    optionsClass.setImgTypeImplicit(epubh.ImgType.Cover);
+  }
 
   if (optionsClass.imgTypeImplicit === epubh.ImgType.Frontmatter) {
     const frontmatterNum = optionsClass.incTracker('Frontmatter');
@@ -576,6 +486,11 @@ function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTex
       sectionId: `frontmatter${frontmatterNum}${ext}`,
       imgFilename: `Frontmatter${frontmatterNum}${ext}`,
       xhtmlFilename: `frontmatter${frontmatterNum}`,
+      useType: {
+        type: epubh.EpubContextFileXHTMLTypes.IMG,
+        imgClass: epubh.ImgClass.Insert,
+        imgType: epubh.ImgType.Frontmatter,
+      },
     };
   } else if (optionsClass.imgTypeImplicit === epubh.ImgType.Backmatter) {
     const backmatterNum = optionsClass.incTracker('Backmatter');
@@ -585,6 +500,11 @@ function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTex
       sectionId: `backmatter${backmatterNum}${ext}`,
       imgFilename: `Backmatter${backmatterNum}${ext}`,
       xhtmlFilename: `backmatter${backmatterNum}`,
+      useType: {
+        type: epubh.EpubContextFileXHTMLTypes.IMG,
+        imgClass: epubh.ImgClass.Insert,
+        imgType: epubh.ImgType.Backmatter,
+      },
     };
   } else if (optionsClass.imgTypeImplicit === epubh.ImgType.Cover) {
     return {
@@ -592,6 +512,11 @@ function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTex
       sectionId: `cover${ext}`,
       imgFilename: `Cover${ext}`,
       xhtmlFilename: COVER_XHTML_FILENAME,
+      useType: {
+        type: epubh.EpubContextFileXHTMLTypes.IMG,
+        imgClass: epubh.ImgClass.Cover,
+        imgType: epubh.ImgType.Cover,
+      },
     };
   }
 
@@ -603,6 +528,11 @@ function genImgIdData(optionsClass: AverbnilECOptions, inputPath: string): DoTex
     sectionId: `insert${insertNum}${ext}`,
     imgFilename: `Insert${insertNum}${ext}`,
     xhtmlFilename: `insert${insertNum}`,
+    useType: {
+      type: epubh.EpubContextFileXHTMLTypes.IMG,
+      imgClass: epubh.ImgClass.Insert,
+      imgType: epubh.ImgType.Insert,
+    },
   };
 }
 
@@ -768,9 +698,15 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
 interface Title2 extends EntryInformation {
   firstLine: string;
   secondLine?: string;
+  imgType: epubh.ImgType;
 }
 
 const GENERIC_TITLE_REGEX = /^\s*(?<type>.+?)(?: (?<num>\d+))?(?:: (?<title>.+?))?\s*$/im;
+
+/** Helper function to process a array into lowercase and remove all spaces */
+function processTitles(arr: string[]): string[] {
+  return arr.map((v) => v.toLowerCase().replaceAll(/\s/g, ''));
+}
 
 /**
  * Function to get the title accurately
@@ -800,14 +736,33 @@ function getTitle(headTitle: string): Title2 {
     secondLine = title;
   }
 
-  const titleType = type === 'Cover Page' ? EntryType.Image : EntryType.Text;
+  let imgType = epubh.ImgType.Insert;
+
+  if (
+    processTitles([
+      'Copyrights and Credits',
+      'Table of Contents Page',
+      'Cast of Characters',
+      'Color Inserts',
+      'Title Page',
+      'Cast Of Characters',
+      'Table of Contents Page',
+    ]).includes(type.toLowerCase().replaceAll(/\s/g, ''))
+  ) {
+    imgType = epubh.ImgType.Frontmatter;
+  }
+
+  if (processTitles(['Afterword']).includes(type.toLowerCase().replaceAll(/\s/g, ''))) {
+    imgType = epubh.ImgType.Backmatter;
+  }
 
   const fullTitle = !utils.isNullOrUndefined(secondLine) ? firstLine + ' ' + secondLine : firstLine;
 
   return {
+    imgType,
     title: fullTitle,
     firstLine,
     secondLine,
-    type: titleType,
+    type: EntryType.Text,
   };
 }

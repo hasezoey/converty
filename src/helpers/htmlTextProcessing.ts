@@ -101,9 +101,10 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    * @param document The Current DOM Document
    * @param entryType The Entry Type with title
    * @param h1Element The h1 header element (eg chapter)
+   * @param documentInput The Document of the INPUT
    * @returns nothing, the "h1Element" input should be directly modified and that will be used
    */
-  genChapterHeaderContent(document: Document, entryType: EntryInformation, h1Element: HTMLHeadingElement): void;
+  genChapterHeaderContent(document: Document, entryType: EntryInformation, h1Element: HTMLHeadingElement, documentInput: Document): void;
   /**
    * Return formatted and only elements that are required
    * @param origNode The original node to process
@@ -116,9 +117,10 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
   /**
    * Define a custom condition for wheter a element should be skipped or kept
    * @param elem The Element to check
+   * @param entryType The Entry Type with title
    * @returns "true" when it should be skipped
    */
-  checkElement?(elem: Element): boolean;
+  checkElement?(elem: Element, entryType: EntryInformation): boolean;
   /**
    * Define a custom function to check if something is a heading
    * This is required for Epub's that dont use normal headings with "h1" or include the exact title in "head > title" (like a normal "p" with a class)
@@ -335,7 +337,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
     // dont add header if ImgType is "inChapter"
     if (epubctx.optionsClass.getTracker('CurrentSubChapter') === 0) {
       const h1element = documentNew.createElement('h1');
-      options.genChapterHeaderContent(documentNew, entryType, h1element);
+      options.genChapterHeaderContent(documentNew, entryType, h1element, documentInput);
       mainElem.appendChild(h1element);
     }
   }
@@ -353,7 +355,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
     }
 
     // skip elements when the customChecker deems it necessary
-    if (!utils.isNullOrUndefined(customChecker) && customChecker(elem)) {
+    if (!utils.isNullOrUndefined(customChecker) && customChecker(elem, entryType)) {
       continue;
     }
 

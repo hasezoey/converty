@@ -334,8 +334,11 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
     if (!utils.isNullOrUndefined(customChecker) && customChecker(elem)) {
       continue;
     }
-    if (elem.localName === 'p') {
-      const imgNode = elem.querySelector('img');
+
+    const imgNode = elem.querySelector('img');
+
+    // use this path if "p" which contains text data, or if a "imgNode" is found
+    if (elem.localName === 'p' || !utils.isNullOrUndefined(imgNode)) {
       const skipSavingMainDOM = isElementEmpty(mainElem) || onlyhash1(mainElem);
 
       // finish current dom and save the found image and start the next dom

@@ -636,6 +636,134 @@ export async function copyImage(fromPath: string, epubctx: epubh.EpubContext<any
   return copiedPath;
 }
 
+/** Helper Class to keep track of what Element needs to be modified */
+export class PElemTracker {
+  protected _currentElem: Element | undefined;
+  protected _topElem: Element | undefined;
+
+  /** Get the Current Element that should be modified or added to */
+  get currentElem() {
+    return this._currentElem;
+  }
+
+  /** Get the Top-Level Element which contains all "currentElem" */
+  get topElem() {
+    return this._topElem;
+  }
+
+  /** Set a new "currentElem" */
+  public setNewElem(newElem: Element) {
+    // if "currentElem" is undefined, we can safely assume "topElem" is also undefined
+    if (utils.isNullOrUndefined(this._currentElem)) {
+      this._currentElem = newElem;
+      this._topElem = newElem;
+    } else {
+      this._currentElem.appendChild(newElem);
+      this._currentElem = newElem;
+    }
+  }
+}
+
+/**
+ * A Interface for {@link processCommonStyle}'s return
+ * The Function returns the listed values so to not have to re-do those things if needed
+ */
+export interface ProcessCommonStyleReturn {
+  /** The "window" object of the input "elem" */
+  window: Window;
+  /** The Computed style of the input "elem" */
+  elemCompStyle: CSSStyleDeclaration;
+}
+
+/**
+ * Process Common styles for a element
+ * @param pelemTracker The PElemTracker to keep track of where to add elements
+ * @param parentElem The OUTPUT Top Element (mostly "p") to apply styling to
+ * @param documentNew The OUTPUT Document where to create Elements on
+ * @param elem The INPUT Element to check
+ * @returns
+ */
+export function processCommonStyle(
+  pelemTracker: PElemTracker,
+  parentElem: Element,
+  documentNew: Document,
+  elem: Element
+): ProcessCommonStyleReturn {
+  const window = elem.ownerDocument.defaultView;
+  utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
+  const elemCompStyle = window.getComputedStyle(elem);
+
+  // Note: if "strong" and css setting "font-weight" are set to "bold", then it will always be "bold", but in chrome & firefox it will be a number (700)
+  if (!parentHas(pelemTracker.currentElem, 'strong') && elemCompStyle.fontWeight === 'bold') {
+    pelemTracker.setNewElem(documentNew.createElement('strong'));
+  }
+  if (!parentHas(pelemTracker.currentElem, 'em') && elemCompStyle.fontStyle === 'italic') {
+    pelemTracker.setNewElem(documentNew.createElement('em'));
+  }
+  if (!parentHas(pelemTracker.currentElem, 'sup') && elemCompStyle.verticalAlign === 'super') {
+    pelemTracker.setNewElem(documentNew.createElement('sup'));
+  }
+  if (!parentHas(pelemTracker.currentElem, 'sub') && elemCompStyle.verticalAlign === 'sub') {
+    pelemTracker.setNewElem(documentNew.createElement('sub'));
+  }
+  if (elemCompStyle.textAlign === 'center') {
+    parentElem.setAttribute('class', 'centerp section-marking');
+  }
+  if (elemCompStyle.textAlign === 'right') {
+    parentElem.setAttribute('class', 'signature');
+  }
+
+  return {
+    window,
+    elemCompStyle,
+  };
+}
+
+/**
+ * Check for a given element "tagName" upwards, until "until" is encountered, upwards
+ * @param startElem The element to start searching on
+ * @param tagName The element name (tagName) to search for
+ * @param until Search for "tagName" until "until" is encountered
+ * @returns "true" if the given "tagName" is found, "false" otherwise
+ */
+export function parentHas(
+  startElem: Element | undefined,
+  tagName: keyof HTMLElementTagNameMap,
+  until: keyof HTMLElementTagNameMap = 'body'
+): boolean {
+  if (utils.isNullOrUndefined(startElem)) {
+    return false;
+  }
+
+  for (const elem of traverseParent(startElem)) {
+    // return if requested element is found
+    if (elem.tagName === tagName) {
+      return true;
+    }
+    // early return "false" if "until" has been found
+    else if (elem.tagName === until) {
+      return false;
+    }
+
+    continue;
+  }
+
+  return false; // base case
+}
+
+/**
+ * Traverse a given "initElem" upwards (through ".parentElement") until there is no parent anymore
+ * @param initElem The Starting Element (will not be given as a output)
+ * @returns A Generator to traverse a given element upwards
+ */
+export function* traverseParent(initElem: Element): Generator<Element> {
+  let currentElem: Element | null = initElem;
+
+  while (!utils.isNullOrUndefined((currentElem = currentElem.parentElement))) {
+    yield currentElem;
+  }
+}
+
 export const STATICS = {
   /** Default JSDOM Options */
   JSDOM_XHTML_OPTIONS: { contentType: xh.STATICS.XHTML_MIMETYPE },

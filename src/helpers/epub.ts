@@ -1037,7 +1037,7 @@ export function copyMetadata(
       }
 
       if (elem.getAttribute('opf:scheme') === 'calibre') {
-        newNode.setAttribute('opf:scheme', 'calibre');
+        newNode.setAttributeNS(xh.STATICS.OPF_XML_NAMESPACE, 'opf:scheme', 'calibre');
       }
     }
 

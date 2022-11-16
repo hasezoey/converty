@@ -589,36 +589,6 @@ function sortContentSpine(a: EpubFile, b: EpubFile) {
     if (b.type.type === EpubContextFileXHTMLTypes.TOC) {
       return 1;
     }
-    // move frontmatter to the front
-    if (a.type.type === EpubContextFileXHTMLTypes.IMG && a.type.imgType === ImgType.Frontmatter) {
-      if (b.type.type === EpubContextFileXHTMLTypes.IMG && b.type.imgType === ImgType.Frontmatter) {
-        return a.globalSeqIndex - b.globalSeqIndex;
-      }
-
-      return -1;
-    }
-    if (b.type.type === EpubContextFileXHTMLTypes.IMG && b.type.imgType === ImgType.Frontmatter) {
-      if (a.type.type === EpubContextFileXHTMLTypes.IMG && a.type.imgType === ImgType.Frontmatter) {
-        return a.globalSeqIndex - b.globalSeqIndex;
-      }
-
-      return 1;
-    }
-    // move backmatter to the back
-    if (a.type.type === EpubContextFileXHTMLTypes.IMG && a.type.imgType === ImgType.Backmatter) {
-      if (b.type.type === EpubContextFileXHTMLTypes.IMG && b.type.imgType === ImgType.Backmatter) {
-        return a.globalSeqIndex - b.globalSeqIndex;
-      }
-
-      return -1;
-    }
-    if (b.type.type === EpubContextFileXHTMLTypes.IMG && b.type.imgType === ImgType.Backmatter) {
-      if (a.type.type === EpubContextFileXHTMLTypes.IMG && a.type.imgType === ImgType.Backmatter) {
-        return a.globalSeqIndex - b.globalSeqIndex;
-      }
-
-      return 1;
-    }
   }
 
   // handle case where the types are not defined

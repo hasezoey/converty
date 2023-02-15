@@ -32,6 +32,15 @@ export const DEFAULT_TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
 export const SERIES_MATCH_REGEX = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/im;
 /** Cover file name (without extension) for the xhtml file */
 export const COVER_XHTML_FILENAME = 'cover';
+/**
+ * Regex for testing if a file is meant to be a cover
+ * Matches:
+ * "Cover"
+ * "Cover Page"
+ * Does not match:
+ * "Chapter 00: Something about cover"
+ */
+export const COVER_TITLE_TEST_REGEX = /^cover(\spage)?$/im;
 
 // CODE
 
@@ -484,7 +493,7 @@ export function genImgIdData(
   }
 
   // determine if the current image processing is for the cover
-  if (entryType.title.trim().toLowerCase().includes('cover')) {
+  if (COVER_TITLE_TEST_REGEX.test(entryType.title)) {
     optionsClass.setImgTypeImplicit(epubh.ImgType.Cover);
   }
 

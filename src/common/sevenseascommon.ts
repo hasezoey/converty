@@ -144,7 +144,7 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     const filePath = file.filePath;
 
     if (new RegExp(config.FilesToFilter ?? DEFAULT_FILES_TO_FILTER_OUT_REGEX).test(filePath)) {
-      log(`Skipping file "${file}" because it is in the filter regex`);
+      log(`Skipping file "${file.id}" because it is in the filter regex`);
       continue;
     }
 
@@ -158,7 +158,7 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     }
 
     const mimetype = file.mediaType;
-    log(`Processing file "${file}", ${mimetype}`);
+    log(`Processing file "${file.id}", ${mimetype}`);
 
     utils.assertion(typeof mimetype === 'string', new Error('Expected "mimetype" to be of string'));
 

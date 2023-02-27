@@ -10,7 +10,7 @@ tmp.setGracefulCleanup();
 // STATIC OPTIONS
 const VERIFIED_MATCH_LIST = [
   'I.{1}m the Evil Lord of an Intergalactic Empire!',
-  'Trapped in a Dating Sim.{1} The World of Otome Games is Tough for Mobs',
+  '(?:Trapped in a Dating Sim.{1} The )?World of Otome Games is Tough for Mobs',
   'Reincarnated as a Sword',
 ];
 const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');

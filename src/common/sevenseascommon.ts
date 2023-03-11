@@ -605,6 +605,7 @@ export function generatePElementInner(
     // author signature (afterword), handled by "generatePElement"
     'P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
     'P_Prose_Formatting__And__Right_Alignment',
+    'P_TEXTBODY_CENTERALIGN__And__Right_Alignment',
     // handled earlier in the function
     'C_Current__And__Times_New_Roman__And__Italic',
     'C_Current__And__Times_New_Roman__And__Bold__And__Italic',

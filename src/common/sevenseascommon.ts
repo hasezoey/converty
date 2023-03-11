@@ -1,7 +1,6 @@
 import * as utils from '../utils.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
-import * as tmp from 'tmp';
 import { getTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
 import * as sh from '../helpers/string.js';
@@ -20,8 +19,6 @@ import {
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('sevenseascommon');
-
-tmp.setGracefulCleanup();
 
 // STATIC OPTIONS
 /** Regex of files to filter out (to not include in the output) */

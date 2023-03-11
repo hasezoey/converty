@@ -5,7 +5,6 @@ import * as epubh from '../helpers/epub.js';
 import * as sh from '../helpers/string.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
-import * as tmp from 'tmp';
 import {
   doTextContent,
   DoTextContentOptionsGenImageData,
@@ -17,8 +16,6 @@ import {
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('lastofkind_ln');
-
-tmp.setGracefulCleanup();
 
 // STATIC OPTIONS
 const INPUT_MATCH_REGEX = /Reincarnated as the Last of My Kind/gim;

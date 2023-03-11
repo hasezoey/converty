@@ -1,11 +1,8 @@
 import * as utils from '../utils.js';
-import * as tmp from 'tmp';
 import * as epubh from '../helpers/epub.js';
 import * as ssc from '../common/sevenseascommon.js';
 
 const log = utils.createNameSpace('averbil_ln');
-
-tmp.setGracefulCleanup();
 
 // STATIC OPTIONS
 const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;

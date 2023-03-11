@@ -1,11 +1,8 @@
 import * as utils from '../utils.js';
-import * as tmp from 'tmp';
 import * as ssc from '../common/sevenseascommon.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _log = utils.createNameSpace('genericSevenSeas_ln');
-
-tmp.setGracefulCleanup();
 
 // STATIC OPTIONS
 const VERIFIED_MATCH_LIST = [

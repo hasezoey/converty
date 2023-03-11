@@ -21,7 +21,8 @@
     "test:coverage": "jest --collectCoverage",
     "test:watchCoverage": "jest --collectCoverage --watchAll",
     "watch": "tsc -w -p tsconfig.json",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "clean": "rm -rf lib"
   },
   "author": "hasezoey",
   "license": "MIT",

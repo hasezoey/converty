@@ -1,7 +1,8 @@
-import { promises as fspromises, Stats } from 'fs';
+import { mkdtempSync, promises as fspromises, Stats } from 'fs';
 import debug from 'debug';
 import 'colors'; // side-effect import, in utils because this file is imported across entry-points
 import * as path from 'path';
+import { tmpdir } from 'node:os';
 
 const log = createNameSpace('utils');
 
@@ -499,4 +500,48 @@ export function regexMatchGroupRequired(match: RegExpMatchArray, groupName: stri
  */
 export function regexMatchGroup(match: RegExpMatchArray, groupName: string): string | undefined {
   return match.groups?.[groupName];
+}
+
+/**
+ * Create a Temporary directory with prefix, and optionally at "atPath"
+ * @param prefix The prefix to use to create the tmpdir
+ * @param atPath Optionally set a custom path other than "os.tmpdir"
+ * @returns The created Path
+ */
+export async function createTmpDir(prefix: string, atPath?: string): Promise<string> {
+  const tmpPath = atPath ?? tmpdir();
+
+  return fspromises.mkdtemp(path.join(tmpPath, prefix));
+}
+
+/**
+ * Create a Temporary directory with prefix, and optionally at "atPath" using sync methods
+ * @param prefix The prefix to use to create the tmpdir
+ * @param atPath Optionally set a custom path other than "os.tmpdir"
+ * @returns The created Path
+ */
+export function createTmpDirSync(prefix: string, atPath?: string): string {
+  const tmpPath = atPath ?? tmpdir();
+
+  return mkdtempSync(path.join(tmpPath, prefix));
+}
+
+/**
+ * Removes the given "path", if it is a directory, and does not throw a error if not existing
+ * @param dirPath The Directory Path to delete
+ * @returns "true" if deleted, otherwise "false"
+ */
+export async function removeDir(dirPath: string): Promise<void> {
+  const stat = await statPath(dirPath);
+
+  if (isNullOrUndefined(stat)) {
+    return;
+  }
+
+  if (!stat.isDirectory()) {
+    throw new Error(`Given Path is not a directory! (Path: "${dirPath}")`);
+  }
+
+  // only since NodeJS 14
+  await fspromises.rm(dirPath, { force: true, recursive: true });
 }

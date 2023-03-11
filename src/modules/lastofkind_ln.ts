@@ -162,19 +162,9 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   await fspromises.copyFile(outPath, finishedEpubPath);
 
   // cleanup
-
   {
-    // somehow "tmp" is not reliable to remove the directory again
-    if (!utils.isNullOrUndefined(await utils.statPath(epubctxInput.rootDir))) {
-      log('"epubctxInput.rootDir" dir still existed after "removeCallback", manually cleaning');
-      await fspromises.rm(epubctxInput.rootDir, { recursive: true, maxRetries: 1 });
-    }
-
-    // somehow "tmp" is not reliable to remove the directory again
-    if (!utils.isNullOrUndefined(await utils.statPath(epubctxOut.rootDir))) {
-      log('"epubctxOut.rootDir" dir still existed after "removeCallback", manually cleaning');
-      await fspromises.rm(epubctxOut.rootDir, { recursive: true, maxRetries: 1 });
-    }
+    await utils.removeDir(epubctxInput.rootDir);
+    await utils.removeDir(epubctxOut.rootDir);
   }
 
   return finishedEpubPath;

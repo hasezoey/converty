@@ -1,7 +1,6 @@
 import * as utils from '../utils.js';
 import * as xh from './xml.js';
 import * as sh from './string.js';
-import * as tmp from 'tmp';
 import * as path from 'path';
 import { applyTemplate, getTemplate } from './template.js';
 import { createWriteStream, promises as fspromises } from 'fs';
@@ -209,7 +208,7 @@ export class BaseEpubOptions<NumberTrackers extends string | keyof BaseEpubConte
 
 export class EpubContext<Options extends BaseEpubOptions, CustomData extends Record<string, any> = never> {
   /** The Tmpdir where the epub files are stored */
-  protected readonly _tmpdir: tmp.DirResult;
+  protected readonly _tmpdir: string;
   /** The Title of the Story */
   public readonly title: string;
   /** The Files of the Epub */
@@ -224,10 +223,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
   constructor(input: { title: string; optionsClass: Options; customData?: CustomData; cssName?: string }) {
     this.title = input.title;
 
-    this._tmpdir = tmp.dirSync({
-      prefix: 'converty',
-      unsafeCleanup: true,
-    });
+    this._tmpdir = utils.createTmpDirSync('converty-');
     log('Tempdir path:', this.rootDir);
     this._optionsClass = input.optionsClass;
 
@@ -242,7 +238,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
 
   /** Get the working directory's root (tmpdir) */
   get rootDir() {
-    return this._tmpdir.name;
+    return this._tmpdir;
   }
 
   /** Get the absolute path to where the content.opf file will be */

@@ -31,7 +31,6 @@
     "@types/debug": "^4.1.7",
     "@types/jsdom": "^20.0.1",
     "@types/mime-types": "^2.1.1",
-    "@types/mkdirp": "^1.0.2",
     "@types/node": "~18.11.9",
     "@types/yauzl": "^2.10.0",
     "@types/yazl": "^2.4.2",
@@ -52,7 +51,6 @@
     "downloads-folder": "^3.0.3",
     "jsdom": "^20.0.2",
     "mime-types": "^2.1.35",
-    "mkdirp": "^1.0.4",
     "tslib": "^2.4.1",
     "yauzl": "^2.10.0",
     "yazl": "^2.5.1"

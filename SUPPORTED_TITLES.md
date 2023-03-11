@@ -4,10 +4,10 @@ List of currently Supported inputs with current modules:
 
 |        Module         |                                   Series                                   | Notes                                                          |
 | :-------------------: | :------------------------------------------------------------------------: | :------------------------------------------------------------- |
-|     `averbil_ln`      | `Didn't I Say to Make My Abilities Average in the Next Life?! Light Novel` | Supports all volumes from 1 to 14 and spinoff; Output is EPUB3 |
+|     `averbil_ln`      | `Didn't I Say to Make My Abilities Average in the Next Life?! Light Novel` | Supports all volumes from 1 to 15 and spinoff; Output is EPUB3 |
 |    `lastofkind_ln`    |                   `Reincarnated as the Last of My Kind`                    | Supports all volumes from 1 to 4; Output is EPUB3              |
-| `genericSevenSeas_ln` |              `I’m the Evil Lord of an Intergalactic Empire!`               | Supports all volumes from 1 to 1; Output is EPUB3              |
-| `genericSevenSeas_ln` |   `Trapped in a Dating Sim: The World of Otome Games is Tough for Mobs`    | Supports all volumes from 1 to 7; Output is EPUB3              |
+| `genericSevenSeas_ln` |              `I’m the Evil Lord of an Intergalactic Empire!`               | Supports all volumes from 1 to 2; Output is EPUB3              |
+| `genericSevenSeas_ln` |   `Trapped in a Dating Sim: The World of Otome Games is Tough for Mobs`    | Supports all volumes from 1 to 8; Output is EPUB3              |
 | `genericSevenSeas_ln` |                         `Reincarnated as a Sword`                          | Supports all volumes from 1 to 2; Output is EPUB3              |
 
 Notes:

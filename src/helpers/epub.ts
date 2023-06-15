@@ -487,12 +487,11 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
   }
 
   /**
-   * Generate the TOC, NCX, and finialize the content.opf and save to a epub.zip
+   * Generate the TOC, NCX, and finialize the content.opf
+   * This function does not generate the final .epub file
    * @param hooks Define Hooks for the generator functions
    */
-  public async finish(hooks?: { contentOPF: ContentOPFFn }): Promise<string> {
-    log('Starting to finish epub');
-
+  public async generateFinish(hooks?: { contentOPF: ContentOPFFn }) {
     this.sortFilesForSpine();
 
     await this.generateTOCXHTML();
@@ -501,6 +500,16 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
     this.sortFilesForSpine(); // sort again because a file got added
 
     await this.generateContentOPF(hooks?.contentOPF);
+  }
+
+  /**
+   * Generate the TOC, NCX, and finialize the content.opf and save to a .epub (zip)
+   * @param hooks Define Hooks for the generator functions
+   */
+  public async finish(hooks?: { contentOPF: ContentOPFFn }): Promise<string> {
+    log('Starting to finish epub');
+
+    await this.generateFinish(hooks);
 
     const epubFileName = path.resolve(this.rootDir, sh.stringToFilename(this.title) + '.epub');
     const epubFileNamePart = epubFileName + '.part';

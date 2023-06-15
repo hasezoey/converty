@@ -553,9 +553,37 @@ export interface GeneratePElementInnerHookReturn {
 
 export type GeneratePElementInnerHook = () => GeneratePElementInnerHookReturn;
 
-/** Return formatted and only elements that are required */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+/**
+ * Wrapper for {@link generatePElementInnerTranslate} to move generated elements around to the previous element if required
+ */
 export function generatePElementInner(
+  origNode: Node,
+  documentNew: Document,
+  parentElem: Element,
+  optionsClass: SevenSeasECOptions,
+  config: SevenSeasConfig
+): Node[] {
+  const elems = generatePElementInnerTranslate(origNode, documentNew, parentElem, optionsClass, config);
+
+  const lastmainnode = documentNew.querySelector('.main')?.lastChild;
+
+  // find elements that end with a word character and a space, we can safely assume that those are meant to be combined (if current is not a control like br)
+  // example: "<p>Some text </p><p>which is meant to be combined.</p>"
+  // this exists because sevenseas texts somehow have this splitting on some first pages of a chapter
+  if (lastmainnode && (lastmainnode.textContent?.length ?? 0) > 5 && lastmainnode.textContent?.match(/\w\s$/)) {
+    log('generatePElementInner: Found previous node which did not end correctly, combining with current node');
+    for (const child of elems) {
+      lastmainnode.appendChild(child);
+    }
+
+    return [];
+  }
+
+  return elems;
+}
+
+/** Return formatted and only elements that are required */
+export function generatePElementInnerTranslate(
   origNode: Node,
   documentNew: Document,
   parentElem: Element,

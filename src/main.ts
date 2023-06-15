@@ -85,7 +85,7 @@ async function load_modules(): Promise<utils.ConverterModuleStore[]> {
  * Helper function to get the DownloadBasePath
  * @returns The download base path
  */
-function getConverterBasePath(): string {
+export function getConverterBasePath(): string {
   if (!utils.isNullOrUndefined(config) && !!config.baseConverterPath) {
     return path.resolve(config.baseConverterPath, PROJECT_NAME);
   }
@@ -133,7 +133,7 @@ async function createDownloadsSymlink() {
   }
 }
 
-export default async function main() {
+export async function readConfig() {
   // multiple "../" because "import.meta.url" resolves to "lib/main.js"
   const configPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', CONFIG_PATH);
 
@@ -141,7 +141,7 @@ export default async function main() {
     log('Trying to load config at path', configPath);
     try {
       const read = (await fspromises.readFile(configPath)).toString();
-      config = JSON.parse(read);
+      setConfig(JSON.parse(read));
       log('Loaded config at path', configPath);
     } catch (err) {
       console.log('Failed to load Config:'.red, err);
@@ -149,10 +149,37 @@ export default async function main() {
   } else {
     log('No Config found at', configPath);
   }
+}
+
+/** Helper function to consistently set the local global config variable */
+export function setConfig(cfg: ConverterPConfig) {
+  config = cfg;
+}
+
+/** Helper function consistently get the config variable */
+export function getConfig(): ConverterPConfig | undefined {
+  return config;
+}
+
+/** Options to overwrite for extending scripts */
+export interface MainOptions {
+  converterInputPath?: string;
+  converterOutputPath?: string;
+  config?: ConverterPConfig;
+}
+
+export default async function main(options?: MainOptions) {
+  if (utils.isNullOrUndefined(options?.config)) {
+    if (utils.isNullOrUndefined(config)) {
+      await readConfig();
+    }
+  } else {
+    setConfig(options!.config);
+  }
 
   const converterBasePath = getConverterBasePath();
-  const converterINPUTPath = path.join(converterBasePath, 'input');
-  const converterOUTPUTPath = path.join(converterBasePath, 'output');
+  const converterINPUTPath = options?.converterInputPath ?? path.join(converterBasePath, 'input');
+  const converterOUTPUTPath = options?.converterOutputPath ?? path.join(converterBasePath, 'output');
 
   // create directories in case they do not exist for future use
   utils.mkdir(converterINPUTPath);

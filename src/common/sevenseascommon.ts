@@ -16,6 +16,7 @@ import {
   STATICS,
   DoTextContentOptions,
   DoTextContentOptionsGenTextIdDataExtra,
+  finishEpubctx,
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('sevenseascommon');
@@ -217,21 +218,9 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     }
   }
 
-  const outPath = await epubctxOut.finish({
+  return await finishEpubctx(epubctxOut, options, [epubctxInput], {
     contentOPF: config.contentOPFHook ?? contentOPFHook,
   });
-
-  const finishedEpubPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}.epub`);
-
-  await fspromises.copyFile(outPath, finishedEpubPath);
-
-  // cleanup
-  {
-    await utils.removeDir(epubctxInput.rootDir);
-    await utils.removeDir(epubctxOut.rootDir);
-  }
-
-  return finishedEpubPath;
 }
 
 // LOCAL

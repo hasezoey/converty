@@ -10,6 +10,7 @@ import {
   DoTextContentOptionsGenImageData,
   EntryInformation,
   EntryType,
+  finishEpubctx,
   PElemTracker,
   processCommonStyle,
   TextProcessingECOptions,
@@ -151,23 +152,9 @@ async function process(options: utils.ConverterOptions): Promise<string> {
     }
   }
 
-  const outPath = await epubctxOut.finish({
+  return await finishEpubctx(epubctxOut, options, [epubctxInput], {
     contentOPF: contentOPFHook,
   });
-
-  // move epub to proper place
-
-  const finishedEpubPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}.epub`);
-
-  await fspromises.copyFile(outPath, finishedEpubPath);
-
-  // cleanup
-  {
-    await utils.removeDir(epubctxInput.rootDir);
-    await utils.removeDir(epubctxOut.rootDir);
-  }
-
-  return finishedEpubPath;
 }
 
 /**

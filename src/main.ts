@@ -124,7 +124,7 @@ async function createDownloadsSymlink() {
   }
 }
 
-async function main_loop() {
+export default async function main() {
   // multiple "../" because "import.meta.url" resolves to "lib/main.js"
   const configPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', CONFIG_PATH);
 
@@ -232,5 +232,3 @@ async function main_loop() {
     finished.push(file);
   }
 }
-
-main_loop();

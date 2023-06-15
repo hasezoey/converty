@@ -13,7 +13,7 @@
     "lib/**/*.d.ts"
   ],
   "scripts": {
-    "run": "yarn run build && node lib/main.js",
+    "run": "yarn run build && node lib/bin/main.js",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint -c ./.eslintrc.cjs './**/*.{cjs,js,ts}'",
     "test": "jest",

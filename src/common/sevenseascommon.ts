@@ -564,6 +564,18 @@ export function generatePElementInner(
 ): Node[] {
   const elems = generatePElementInnerTranslate(origNode, documentNew, parentElem, optionsClass, config);
 
+  const res = combineWithLastNode(documentNew, config, elems);
+
+  return res ?? elems;
+}
+
+/** Helper for control flow */
+function combineWithLastNode(documentNew: Document, config: SevenSeasConfig, elems: Node[]): Node[] | undefined {
+  // quick end for when "elems" is empty or when the node is a separator
+  if (elems.length === 0) {
+    return undefined;
+  }
+
   const lastmainnode = documentNew.querySelector('.main')?.lastChild;
 
   // find elements that end with a word character and a space, we can safely assume that those are meant to be combined (if current is not a control like br)
@@ -576,7 +588,13 @@ export function generatePElementInner(
 
     if (!shouldNotCombine) {
       log('generatePElementInner: Found previous node which did not end correctly, combining with current node');
+
       for (const child of elems) {
+        // ignore "br" elements in while combining
+        if (child.nodeName === 'br') {
+          continue;
+        }
+
         lastmainnode.appendChild(child);
       }
 
@@ -586,7 +604,7 @@ export function generatePElementInner(
     log('generatePElementInner: Found previous node which did not end correctly, but custom hook prevented it');
   }
 
-  return elems;
+  return undefined;
 }
 
 /** Return formatted and only elements that are required */

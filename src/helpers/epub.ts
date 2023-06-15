@@ -397,7 +397,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
 
     const outpath = path.resolve(containerBasePath, STATICS.TOC_NCX_FILENAME);
     await utils.mkdir(containerBasePath);
-    await fspromises.writeFile(outpath, `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize());
+    await fspromises.writeFile(outpath, await serializeXML(dom));
     this.addFile(
       new EpubContextFileBase({
         id: STATICS.TOC_NCX_FILENAME,
@@ -478,7 +478,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
       });
     }
 
-    const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize();
+    const serialized = await serializeXML(dom);
     const writtenPath = this.contentOPFPath;
 
     {
@@ -638,7 +638,7 @@ export async function finishDOMtoFile(
   epubctx: EpubContext<any, any>,
   epubfileOptions: Omit<ConstructorParameters<typeof EpubContextFileXHTML>[0], 'filePath'>
 ): Promise<string> {
-  const serialized = `${xh.STATICS.XML_BEGINNING_OP}\n` + dom.serialize();
+  const serialized = await serializeXML(dom);
 
   const writtenPath = path.resolve(basePath, subdir, filename);
   await utils.mkdir(path.dirname(writtenPath));
@@ -1106,6 +1106,25 @@ export function applySeriesMetadata(document: Document, metadataElem: Element, i
   metadataElem.appendChild(metaCollectionElem);
   metadataElem.appendChild(metaTypeElem);
   metadataElem.appendChild(metaPositionElem);
+}
+
+/**
+ * Function to consistently serialize DOM's, taking into consideration all processing options (like debugOutputEnabled)
+ * @param dom The DOM to serialize
+ * @returns The serialized DOM content
+ */
+export async function serializeXML(dom: JSDOM): Promise<string> {
+  let serialized = dom.serialize();
+
+  if (utils.debugOutputEnabled()) {
+    serialized = (await import('prettier')).format(serialized, {
+      parser: 'xml',
+      bracketSameLine: true,
+      xmlWhitespaceSensitivity: 'ignore',
+    });
+  }
+
+  return `${xh.STATICS.XML_BEGINNING_OP}\n` + serialized;
 }
 
 export const STATICS = {

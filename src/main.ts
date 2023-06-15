@@ -14,16 +14,10 @@ const PROJECT_NAME = 'converty';
 
 /** Set the output path of where to store outputs (and in some cases also inputs) */
 const CONVERTER_BASE_PATH_FALLBACK = path.resolve(downloadsFolder(), PROJECT_NAME);
-/** Create a link in the Downloads-Folder to the path where "CONVERTER_BASE_PATH" is, only if they are not the same */
-const CREATE_DOWNLOADS_LINK = true;
 /** Path to the config file, if relative will be resolved relative to the project root */
 const CONFIG_PATH = './converterrc.json';
 /** Overwrite files to process instead of finding all */
 const OVERWRITE_FILES: undefined | string[] = undefined;
-/** Set "No Module for File" Errors to be Silent */
-const SILENT_NO_MODULE_FOR_FILE: boolean = false;
-/** Set to allow Directories as input to modules, instead of just files */
-const ALLOW_DIR_AS_INPUT: boolean = true;
 
 /** The Loaded Config of the Project */
 let config: ConverterPConfig | undefined = undefined;
@@ -31,6 +25,21 @@ let config: ConverterPConfig | undefined = undefined;
 interface ConverterPConfig {
   /** The Absolute path to the Base Converter Dir to use, the Project-name will be appended */
   baseConverterPath?: string;
+  /**
+   * Create a link in the current user's home/Downloads directory to the converty processing directory
+   * @default true
+   */
+  createDownloadLink?: boolean;
+  /**
+   * Set to allow Directories as input to modules, instead of just files
+   * @default true
+   */
+  allowDirAsInput?: boolean;
+  /**
+   * Disable the "No Module for File" warning
+   * @default false
+   */
+  disableNoModuleWarning?: boolean;
 }
 
 // CODE
@@ -88,7 +97,7 @@ function getConverterBasePath(): string {
  * Helper function to out-source the creation of a symlink in the downloads folder to the base-path
  */
 async function createDownloadsSymlink() {
-  if (CREATE_DOWNLOADS_LINK) {
+  if (config?.createDownloadLink ?? true) {
     const converterBasePath = getConverterBasePath();
     const downloadsFolderPath = path.resolve(downloadsFolder(), PROJECT_NAME);
     // using "lstat" because otherwise it will read the link's content instead of the link itself
@@ -176,7 +185,7 @@ export default async function main() {
     const stat = await utils.statPath(fullPath);
 
     // ignore all paths that are not possible to read or are not a file
-    if (utils.isNullOrUndefined(stat) || (!stat.isFile() && !(ALLOW_DIR_AS_INPUT && stat.isDirectory()))) {
+    if (utils.isNullOrUndefined(stat) || (!stat.isFile() && !((config?.allowDirAsInput ?? true) && stat.isDirectory()))) {
       continue;
     }
 
@@ -208,7 +217,7 @@ export default async function main() {
 
     // ignore files that dont have a module, but print error
     if (utils.isNullOrUndefined(processingModel)) {
-      if (!SILENT_NO_MODULE_FOR_FILE) {
+      if (!(config?.disableNoModuleWarning ?? false)) {
         console.error(new Error(`Could not find a module for path "${file}"`));
       }
 

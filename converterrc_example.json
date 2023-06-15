@@ -1,3 +1,6 @@
 {
-  "baseConverterPath": "/path/to/base/directory"
+  "baseConverterPath": "/path/to/base/directory",
+  "createDownloadLink": true,
+  "allowDirAsInput": true,
+  "disableNoModuleWarning": false
 }

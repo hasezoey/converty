@@ -31,9 +31,13 @@ export interface ConverterModule {
   process(options: ConverterOptions): Promise<string>;
 }
 
+/** Options provided on where the input path is and where paths should be output to */
 export interface ConverterOptions {
+  /** The General input path of the converty package (directory) */
   converterInputPath: string;
+  /** The General output path of the converty package (directory) */
   converterOutputPath: string;
+  /** The Path of the input that has been detected, either a directory or a file */
   fileInputPath: string;
 }
 

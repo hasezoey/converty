@@ -3,7 +3,7 @@ import * as xh from './xml.js';
 import * as sh from './string.js';
 import * as path from 'path';
 import { applyTemplate, getTemplate } from './template.js';
-import { createWriteStream, promises as fspromises } from 'fs';
+import { createWriteStream, promises as fspromises, constants as fsconstants } from 'fs';
 import { JSDOM } from 'jsdom';
 import yazl from 'yazl';
 import yauzl from 'yauzl';
@@ -717,7 +717,7 @@ export async function getInputContext(inputPath: string): Promise<EpubContext<Ba
       const newPath = path.resolve(rootPath, relPath);
       await utils.mkdir(path.dirname(newPath));
 
-      await fspromises.copyFile(file, newPath, 0x755);
+      await fspromises.copyFile(file, newPath, fsconstants.COPYFILE_FICLONE);
 
       await addToCtx(epubctx, newPath);
     }
@@ -946,6 +946,7 @@ async function* recursiveDirRead(inputPath: string): AsyncGenerator<string> {
 
     if (ent.isDirectory()) {
       yield* recursiveDirRead(resPath);
+      continue;
     }
 
     yield resPath;

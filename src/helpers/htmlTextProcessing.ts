@@ -6,6 +6,7 @@ import * as xh from '../helpers/xml.js';
 import * as path from 'path';
 import { getTemplate, applyTemplate } from '../helpers/template.js';
 import * as mime from 'mime-types';
+import * as fsextra from 'fs-extra';
 
 const log = utils.createNameSpace('htmlTextProcessing');
 
@@ -796,17 +797,28 @@ export async function finishEpubctx(
   additionalEpubctx: epubh.EpubContext<any, any>[],
   hooks?: epubh.EpubFinishFunctions
 ): Promise<string> {
-  const outPath = await epubctxOut.finish(hooks);
+  let finalPath;
 
-  // move epub to proper place
+  // compress files into epub only when debug output is not enabled
+  if (utils.debugOutputEnabled()) {
+    await epubctxOut.generateFinish(hooks);
 
-  const finishedEpubPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}.epub`);
+    finalPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}`);
 
-  await fspromises.copyFile(outPath, finishedEpubPath);
+    await fsextra.copy(epubctxOut.rootDir, finalPath, { overwrite: true });
+  } else {
+    const outPath = await epubctxOut.finish(hooks);
+
+    finalPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}.epub`);
+
+    await fspromises.copyFile(outPath, finalPath);
+  }
+
+  // cleanup
 
   const epubctxClean = [epubctxOut, ...additionalEpubctx];
 
   await Promise.all(epubctxClean.map((v) => utils.removeDir(v.rootDir)));
 
-  return finishedEpubPath;
+  return finalPath;
 }

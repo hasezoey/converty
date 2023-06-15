@@ -54,11 +54,11 @@ export function matcher(inputRegex: RegExp): (name: string) => boolean {
 }
 
 /** Base Config for SevenSeas processes */
-export interface SevenSeasonConfig {
+export interface SevenSeasConfig {
   /** Define a custom "ContentOPFFn" */
   contentOPFHook?: epubh.ContentOPFFn;
   /** Define a custom "processHTMLFile" */
-  processHTMLFile?: (filePath: string, epubctxOut: epubh.EpubContext<SevenSeasECOptions>, config: SevenSeasonConfig) => Promise<void>;
+  processHTMLFile?: (filePath: string, epubctxOut: epubh.EpubContext<SevenSeasECOptions>, config: SevenSeasConfig) => Promise<void>;
   /** Define a custom ECOptions class */
   customECOptions?: typeof SevenSeasECOptions;
   /** Define a custom "doGenericPage" call */
@@ -67,7 +67,7 @@ export interface SevenSeasonConfig {
     entryType: EntryInformationExt,
     epubctxOut: epubh.EpubContext<SevenSeasECOptions>,
     currentInputFile: string,
-    config: SevenSeasonConfig,
+    config: SevenSeasConfig,
     skipElements?: number
   ) => Promise<void>;
   /**
@@ -126,7 +126,7 @@ export interface SevenSeasonConfig {
   FilesToFilter?: RegExp;
 }
 
-export async function process(options: utils.ConverterOptions, config: SevenSeasonConfig): Promise<string> {
+export async function process(options: utils.ConverterOptions, config: SevenSeasConfig): Promise<string> {
   const epubctxInput = await epubh.getInputContext(options.fileInputPath);
 
   const epubctxOut = new epubh.EpubContext<SevenSeasECOptions>({
@@ -239,7 +239,7 @@ export class SevenSeasECOptions extends TextProcessingECOptions {
 export async function processHTMLFile(
   filePath: string,
   epubctxOut: epubh.EpubContext<SevenSeasECOptions>,
-  config: SevenSeasonConfig
+  config: SevenSeasConfig
 ): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, STATICS.JSDOM_XHTML_OPTIONS);
@@ -289,7 +289,7 @@ export async function doGenericPage(
   entryType: EntryInformationExt,
   epubctxOut: epubh.EpubContext<SevenSeasECOptions>,
   currentInputFile: string,
-  config: SevenSeasonConfig,
+  config: SevenSeasConfig,
   skipElements?: number
 ): Promise<void> {
   // just to make sure that the type is defined and correctly assumed
@@ -560,7 +560,7 @@ export function generatePElementInner(
   documentNew: Document,
   parentElem: Element,
   optionsClass: SevenSeasECOptions,
-  config: SevenSeasonConfig
+  config: SevenSeasConfig
 ): Node[] {
   if (origNode.nodeType === documentNew.TEXT_NODE) {
     utils.assertionDefined(origNode.textContent, new Error('Expected "origElem.textContent" to be defined'));
@@ -712,7 +712,7 @@ export type GetTitleHook = (
  * @param headTitle The Title to parse
  * @returns The Processed title
  */
-export function getTitle(headTitle: string, config: SevenSeasonConfig): EntryInformationExt {
+export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInformationExt {
   const matches = GENERIC_TITLE_REGEX.exec(headTitle);
 
   utils.assertionDefined(matches, new Error('Failed to get matches for Title'));

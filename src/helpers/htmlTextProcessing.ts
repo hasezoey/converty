@@ -783,3 +783,30 @@ export const STATICS = {
   /** The default amount of elements to skip regardless of what they are */
   DEFAULT_SKIP_ELEMENTS: 0,
 };
+
+/**
+ * Handle calling all epubctx finish methods and move the final file to the output
+ * @param epubctxOut The Epub Context to save
+ * @param options Input Converter options for output dir
+ * @param additionalEpubctx Additional Epub Contexts to cleanup
+ */
+export async function finishEpubctx(
+  epubctxOut: epubh.EpubContext<any, any>,
+  options: utils.ConverterOptions,
+  additionalEpubctx: epubh.EpubContext<any, any>[],
+  hooks?: epubh.EpubFinishFunctions
+): Promise<string> {
+  const outPath = await epubctxOut.finish(hooks);
+
+  // move epub to proper place
+
+  const finishedEpubPath = path.resolve(options.converterOutputPath, `${epubctxOut.title}.epub`);
+
+  await fspromises.copyFile(outPath, finishedEpubPath);
+
+  const epubctxClean = [epubctxOut, ...additionalEpubctx];
+
+  await Promise.all(epubctxClean.map((v) => utils.removeDir(v.rootDir)));
+
+  return finishedEpubPath;
+}

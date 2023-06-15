@@ -5,7 +5,7 @@ import * as ssc from '../common/sevenseascommon.js';
 const log = utils.createNameSpace('averbil_ln');
 
 // STATIC OPTIONS
-const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average/gim;
+const INPUT_MATCH_REGEX = /Didn.{1}t I Say to Make My Abilities Average(?!: Everyday Misadventures)/gim;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_FILES_TO_FILTER_OUT_REGEX;
 const TITLES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_TITLES_TO_FILTER_OUT_REGEX;

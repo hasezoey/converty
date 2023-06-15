@@ -301,3 +301,24 @@ export async function removeDir(dirPath: string): Promise<void> {
   // only since NodeJS 14
   await fspromises.rm(dirPath, { force: true, recursive: true });
 }
+
+/**
+ * Convert "1, on, yes, true" to true (otherwise false)
+ * @param env The String / Environment Variable to check
+ */
+export function envToBool(env: string = ''): boolean {
+  if (typeof env !== 'string') {
+    log('envToBool: input was not a string!');
+
+    return false;
+  }
+
+  return ['1', 'on', 'yes', 'true'].indexOf(env.toLowerCase()) !== -1;
+}
+
+/**
+ * Check whether debug inspect is enabled or not
+ */
+export function debugOutputEnabled(): boolean {
+  return envToBool(process.env['DEBUG_OUTPUT']);
+}

@@ -53,6 +53,10 @@ Custom Modules can be added and placed in `src/modules`, and all modules must ha
 
 See existing Modules for help.
 
+### Extra modes
+
+There is the environment variable `DEBUG_OUTPUT` which will output files uncompressed and prettified where possible.
+
 ## Currently Supported Titles
 
 See [Supported Titles](./SUPPORTED_TITLES.md).

@@ -533,10 +533,19 @@ function genPElem<Options extends TextProcessingECOptions>(
   documentNew: Document,
   options: DoTextContentOptions<Options>,
   epubctx: epubh.EpubContext<Options>
-): Element {
+): Node {
   const topElem = documentNew.createElement('p');
 
-  for (const elem of options.genPElemText(origElem, documentNew, topElem, epubctx.optionsClass)) {
+  const elems = options.genPElemText(origElem, documentNew, topElem, epubctx.optionsClass);
+
+  // dont add a empty p element, just omit it (has the same behavior)
+  if (elems.length === 0) {
+    log('genPElem: Found elems to be empty, returning empty text node');
+
+    return documentNew.createTextNode('');
+  }
+
+  for (const elem of elems) {
     topElem.appendChild(elem);
   }
 

@@ -120,6 +120,12 @@ export interface SevenSeasConfig {
    * Has no effect if the default "generatePElementInner" is not used in "doGenericPage"
    */
   generatePElementInnerHook?: GeneratePElementInnerHook;
+  /**
+   * Define a hook to customize if the current element should be combined with the last element
+   * Has no effect if a custom "generatePElementInner" is defined
+   * Has no effect if the default "generatePElementInner" is not used in "doGenericPage"
+   */
+  generatePElementCombineHook?: GeneratePElementCombineHook;
   /** Define a custom title regex filter-out */
   TitlesToFilter?: RegExp;
   /** Define a custom files regex filter-out */
@@ -552,6 +558,10 @@ export interface GeneratePElementInnerHookReturn {
 }
 
 export type GeneratePElementInnerHook = () => GeneratePElementInnerHookReturn;
+/**
+ * Return "true" to skip combining, return "false" otherwise
+ */
+export type GeneratePElementCombineHook = (lastNode: Node, currentNodes: Node[]) => boolean;
 
 /**
  * Wrapper for {@link generatePElementInnerTranslate} to move generated elements around to the previous element if required
@@ -571,12 +581,20 @@ export function generatePElementInner(
   // example: "<p>Some text </p><p>which is meant to be combined.</p>"
   // this exists because sevenseas texts somehow have this splitting on some first pages of a chapter
   if (lastmainnode && (lastmainnode.textContent?.length ?? 0) > 5 && lastmainnode.textContent?.match(/\w\s$/)) {
-    log('generatePElementInner: Found previous node which did not end correctly, combining with current node');
-    for (const child of elems) {
-      lastmainnode.appendChild(child);
+    const shouldNotCombine = !utils.isNullOrUndefined(config.generatePElementCombineHook)
+      ? config.generatePElementCombineHook(lastmainnode, elems)
+      : false;
+
+    if (!shouldNotCombine) {
+      log('generatePElementInner: Found previous node which did not end correctly, combining with current node');
+      for (const child of elems) {
+        lastmainnode.appendChild(child);
+      }
+
+      return [];
     }
 
-    return [];
+    log('generatePElementInner: Found previous node which did not end correctly, but custom hook prevented it');
   }
 
   return elems;

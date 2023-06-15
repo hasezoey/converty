@@ -57,6 +57,14 @@ See existing Modules for help.
 
 There is the environment variable `DEBUG_OUTPUT` which will output files uncompressed and prettified where possible.
 
+#### run:compare script
+
+There is also a comparison script `run:compare` which will create a separate output directory along with `input` and `output` which is a git repository, the script will run like normal and then commit all the output in the git repository to make comparing changes easier (commit messages include the commit they are generated from).
+
+This makes regression testing much easier by having a simple script to run to find what changed or while using `git bisect`.  
+
+Makes use of `DEBUG_OUTPUT` to pretty print the output.
+
 ## Currently Supported Titles
 
 See [Supported Titles](./SUPPORTED_TITLES.md).

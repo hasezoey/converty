@@ -206,6 +206,13 @@ export class BaseEpubOptions<NumberTrackers extends string | keyof BaseEpubConte
   }
 }
 
+/**
+ * All functions that may be used for the finish methods
+ */
+export interface EpubFinishFunctions {
+  contentOPF: ContentOPFFn;
+}
+
 export class EpubContext<Options extends BaseEpubOptions, CustomData extends Record<string, any> = never> {
   /** The Tmpdir where the epub files are stored */
   protected readonly _tmpdir: string;
@@ -491,7 +498,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
    * This function does not generate the final .epub file
    * @param hooks Define Hooks for the generator functions
    */
-  public async generateFinish(hooks?: { contentOPF: ContentOPFFn }) {
+  public async generateFinish(hooks?: EpubFinishFunctions) {
     this.sortFilesForSpine();
 
     await this.generateTOCXHTML();
@@ -506,7 +513,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
    * Generate the TOC, NCX, and finialize the content.opf and save to a .epub (zip)
    * @param hooks Define Hooks for the generator functions
    */
-  public async finish(hooks?: { contentOPF: ContentOPFFn }): Promise<string> {
+  public async finish(hooks?: EpubFinishFunctions): Promise<string> {
     log('Starting to finish epub');
 
     await this.generateFinish(hooks);

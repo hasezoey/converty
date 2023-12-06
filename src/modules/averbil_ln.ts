@@ -70,6 +70,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     // custom hook to ignore some combining with previous elements, because for example volume 5 chapter 45
     // has some things which look the same as those that should be combined
     // and the only differentiator is that those nodes are not just plain text (wrapped in em)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     generatePElementCombineHook(lastnode, _elems) {
       for (const child of lastnode.childNodes) {
         if (child.nodeType !== lastnode.TEXT_NODE) {

@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import * as utils from '../utils.js';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const log = utils.createNameSpace('xmlHelpers');
 
 /**

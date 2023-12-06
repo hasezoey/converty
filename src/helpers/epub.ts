@@ -1118,9 +1118,13 @@ export async function serializeXML(dom: JSDOM): Promise<string> {
   let serialized = dom.serialize();
 
   if (utils.debugOutputEnabled()) {
-    serialized = (await import('prettier')).format(serialized, {
+    serialized = await (
+      await import('prettier')
+    ).format(serialized, {
+      plugins: ['@prettier/plugin-xml'],
       parser: 'xml',
       bracketSameLine: true,
+      // @ts-expect-error option from / for "@prettier/plugin-xml" which does not have types
       xmlWhitespaceSensitivity: 'ignore',
     });
   }

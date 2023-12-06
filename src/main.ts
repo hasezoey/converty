@@ -45,7 +45,10 @@ interface ConverterPConfig {
 // CODE
 
 class ModulesError extends Error {
-  constructor(public module: string, public err: Error) {
+  constructor(
+    public module: string,
+    public err: Error
+  ) {
     super(`A Error happened with Module "${module}""`);
   }
 }

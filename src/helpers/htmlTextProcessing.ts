@@ -202,7 +202,7 @@ export enum LastProcessedType {
 }
 
 export class TextProcessingECOptions<
-  ExtraTrackers extends string | keyof BaseTrackers = keyof BaseTrackers
+  ExtraTrackers extends string | keyof BaseTrackers = keyof BaseTrackers,
 > extends epubh.BaseEpubOptions<ExtraTrackers> {
   /** Stores the implicit image type to use */
   protected _imgType: epubh.ImgType = epubh.ImgType.Frontmatter;

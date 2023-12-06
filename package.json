@@ -31,7 +31,7 @@
     "@commitlint/cli": "^17.6.5",
     "@commitlint/config-conventional": "^17.6.5",
     "@prettier/plugin-xml": "^2.2.0",
-    "@types/debug": "^4.1.8",
+    "@types/debug": "^4.1.12",
     "@types/fs-extra": "^11.0.1",
     "@types/jsdom": "^21.1.1",
     "@types/mime-types": "^2.1.1",

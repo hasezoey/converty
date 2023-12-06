@@ -6,10 +6,10 @@ const _log = utils.createNameSpace('genericSevenSeas_ln');
 
 // STATIC OPTIONS
 const VERIFIED_MATCH_LIST = [
-  'I.{1}m the Evil Lord of an Intergalactic Empire!',
+  'I.{1}m the Evil Lord of an Intergalactic (?:Empire!)?',
   '(?:Trapped in a Dating Sim.{1} The )?World of Otome Games is Tough for Mobs',
   'Reincarnated as a Sword',
-  'Reborn as a Space Mercenary.{1} I Woke Up Piloting the Strongest Starship!',
+  'Reborn as a Space Mercenary.{1} I Woke Up P(?:iloting the Strongest Starship!)?',
 ];
 const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
 /** Regex of files to filter out (to not include in the output) */

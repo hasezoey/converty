@@ -3,6 +3,14 @@ import { execSync } from 'node:child_process';
 import * as utils from '../utils.js';
 import * as path from 'node:path';
 
+/*
+This script is to ease comparision between generation changes by commiting each run as a git commit in the output directory, also forces:
+- output to be directories instead of .epubs
+- forces `DEBUG_OUTPUT` to be on (using prettier on output xml / xhtml files)
+
+Usage of this script otherwise the same as "main.js".
+*/
+
 function hasDoneInitialCommit(compareOutPath: string): boolean {
   try {
     // this will fail if not in a git directory or no initial commit has been done

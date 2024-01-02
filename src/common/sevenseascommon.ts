@@ -645,6 +645,7 @@ export function generatePElementInnerTranslate(
     // default formatting for p, ignored
     'P_Normal__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
     'P_Prose_Formatting',
+    'P_Normal',
     // default formatting for span, ignored
     'C_Current__And__Times_New_Roman',
     // default formatting for section markings, handled by "generatePElement"
@@ -652,6 +653,7 @@ export function generatePElementInnerTranslate(
     'P_Prose_Formatting__And__Centre_Alignment',
     'P__STAR__STAR__STAR__page_break__And__Page_Break',
     'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
+    'P_TEXTBODY_CENTERALIGN',
     // transform all text to uppercase, ignored because all text is already uppercase
     'C_Nanomachines__And__Times_New_Roman__And__Capitals',
     'C_Current__And__Times_New_Roman__And__Capitals',
@@ -664,6 +666,7 @@ export function generatePElementInnerTranslate(
     'C_Current__And__Times_New_Roman__And__Bold__And__Italic',
     // extra indentation (and margin), handled by "generatePElement"
     'P_Prose_Formatting__And__Left_Indent',
+    'P_Prose_Formatting__And__Left_Indent__OPENPAR_1_CLOSEPAR_',
     // this is always after a div with "page-break: always", but can be ignored
     'P_Prose_Formatting__And__Page_Break',
   ];

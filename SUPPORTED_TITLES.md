@@ -4,7 +4,7 @@ List of currently Supported inputs with current modules:
 
 |        Module         |                                   Series                                   | Notes                                         |
 | :-------------------: | :------------------------------------------------------------------------: | :-------------------------------------------- |
-|     `averbil_ln`      | `Didn't I Say to Make My Abilities Average in the Next Life?! Light Novel` | Supports all volumes from 1 to 16 and spinoff |
+|     `averbil_ln`      | `Didn't I Say to Make My Abilities Average in the Next Life?! Light Novel` | Supports all volumes from 1 to 17 and spinoff |
 |    `lastofkind_ln`    |                   `Reincarnated as the Last of My Kind`                    | Supports all volumes from 1 to 4              |
 | `genericSevenSeas_ln` |              `I’m the Evil Lord of an Intergalactic Empire!`               | Supports all volumes from 1 to 3              |
 | `genericSevenSeas_ln` |   `Trapped in a Dating Sim: The World of Otome Games is Tough for Mobs`    | Supports all volumes from 1 to 10             |

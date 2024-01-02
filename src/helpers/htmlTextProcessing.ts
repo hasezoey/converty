@@ -718,6 +718,12 @@ export function processCommonStyle(
   if (!parentHas(pelemTracker.currentElem, 'sub') && elemCompStyle.verticalAlign === 'sub') {
     pelemTracker.setNewElem(documentNew.createElement('sub'));
   }
+  if (!parentHas(pelemTracker.currentElem, 'u') && elemCompStyle.textDecoration === 'underline') {
+    pelemTracker.setNewElem(documentNew.createElement('u'));
+  }
+  if (!parentHas(pelemTracker.currentElem, 's') && elemCompStyle.textDecoration === 'line-through') {
+    pelemTracker.setNewElem(documentNew.createElement('s'));
+  }
   if (elemCompStyle.textAlign === 'center') {
     parentElem.setAttribute('class', 'centerp section-marking');
   }

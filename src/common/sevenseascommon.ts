@@ -641,6 +641,8 @@ export function generatePElementInnerTranslate(
     return [documentNew.createElement('br')];
   }
 
+  // classes to ignore that are either unnecessary or are handled by different things (like "htmlTextProcessing"'s "processCommonStyle")
+  // this is used to warn about new volume's different and maybe unhandled formatting
   const classesToIgnore: string[] = [
     // default formatting for p, ignored
     'P_Normal__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
@@ -670,6 +672,8 @@ export function generatePElementInnerTranslate(
     // this is always after a div with "page-break: always", but can be ignored
     'P_Prose_Formatting__And__Page_Break',
   ];
+  // styles that are directly on a element to ignore that are either unnecessary or are handled already (mostly in "htmlTextProcessing"'s "processCommonStyle")
+  // like "<p style=\"HERE\" class=\"NOT HERE\">"
   const stylesToIgnore: string[] = [
     'font-style',
     'font-weight',

@@ -17,6 +17,7 @@ import {
   DoTextContentOptions,
   DoTextContentOptionsGenTextIdDataExtra,
   finishEpubctx,
+  parentHas,
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('sevenseascommon');
@@ -637,6 +638,11 @@ export function generatePElementInnerTranslate(
     parentElem.setAttribute('class', 'extra-indent');
   }
 
+  // cover initial missing boldness but having big font-size (chapter start first letter after heading)
+  if (!parentHas(elemObj.currentElem, 'strong') && elemCompStyle.fontSize === '3.00em') {
+    elemObj.setNewElem(documentNew.createElement('strong'));
+  }
+
   if (origElem.localName === 'br') {
     return [documentNew.createElement('br')];
   }
@@ -656,6 +662,10 @@ export function generatePElementInnerTranslate(
     'P__STAR__STAR__STAR__page_break__And__Page_Break',
     'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
     'P_TEXTBODY_CENTERALIGN',
+    // class to mark some headings
+    'P_Chapter_Header',
+    // random change in letter-spacing following the chapter start big character, but before actual text, ignored
+    'C_Current__And__Properties__And__Times_New_Roman',
     // transform all text to uppercase, ignored because all text is already uppercase
     'C_Nanomachines__And__Times_New_Roman__And__Capitals',
     'C_Current__And__Times_New_Roman__And__Capitals',
@@ -671,6 +681,8 @@ export function generatePElementInnerTranslate(
     'P_Prose_Formatting__And__Left_Indent__OPENPAR_1_CLOSEPAR_',
     // this is always after a div with "page-break: always", but can be ignored
     'P_Prose_Formatting__And__Page_Break',
+    // random change of font size for "About the Author" heading, ignored to keep same size
+    'C_Current__And__Small_Capitals',
   ];
   // styles that are directly on a element to ignore that are either unnecessary or are handled already (mostly in "htmlTextProcessing"'s "processCommonStyle")
   // like "<p style=\"HERE\" class=\"NOT HERE\">"

@@ -8,6 +8,7 @@ const _log = utils.createNameSpace('genericSevenSeas_ln');
 const VERIFIED_MATCH_LIST = [
   'I.{1}m the Evil Lord of an Intergalactic (?:Empire!)?',
   '(?:Trapped in a Dating Sim.{1} The )?World of Otome Games is Tough for Mobs',
+  'Trapped in a Dating Sim.{1} Otome Games Are Tough For Us, Too',
   'Reincarnated as a Sword',
   'Reborn as a Space Mercenary.{1} I Woke Up P(?:iloting the Strongest Starship!)?',
 ];

@@ -278,6 +278,10 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
    * @param file The file to be added
    */
   public addFile(file: EpubFile) {
+    if (this._innerFiles.findIndex((v) => v.id.length > 0 && v.id === file.id) >= 0) {
+      console.error(`Overwriting file! path: ${file.filePath}; id: ${file.id}`.red);
+    }
+
     this._innerFiles.push(file);
   }
 

@@ -412,17 +412,18 @@ export function isTitle(
   }
 
   // basic fast test if the content matches the parsed title
-  // not using just "includes" because it is slower than directly checking
+  // not using just "includes" first because it is slower than directly checking
   if (processedTitle === entryType.title || processedTitle.includes(entryType.title)) {
     return processedTitle;
   }
 
-  if (processedTitle.replaceAll(' ', '').includes(entryType.title.replaceAll(' ', ''))) {
+  // try to test if they are the same title with less variance
+  if (convertTitleCompare(processedTitle).includes(convertTitleCompare(entryType.title))) {
     return true;
   }
 
-  // all headers have a "auto_bookmark_toc_top" id, in most books - the other checks are fallbacks
-  if (elem.id.includes('auto_bookmark_toc_top')) {
+  // seemingly all sevenseas headers have a "auto_bookmark_toc_("top"|number)" id in most books
+  if (elem.id.includes('auto_bookmark_toc_')) {
     return true;
   }
 
@@ -461,6 +462,15 @@ export function isTitle(
   }
 
   return false;
+}
+
+/**
+ * Helper function to convert a title to be compare to another with less variance
+ * @param title The title to convert
+ * @returns a less-variance string
+ */
+export function convertTitleCompare(title: string): string {
+  return title.replaceAll(' ', '').replaceAll('…', '...');
 }
 
 /** Helper for consistent Image naming */

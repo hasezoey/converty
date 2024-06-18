@@ -656,6 +656,21 @@ export function generatePElementInnerTranslate(
     'P_Normal',
     // default formatting for span, ignored
     'C_Current__And__Times_New_Roman',
+    // random colored text, ignored
+    'C_Current__And__Coloured_Text__And__Times_New_Roman',
+    // name implies same as "C_Current__And__Times_New_Roman" but actually only sets text color to black, ignored
+    'C_Current__And__Black_Text__And__Times_New_Roman',
+    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman',
+    // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting letter-spacing (ignored) and font-size (ignored)
+    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Small_Capitals',
+    // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-weight (handled)
+    'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold',
+    // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-style (handled)
+    'C_Current__And__Black_Text__And__Times_New_Roman__And__Italic',
+    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Italic',
+    'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Italic',
+    // in addition to the previous things, also sets text-transform (handled)
+    'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Capitals',
     // default formatting for section markings, handled by "generatePElement"
     'P__STAR__STAR__STAR__page_break',
     'P_Prose_Formatting__And__Centre_Alignment',
@@ -683,6 +698,10 @@ export function generatePElementInnerTranslate(
     'P_Prose_Formatting__And__Page_Break',
     // random change of font size for "About the Author" heading, ignored to keep same size
     'C_Current__And__Small_Capitals',
+    // random class which is empty in space merc 9
+    'C_No_Tail_Q__And__Times_New_Roman',
+    // slightly lower letter-spacing (ignored) and setting italic (handled) in space merc 9
+    'C_Current__And__Properties__And__Times_New_Roman__And__Italic',
   ];
   // styles that are directly on a element to ignore that are either unnecessary or are handled already (mostly in "htmlTextProcessing"'s "processCommonStyle")
   // like "<p style=\"HERE\" class=\"NOT HERE\">"

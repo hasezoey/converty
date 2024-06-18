@@ -116,7 +116,7 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    */
   genPElemText(origNode: Node, documentNew: Document, parentElem: Element, optionsClass: Options): Node[];
   /**
-   * Define a custom condition for wheter a element should be skipped or kept
+   * Define a custom condition for whether a element should be skipped or kept
    * @param elem The Element to check
    * @param entryType The Entry Type with title
    * @returns "true" when it should be skipped
@@ -349,7 +349,6 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
   const innerElements = Array.from(documentInput.querySelector('body')?.children ?? []);
   const customChecker = options.checkElement;
   for (const [index, elem] of innerElements.entries()) {
-    // for this series, it is safe to assume that the first element is the chapter "p" element
     if (toSkipNumber > 0) {
       toSkipNumber -= 1;
       continue;

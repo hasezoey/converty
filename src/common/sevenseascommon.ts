@@ -233,6 +233,8 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
 // extends, because otherwise it would complain about types being not correct in a alias
 export class SevenSeasECOptions extends TextProcessingECOptions {
   public titleCache?: IsTitleCache;
+  /** The {@link EntryInformationExt} of the last processed file */
+  public lastEntryType?: EntryInformationExt;
 }
 
 /** Process a (X)HTML file from input to output */
@@ -274,6 +276,8 @@ export async function processHTMLFile(
   }
 
   await (config.doGenericPage ?? doGenericPage)(documentInput, entryType, epubctxOut, filePath, config);
+
+  epubctxOut.optionsClass.lastEntryType = entryType;
 }
 
 /**
@@ -306,10 +310,30 @@ export async function doGenericPage(
 
     isTitle: config.isTitle ?? isTitle,
     checkElement: config.checkElement,
-    determineReset: config.determineReset,
+    determineReset: config.determineReset ?? determineReset,
 
     skipElements,
   });
+}
+
+/** Compare 2 {@link EntryInformationExt}, this is necessary as `==(=)` always seems to match false */
+export function compareEntryInformationExt(a: EntryInformationExt, b: EntryInformationExt): boolean {
+  return a.title === b.title && a.imgType === b.imgType && a.type === b.type;
+}
+
+/** Base Seven Seas determine reset function */
+export function determineReset(document: Document, entryType: EntryInformationExt, optionsClass: SevenSeasECOptions): boolean {
+  // handle the case where the Color Gallery (or other things) are split up in multiple files instead of one single file
+  if (
+    (entryType.imgType === epubh.ImgType.Frontmatter || entryType.imgType === epubh.ImgType.Backmatter) &&
+    optionsClass.lastEntryType &&
+    compareEntryInformationExt(optionsClass.lastEntryType, entryType)
+  ) {
+    return false;
+  }
+
+  // base case, let "htmlTextProcessing" handle it
+  return true;
 }
 
 /** Base function for "genTextIdData" */

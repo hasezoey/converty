@@ -117,6 +117,10 @@ export interface SevenSeasConfig {
    */
   generatePElementInner?: DoTextContentOptions<SevenSeasECOptions>['genPElemText'];
   /**
+   * Define a custom function "determineReset" function
+   */
+  determineReset?: DoTextContentOptions<SevenSeasECOptions>['determineReset'];
+  /**
    * Define a hook for inside the default "generatePElementInner" to apply extra styling
    * Has no effect if a custom "generatePElementInner" is defined
    * Has no effect if the default "generatePElementInner" is not used in "doGenericPage"
@@ -302,6 +306,7 @@ export async function doGenericPage(
 
     isTitle: config.isTitle ?? isTitle,
     checkElement: config.checkElement,
+    determineReset: config.determineReset,
 
     skipElements,
   });

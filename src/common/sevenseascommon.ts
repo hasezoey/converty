@@ -259,21 +259,21 @@ export async function processHTMLFile(
     }
   }
 
-  const title = (config.getTitle ?? getTitle)(documentInput.title, config);
+  const entryType = (config.getTitle ?? getTitle)(documentInput.title, config);
 
-  // ignore the TOC, because a new one will be generated
-  if (title.firstLine.toLowerCase() === 'table of contents') {
+  // ignore all entries determined as a "Ignore" (like the toc.xhtml)
+  if (entryType.type === EntryType.Ignore) {
     return;
   }
 
   // ignore everything that matches the regex
-  if (new RegExp(config.TitlesToFilter ?? DEFAULT_TITLES_TO_FILTER_OUT_REGEX).test(title.firstLine)) {
+  if (new RegExp(config.TitlesToFilter ?? DEFAULT_TITLES_TO_FILTER_OUT_REGEX).test(entryType.firstLine)) {
     log(`Skipping file "${filePath}" because it is in the filter regex (titles)`);
 
     return;
   }
 
-  await (config.doGenericPage ?? doGenericPage)(documentInput, title, epubctxOut, filePath, config);
+  await (config.doGenericPage ?? doGenericPage)(documentInput, entryType, epubctxOut, filePath, config);
 }
 
 /**
@@ -849,16 +849,20 @@ export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInfor
     config.getTitleHook(retObj, type, numString, title, headTitle);
   }
 
-  if (
-    processTitles(['Copyrights and Credits', 'Table of Contents Page', 'Color Inserts', 'Title Page']).includes(
-      type.toLowerCase().replaceAll(/\s/g, '')
-    )
+  // process it once
+  const typeP = type.toLowerCase().replaceAll(/\s/g, '');
+
+  if (processTitles(['Cover']).includes(typeP)) {
+    retObj.imgType = epubh.ImgType.Cover;
+  } else if (
+    processTitles(['Copyrights and Credits', 'Table of Contents Page', 'Color Inserts', 'Color Gallery', 'Title Page']).includes(typeP)
   ) {
     retObj.imgType = epubh.ImgType.Frontmatter;
-  }
-
-  if (processTitles(['Afterword']).includes(type.toLowerCase().replaceAll(/\s/g, ''))) {
+  } else if (processTitles(['Afterword']).includes(typeP)) {
     retObj.imgType = epubh.ImgType.Backmatter;
+  } else if (processTitles(['table of contents']).includes(typeP)) {
+    // ignore the TOC, because a new one will be generated
+    retObj.type = EntryType.Ignore;
   }
 
   const fullTitle = !utils.isNullOrUndefined(retObj.secondLine) ? retObj.firstLine + ' ' + retObj.secondLine : retObj.firstLine;

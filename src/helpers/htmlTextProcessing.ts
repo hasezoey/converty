@@ -247,6 +247,9 @@ export class TextProcessingECOptions<ExtraTrackers extends BaseTrackers = BaseTr
 
 /**
  * Handle everything related to the "Title.Chapter" type
+ *
+ * Note: it is the responsibility of the module to ignore {@link EntryType.Ignore}!
+ *
  * @param documentInput The Input Document's "document.body"
  * @param entryType The Title Object
  * @param epubctx EPUB Context of the Output file

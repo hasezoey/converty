@@ -33,6 +33,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
             // 'Color Inserts',
             // 'Title Page',
             'Cast of Characters',
+            'Characters',
           ])
           .includes(type.toLowerCase().replaceAll(/\s/g, ''))
       ) {

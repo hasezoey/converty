@@ -196,14 +196,13 @@ export interface BaseTrackers extends epubh.BaseEpubContextTrackers {
   Backmatter: number;
 }
 
+/** Type to indicate what type of document was processed last */
 export enum LastProcessedType {
   None,
   Image,
 }
 
-export class TextProcessingECOptions<
-  ExtraTrackers extends string | keyof BaseTrackers = keyof BaseTrackers,
-> extends epubh.BaseEpubOptions<ExtraTrackers> {
+export class TextProcessingECOptions<ExtraTrackers extends BaseTrackers = BaseTrackers> extends epubh.BaseEpubOptions<ExtraTrackers> {
   /** Stores the implicit image type to use */
   protected _imgType: epubh.ImgType = epubh.ImgType.Frontmatter;
   /** Stores the last type processed */

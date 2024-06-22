@@ -139,7 +139,10 @@ export interface BaseEpubContextTrackers {
   Global: number;
 }
 
-export class BaseEpubOptions<NumberTrackers extends string | keyof BaseEpubContextTrackers = keyof BaseEpubContextTrackers> {
+export class BaseEpubOptions<
+  NumberTrackersI extends BaseEpubContextTrackers = BaseEpubContextTrackers,
+  NumberTrackers extends keyof NumberTrackersI = keyof NumberTrackersI,
+> {
   protected _numberTrackers: Partial<Record<NumberTrackers, number>> = {};
 
   /** Get all the trackers (get wrapper for "_numberTrackers") */

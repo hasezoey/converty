@@ -371,6 +371,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
       if (!utils.isNullOrUndefined(imgNode)) {
         // dont save a empty dom
         if (!skipSavingMainDOM) {
+          trimDOM(mainElem);
           const xhtmlNameMain = `${textIdData.sectionId}.xhtml`;
           await epubh.finishDOMtoFile(currentDOM, epubctx.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctx, {
             id: xhtmlNameMain,
@@ -451,6 +452,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
 
   // ignore DOM's that are empty or only have the chapter header
   if (!isElementEmpty(mainElem) && !onlyhash1(mainElem)) {
+    trimDOM(mainElem);
     const xhtmlNameMain = `${textIdData.sectionId}.xhtml`;
     await epubh.finishDOMtoFile(currentDOM, epubctx.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctx, {
       id: xhtmlNameMain,
@@ -463,6 +465,58 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
     epubctx.optionsClass.setLastType(LastProcessedType.None);
   } else {
     log('Not saving final DOM, because main element is empty');
+  }
+}
+
+/** Helper function for logging */
+function trimNode(mainElem: Element, node: Node) {
+  mainElem.removeChild(node);
+  const title = mainElem.ownerDocument.title;
+  log(`Trimmed element off of "${title}", content: ${node.nodeName} "${node.textContent}"`);
+}
+
+/**
+ * Trim the document of unnecessary elements
+ *
+ * This is done because empty elements at the end may cause a unnecessary extra (blank) page without visible reason (until looking at the source)
+ */
+export function trimDOM(mainElem: Element) {
+  while (!utils.isNullOrUndefined(mainElem.lastChild)) {
+    const lastNode = mainElem.lastChild;
+
+    // trim text nodes that are completely empty
+    if (lastNode.nodeType === mainElem.TEXT_NODE) {
+      if (!lastNode.textContent || lastNode.textContent.trim().length === 0) {
+        trimNode(mainElem, lastNode);
+        continue;
+      }
+    }
+
+    // trim nodes like "p"
+    if (lastNode.nodeType === mainElem.ELEMENT_NODE) {
+      const elemNode = lastNode as Element;
+
+      // trim nodes that are completely empty
+      if (elemNode.childNodes.length === 0 && elemNode.classList.length === 0 && elemNode.id.length === 0) {
+        trimNode(mainElem, elemNode);
+        continue;
+      }
+
+      // trim nodes that only has text nodes, but is otherwise completely empty
+      if (
+        elemNode.childNodes.length > 0 &&
+        Array.from(elemNode.childNodes).every((v) => v.nodeType === mainElem.TEXT_NODE) &&
+        elemNode.classList.length === 0 &&
+        elemNode.id.length === 0 &&
+        elemNode.textContent?.trim().length === 0
+      ) {
+        trimNode(mainElem, elemNode);
+        continue;
+      }
+    }
+
+    // base case, trim functions will continue a cycle if necessary
+    break;
   }
 }
 

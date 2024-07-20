@@ -259,6 +259,12 @@ export async function processHTMLFile(
     return;
   }
 
+  // apply the type gottem from the title
+  // excluding setting "Insert" as that is the default and should only be set by the body>title way
+  if (entryType.imgType !== epubh.ImgType.Insert) {
+    epubctxOut.optionsClass.setImgTypeImplicit(entryType.imgType);
+  }
+
   // ignore everything that matches the regex
   if (new RegExp(config.TitlesToFilter ?? DEFAULT_TITLES_TO_FILTER_OUT_REGEX).test(entryType.firstLine)) {
     log(`Skipping file "${filePath}" because it is in the filter regex (titles)`);

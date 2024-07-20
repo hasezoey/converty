@@ -274,7 +274,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
   }
 
   /** Used as a reset condition for "CurrentSubChapter" */
-  let hasTitle = false;
+  let hasBodyTitle = false;
 
   // determine if the first elements have a heading element, which would indicate that it is a new chapter and not a continuation
   // if yes, it is used as a "reset condition"
@@ -295,7 +295,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
       const newTitle = options.isTitle(documentInput, elem, entryType, epubctx.optionsClass);
 
       if (newTitle) {
-        hasTitle = true;
+        hasBodyTitle = true;
 
         // in some cases, the "head>title" and the "body>heading" text do not match, in those cases use the "body>heading" text when available
         if (typeof newTitle === 'string') {
@@ -312,16 +312,16 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
 
   const resetFn = !utils.isNullOrUndefined(options.determineReset) ? options.determineReset : () => true;
 
-  // reset Trackers when either "hasTitle" (found a title in the body) or when "ImgType" is anything but "insert"
+  // reset Trackers when either "hasBodyTitle" (found a title in the body instead of head) or when "ImgType" is anything but "insert"
   if (
-    (epubctx.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasTitle) &&
+    (epubctx.optionsClass.imgTypeImplicit !== epubh.ImgType.Insert || hasBodyTitle) &&
     resetFn(documentInput, entryType, epubctx.optionsClass)
   ) {
     epubctx.optionsClass.resetTracker('CurrentSeq');
     epubctx.optionsClass.resetTracker('CurrentSubChapter');
 
     // only increment "Chapter" tracker if the current document has a heading detected in the body
-    if (hasTitle) {
+    if (hasBodyTitle) {
       epubctx.optionsClass.setImgTypeImplicit(epubh.ImgType.Insert);
 
       increasedChapter = true;

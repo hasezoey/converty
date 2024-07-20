@@ -876,7 +876,7 @@ export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInfor
   // process it once
   const typeP = type.toLowerCase().replaceAll(/\s/g, '');
 
-  if (processTitles(['Cover']).includes(typeP)) {
+  if (processTitles(['Cover', 'Cover Page']).includes(typeP)) {
     retObj.imgType = epubh.ImgType.Cover;
   } else if (
     processTitles(['Copyrights and Credits', 'Table of Contents Page', 'Color Inserts', 'Color Gallery', 'Title Page']).includes(typeP)

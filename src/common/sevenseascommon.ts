@@ -31,15 +31,6 @@ export const DEFAULT_TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
 export const SERIES_MATCH_REGEX = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/im;
 /** Cover file name (without extension) for the xhtml file */
 export const COVER_XHTML_FILENAME = 'cover';
-/**
- * Regex for testing if a file is meant to be a cover
- * Matches:
- * "Cover"
- * "Cover Page"
- * Does not match:
- * "Chapter 00: Something about cover"
- */
-export const COVER_TITLE_TEST_REGEX = /^cover(\spage)?$/im;
 
 // CODE
 
@@ -506,7 +497,9 @@ export function convertTitleCompare(title: string): string {
 export function genImgIdData(
   optionsClass: SevenSeasECOptions,
   inputPath: string,
-  imgNode: Element,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _imgNode: Element,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   entryType: EntryInformation
 ): DoTextContentOptionsGenImageData {
   const ext = path.extname(inputPath);
@@ -517,7 +510,7 @@ export function genImgIdData(
   }
 
   // determine if the current image processing is for the cover
-  if (COVER_TITLE_TEST_REGEX.test(entryType.title)) {
+  if (isTitleCover(preProcessTitle(entryType.title))) {
     optionsClass.setImgTypeImplicit(epubh.ImgType.Cover);
   }
 
@@ -874,9 +867,9 @@ export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInfor
   }
 
   // process it once
-  const typeP = type.toLowerCase().replaceAll(/\s/g, '');
+  const typeP = preProcessTitle(type);
 
-  if (processTitles(['Cover', 'Cover Page']).includes(typeP)) {
+  if (isTitleCover(typeP)) {
     retObj.imgType = epubh.ImgType.Cover;
   } else if (
     processTitles(['Copyrights and Credits', 'Table of Contents Page', 'Color Inserts', 'Color Gallery', 'Title Page']).includes(typeP)
@@ -895,4 +888,18 @@ export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInfor
     ...retObj,
     title: fullTitle,
   };
+}
+
+/** Pre-process a title for {@link processTitles} */
+export function preProcessTitle(title: string): string {
+  return title.toLowerCase().replaceAll(/\s/g, '');
+}
+
+/**
+ * Is the given title a cover page?
+ *
+ * Requires {@link preProcessTitle}
+ */
+export function isTitleCover(title: string): boolean {
+  return processTitles(['Cover', 'Cover Page']).includes(title);
 }

@@ -11,6 +11,7 @@ const VERIFIED_MATCH_LIST = [
   'Trapped in a Dating Sim.{1} Otome Games Are Tough For Us, Too',
   'Reincarnated as a Sword',
   'Reborn as a Space Mercenary.{1} I Woke Up P(?:iloting the Strongest Starship!)?',
+  'Modern Dungeon Capture Starting with Broken Skills',
 ];
 const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
 /** Regex of files to filter out (to not include in the output) */

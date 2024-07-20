@@ -715,6 +715,7 @@ export function generatePElementInnerTranslate(
     'P__STAR__STAR__STAR__page_break__And__Page_Break',
     'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
     'P_TEXTBODY_CENTERALIGN',
+    'P_TEXTBODY_CENTERALIGN__And__Page_Break',
     // class to mark some headings
     'P_Chapter_Header',
     // random change in letter-spacing following the chapter start big character, but before actual text, ignored

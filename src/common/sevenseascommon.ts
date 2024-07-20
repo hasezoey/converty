@@ -886,6 +886,9 @@ export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInfor
   } else if (processTitles(['table of contents']).includes(typeP)) {
     // ignore the TOC, because a new one will be generated
     retObj.type = EntryType.Ignore;
+    // the following is from "Reincarnated as a Sword Vol. 4"
+  } else if (processTitles(['Extra Chapter']).includes(typeP)) {
+    retObj.imgType = epubh.ImgType.Backmatter;
   }
 
   const fullTitle = !utils.isNullOrUndefined(retObj.secondLine) ? retObj.firstLine + ' ' + retObj.secondLine : retObj.firstLine;

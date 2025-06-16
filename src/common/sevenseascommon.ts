@@ -866,6 +866,13 @@ export type GetTitleHook = (
  * @returns The Processed title
  */
 export function getTitle(headTitle: string, config: SevenSeasConfig): EntryInformationExt {
+  // newer seven seas titles seem to add "image" to the title for insert-only html pages
+  // lets remove them here to have a consistent title and for matching later
+  if (headTitle.toLowerCase().trim().endsWith('image')) {
+    headTitle = headTitle.trim();
+    headTitle = headTitle.substring(0, headTitle.length - 'image'.length);
+  }
+
   const matches = GENERIC_TITLE_REGEX.exec(headTitle);
 
   utils.assertionDefined(matches, new Error('Failed to get matches for Title'));

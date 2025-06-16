@@ -715,6 +715,8 @@ export function generatePElementInnerTranslate(
     'C_Current__And__Times_New_Roman',
     // random colored text, ignored
     'C_Current__And__Coloured_Text__And__Times_New_Roman',
+    // random class for punctuation in first sentence of a chapter
+    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
     // name implies same as "C_Current__And__Times_New_Roman" but actually only sets text color to black, ignored
     'C_Current__And__Black_Text__And__Times_New_Roman',
     'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman',
@@ -736,6 +738,7 @@ export function generatePElementInnerTranslate(
     'P_TEXTBODY_CENTERALIGN',
     'P_TEXTBODY_CENTERALIGN__And__Page_Break',
     'C_Current__And__Black_Text__And__Cambria_Math',
+    'C_Current__And__Black_Text__And__Segoe_UI_Symbol',
     // class to mark some headings
     'P_Chapter_Header',
     // random change in letter-spacing following the chapter start big character, but before actual text, ignored
@@ -743,13 +746,18 @@ export function generatePElementInnerTranslate(
     // transform all text to uppercase, ignored because all text is already uppercase
     'C_Nanomachines__And__Times_New_Roman__And__Capitals',
     'C_Current__And__Times_New_Roman__And__Capitals',
+    // used in Space merc 11, which has "TT: uppercase", but only for symbols, so it does not matter; italics are already handled
+    'C_Current__And__Times_New_Roman__And__Italic__And__Capitals',
     // author signature (afterword), handled by "generatePElement"
     'P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
     'P_Prose_Formatting__And__Right_Alignment',
     'P_TEXTBODY_CENTERALIGN__And__Right_Alignment',
+    'P_Normal__And__Right_Alignment',
     // handled earlier in the function
     'C_Current__And__Times_New_Roman__And__Italic',
     'C_Current__And__Times_New_Roman__And__Bold__And__Italic',
+    // "about the author" section things
+    'C_Current__And__Times_New_Roman__And__Bold',
     // extra indentation (and margin), handled by "generatePElement"
     'P_Prose_Formatting__And__Left_Indent',
     'P_Prose_Formatting__And__Left_Indent__OPENPAR_1_CLOSEPAR_',
@@ -761,6 +769,9 @@ export function generatePElementInnerTranslate(
     'C_No_Tail_Q__And__Times_New_Roman',
     // slightly lower letter-spacing (ignored) and setting italic (handled) in space merc 9
     'C_Current__And__Properties__And__Times_New_Roman__And__Italic',
+
+    // literally empty class
+    'C_Citation',
 
     // normally sets font to monospace for code-like text, but handled above with "code" detection
     'C_Mecha-Birdie',

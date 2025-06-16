@@ -145,7 +145,7 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    * @param document The INPUT document
    * @param entryType The Entry Type with title already parsed from somewhere else
    * @param optionsClass The Options class with all Context
-   * @returns "true" if a element is a title, or a string with a updated title (if string it always means "true")
+   * @returns "true" if a element is a title
    */
   determineReset?(document: Document, entryType: EntryInformation, optionsClass: Options): boolean;
 

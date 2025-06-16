@@ -314,8 +314,13 @@ export async function doGenericPage(
 }
 
 /** Compare 2 {@link EntryInformationExt}, this is necessary as `==(=)` always seems to match false */
-export function compareEntryInformationExt(a: EntryInformationExt, b: EntryInformationExt): boolean {
-  return a.title === b.title && a.imgType === b.imgType && a.type === b.type;
+export function compareEntryInformationFull(last: EntryInformationExt, current: EntryInformationExt): boolean {
+  return last.title === current.title && last.imgType === current.imgType && last.type === current.type;
+}
+
+/** Compare 2 {@link EntryInformationExt} with the title & image type only, necessary to match text & image insert files */
+export function compareEntryInformationTitle(last: EntryInformationExt, current: EntryInformationExt): boolean {
+  return last.title === current.title && last.imgType === current.imgType;
 }
 
 /** Base Seven Seas determine reset function */
@@ -324,7 +329,16 @@ export function determineReset(document: Document, entryType: EntryInformationEx
   if (
     (entryType.imgType === epubh.ImgType.Frontmatter || entryType.imgType === epubh.ImgType.Backmatter) &&
     optionsClass.lastEntryType &&
-    compareEntryInformationExt(optionsClass.lastEntryType, entryType)
+    compareEntryInformationFull(optionsClass.lastEntryType, entryType)
+  ) {
+    return false;
+  }
+
+  // handle cases where there is text, then image, then text, all in different files
+  if (
+    entryType.imgType === epubh.ImgType.Insert &&
+    optionsClass.lastEntryType &&
+    compareEntryInformationTitle(optionsClass.lastEntryType, entryType)
   ) {
     return false;
   }

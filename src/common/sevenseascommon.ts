@@ -843,6 +843,10 @@ export function generatePElementInnerTranslate(
 
   utils.assertionDefined(elemObj.topElem, new Error('Expected "elemObj.topElem" to be defined at this point'));
 
+  if (origElem.id) {
+    elemObj.topElem.id = origElem.id;
+  }
+
   return [elemObj.topElem];
 }
 

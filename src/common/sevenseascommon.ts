@@ -681,6 +681,11 @@ export function generatePElementInnerTranslate(
     elemObj.setNewElem(documentNew.createElement('strong'));
   }
 
+  // cover css having "monospace" but not a "code" segment
+  if (!parentHas(elemObj.currentElem, 'code') && elemCompStyle.fontFamily.includes('monospace')) {
+    elemObj.setNewElem(documentNew.createElement('code'));
+  }
+
   if (origElem.localName === 'br') {
     return [documentNew.createElement('br')];
   }
@@ -716,6 +721,7 @@ export function generatePElementInnerTranslate(
     'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
     'P_TEXTBODY_CENTERALIGN',
     'P_TEXTBODY_CENTERALIGN__And__Page_Break',
+    'C_Current__And__Black_Text__And__Cambria_Math',
     // class to mark some headings
     'P_Chapter_Header',
     // random change in letter-spacing following the chapter start big character, but before actual text, ignored
@@ -741,6 +747,9 @@ export function generatePElementInnerTranslate(
     'C_No_Tail_Q__And__Times_New_Roman',
     // slightly lower letter-spacing (ignored) and setting italic (handled) in space merc 9
     'C_Current__And__Properties__And__Times_New_Roman__And__Italic',
+
+    // normally sets font to monospace for code-like text, but handled above with "code" detection
+    'C_Mecha-Birdie',
   ];
   // styles that are directly on a element to ignore that are either unnecessary or are handled already (mostly in "htmlTextProcessing"'s "processCommonStyle")
   // like "<p style=\"HERE\" class=\"NOT HERE\">"

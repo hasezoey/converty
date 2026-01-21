@@ -184,7 +184,7 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
       continue;
     }
 
-    console.error(`Unhandled "mimetype": ${mimetype}`.red);
+    console.error(`Unhandled "mimetype": ${mimetype}`.red, file);
   }
 
   // check needs to be done, because it does not carry over from the function that defined it
@@ -717,6 +717,11 @@ export function generatePElementInnerTranslate(
     'C_Current__And__Coloured_Text__And__Times_New_Roman',
     // random class for punctuation in first sentence of a chapter
     'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
+    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
+    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_2_CLOSEPAR_',
+    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_3_CLOSEPAR_',
+    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_4_CLOSEPAR_',
+    'C_Current__And__Properties__And__Times_New_Roman__And__Italic__OPENPAR_1_CLOSEPAR_',
     // name implies same as "C_Current__And__Times_New_Roman" but actually only sets text color to black, ignored
     'C_Current__And__Black_Text__And__Times_New_Roman',
     'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman',
@@ -728,6 +733,7 @@ export function generatePElementInnerTranslate(
     'C_Current__And__Black_Text__And__Times_New_Roman__And__Italic',
     'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Italic',
     'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Italic',
+    'C_No_Tail_Q__And__Times_New_Roman__And__Italic',
     // in addition to the previous things, also sets text-transform (handled)
     'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Capitals',
     // default formatting for section markings, handled by "generatePElement"
@@ -737,6 +743,7 @@ export function generatePElementInnerTranslate(
     'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
     'P_TEXTBODY_CENTERALIGN',
     'P_TEXTBODY_CENTERALIGN__And__Page_Break',
+    'P_Centre',
     'C_Current__And__Black_Text__And__Cambria_Math',
     'C_Current__And__Black_Text__And__Segoe_UI_Symbol',
     // class to mark some headings
@@ -772,6 +779,7 @@ export function generatePElementInnerTranslate(
 
     // literally empty class
     'C_Citation',
+    'C_No_Break__And__Times_New_Roman',
 
     // normally sets font to monospace for code-like text, but handled above with "code" detection
     'C_Mecha-Birdie',

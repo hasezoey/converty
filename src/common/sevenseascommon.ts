@@ -24,7 +24,7 @@ const log = utils.createNameSpace('sevenseascommon');
 
 // STATIC OPTIONS
 /** Regex of files to filter out (to not include in the output) */
-export const DEFAULT_FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
+export const DEFAULT_FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo|calibre_bookmarks.txt/gim;
 /** Regex of titles to filter out (to not include in the output) */
 export const DEFAULT_TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
 /** Regex for detecting the series in the ContentOPF */

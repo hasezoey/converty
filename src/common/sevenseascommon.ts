@@ -165,6 +165,10 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     if (/\.ncx/.test(filePath)) {
       continue;
     }
+    // ignore common names for table-of-contents
+    if (/^(?:toc|nav).xhtml$/.test(path.basename(filePath))) {
+      continue;
+    }
 
     const mimetype = file.mediaType;
     log(`Processing file "${file.id}", ${mimetype}`);

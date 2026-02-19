@@ -899,13 +899,8 @@ async function addToCtx(epubctx: EpubContext<BaseEpubOptions, InputEpubCustomDat
     return;
   }
 
-  let guessedMime = mime.lookup(filePath);
-  log(`addToCtx: guessedMime: "${guessedMime}"`);
-
-  // change "guessedMime" to always be a valid string
-  if (!guessedMime) {
-    guessedMime = 'application/octet-stream';
-  }
+  const guessedMime = mime.lookup(filePath) || 'application/octet-stream';
+  log(`addToCtx: guessedMime: "${guessedMime}" for "${filePath}"`);
 
   if (guessedMime === xh.STATICS.XHTML_MIMETYPE || guessedMime === STATICS.HTML_MIMETYPE) {
     const { document } = xh.newJSDOM(await fspromises.readFile(filePath), { contentType: STATICS.HTML_MIMETYPE });

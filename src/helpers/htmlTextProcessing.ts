@@ -447,7 +447,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
       }
     }
 
-    console.error(`Unhandled "localName": ${elem.localName}`.red);
+    console.error(`Unhandled "localName": "${elem.localName}"`.red);
   }
 
   // ignore DOM's that are empty or only have the chapter header

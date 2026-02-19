@@ -763,6 +763,7 @@ export function generatePElementInnerTranslate(
     // handled earlier in the function
     'C_Current__And__Times_New_Roman__And__Italic',
     'C_Current__And__Times_New_Roman__And__Bold__And__Italic',
+    'C_Stat_Box_-_Name__And__Italic',
     // "about the author" section things
     'C_Current__And__Times_New_Roman__And__Bold',
     // extra indentation (and margin), handled by "generatePElement"
@@ -780,6 +781,7 @@ export function generatePElementInnerTranslate(
     // literally empty class
     'C_Citation',
     'C_No_Break__And__Times_New_Roman',
+    'C_Current__And__Segoe_UI_Symbol',
 
     // normally sets font to monospace for code-like text, but handled above with "code" detection
     'C_Mecha-Birdie',

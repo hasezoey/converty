@@ -15,6 +15,7 @@ import {
   processCommonStyle,
   TextProcessingECOptions,
 } from '../helpers/htmlTextProcessing.js';
+import { getTextContentBody } from '../common/sevenseascommon.js';
 
 const log = utils.createNameSpace('lastofkind_ln');
 
@@ -395,6 +396,7 @@ async function doGenericPage(
 
       return true;
     },
+    getTextContent: getTextContentBody,
 
     skipElements,
     headerSearchCount: TITLE_CHECK_NUMBER,

@@ -148,6 +148,12 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    * @returns "true" if a element is a title
    */
   determineReset?(document: Document, entryType: EntryInformation, optionsClass: Options): boolean;
+  /**
+   * Get the text content for the given document.
+   * @param document The INPUT document
+   * @returns all child elements in-order to process as text elements
+   */
+  getTextContent(document: Document): Element[];
 
   /**
    * Set a static number of elements to skip in the beginning regardless of what it is
@@ -348,7 +354,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
   let toSkipNumber =
     !utils.isNullOrUndefined(options.skipElements) && options.skipElements >= 0 ? options.skipElements : STATICS.DEFAULT_SKIP_ELEMENTS;
 
-  const innerElements = Array.from(documentInput.querySelector('body')?.children ?? []);
+  const innerElements = options.getTextContent(documentInput);
   const customChecker = options.checkElement;
   for (const [index, elem] of innerElements.entries()) {
     if (toSkipNumber > 0) {

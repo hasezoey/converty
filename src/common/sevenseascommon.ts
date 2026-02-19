@@ -108,7 +108,7 @@ export interface SevenSeasConfig {
    */
   generatePElementInner?: DoTextContentOptions<SevenSeasECOptions>['genPElemText'];
   /**
-   * Define a custom function "determineReset" function
+   * Define a custom "determineReset" function
    */
   determineReset?: DoTextContentOptions<SevenSeasECOptions>['determineReset'];
   /**
@@ -123,6 +123,10 @@ export interface SevenSeasConfig {
    * Has no effect if the default "generatePElementInner" is not used in "doGenericPage"
    */
   generatePElementCombineHook?: GeneratePElementCombineHook;
+  /**
+   * Define a custom "getTextContent" function
+   */
+  getTextContent?: DoTextContentOptions<SevenSeasECOptions>['getTextContent'];
   /** Define a custom title regex filter-out */
   TitlesToFilter?: RegExp;
   /** Define a custom files regex filter-out */
@@ -308,6 +312,7 @@ export async function doGenericPage(
         return generatePElementInner(...args, config);
       },
     cachedIsTitleOptions: config.cachedIsTitleOptions ?? cachedIsTitleOptions,
+    getTextContent: config.getTextContent ?? getTextContentBody,
 
     isTitle: config.isTitle ?? isTitle,
     checkElement: config.checkElement,
@@ -315,6 +320,15 @@ export async function doGenericPage(
 
     skipElements,
   });
+}
+
+/**
+ * Base function for "getTextContent"
+ * @param document The INPUT document
+ * @returns All children of "body"
+ */
+export function getTextContentBody(document: Document): Element[] {
+  return Array.from(document.querySelector('body')?.children ?? []);
 }
 
 /** Compare 2 {@link EntryInformationExt}, this is necessary as `==(=)` always seems to match false */

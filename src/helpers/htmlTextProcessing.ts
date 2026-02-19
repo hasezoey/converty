@@ -661,10 +661,12 @@ export async function createIMGlnDOM(
   epubctx: epubh.EpubContext<any, any>,
   jsdomOptions = STATICS.JSDOM_XHTML_OPTIONS
 ): Promise<ReturnType<typeof xh.newJSDOM>> {
+  const epubType = imgClass === epubh.ImgClass.Cover ? epubh.EPubType.Cover : epubh.EPubType.BodyMatterChapter;
+
   const modXHTML = applyTemplate(await getTemplate('img-ln.xhtml'), {
     '{{TITLE}}': entryType.title,
     '{{SECTIONID}}': sectionId,
-    '{{EPUBTYPE}}': epubh.EPubType.BodyMatterChapter,
+    '{{EPUBTYPE}}': epubType,
     '{{IMGALT}}': sectionId,
     '{{IMGCLASS}}': imgClass,
     '{{IMGSRC}}': imgSrc,

@@ -898,6 +898,10 @@ async function addToCtx(epubctx: EpubContext<BaseEpubOptions, InputEpubCustomDat
   if (path.basename(filePath) === 'container.xml') {
     return;
   }
+  // ignore the calibre booksmarks file that sometimes gets added
+  if (path.basename(filePath) === 'calibre_bookmarks.txt') {
+    return;
+  }
 
   const guessedMime = mime.lookup(filePath) || 'application/octet-stream';
   log(`addToCtx: guessedMime: "${guessedMime}" for "${filePath}"`);

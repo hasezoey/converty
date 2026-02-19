@@ -370,6 +370,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
     const imgNode = elem.querySelector('img');
 
     // use this path if "p" which contains text data, or if a "imgNode" is found
+    // TODO: this currently does not handle inline images
     if (elem.localName === 'p' || !utils.isNullOrUndefined(imgNode)) {
       const skipSavingMainDOM = isElementEmpty(mainElem) || onlyhash1(mainElem);
 

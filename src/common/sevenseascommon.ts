@@ -158,7 +158,7 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     }
 
     // skip "content.opf" file, because it is handled outside of this loop
-    if (/content\.opf/.test(filePath)) {
+    if (/\.opf/.test(filePath)) {
       continue;
     }
     // ignore all .ncx files (like toc.ncx)

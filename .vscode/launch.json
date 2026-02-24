@@ -2,6 +2,16 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Launch Program",
+      "program": "${workspaceFolder}/lib/bin/main.js",
+      "request": "launch",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "preLaunchTask": "npm: build"
+    },
+    {
       "name": "Attach",
       "port": 9229,
       "request": "attach",

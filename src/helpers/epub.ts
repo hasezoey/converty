@@ -40,6 +40,7 @@ export class EpubContextFileBase {
 export enum ImgClass {
   Cover = 'cover',
   Insert = 'insert',
+  Inline = 'inline',
 }
 
 export enum ImgType {
@@ -47,6 +48,7 @@ export enum ImgType {
   Frontmatter,
   Backmatter,
   Insert,
+  Inline,
 }
 
 export enum EpubContextFileXHTMLTypes {

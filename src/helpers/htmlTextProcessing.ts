@@ -95,8 +95,15 @@ export interface DoTextContentOptions<Options extends TextProcessingECOptions> {
    * @param inputImg the full file path for the input image
    * @param imgNode The Image Element node for that needs the data generated
    * @param entryType The Entry Type with title
+   * @param imgTypeHint A Hint to what the image type is
    */
-  genImageIdData(optionsClass: Options, inputImg: string, imgNode: Element, entryType: EntryInformation): DoTextContentOptionsGenImageData;
+  genImageIdData(
+    optionsClass: Options,
+    inputImg: string,
+    imgNode: Element,
+    entryType: EntryInformation,
+    imgTypeHint?: epubh.ImgType
+  ): DoTextContentOptionsGenImageData;
   /**
    * Generate the "h1" element's content
    * @param document The Current DOM Document
@@ -367,15 +374,19 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
       continue;
     }
 
-    const imgNode = elem.querySelector('img');
+    const imgNodes = elem.querySelectorAll('img');
 
     // use this path if "p" which contains text data, or if a "imgNode" is found
     // TODO: this currently does not handle inline images
-    if (elem.localName === 'p' || !utils.isNullOrUndefined(imgNode)) {
+    if (elem.localName === 'p' || !utils.isNullOrUndefined(imgNodes)) {
       const skipSavingMainDOM = isElementEmpty(mainElem) || onlyhash1(mainElem);
 
+      const styles = Array.from(imgNodes).map((node) => documentInput.defaultView!.getComputedStyle(node));
+
       // finish current dom and save the found image and start the next dom
-      if (!utils.isNullOrUndefined(imgNode)) {
+      if (!utils.isNullOrUndefined(imgNodes) && imgNodes.length === 1 && styles[0].verticalAlign !== 'middle') {
+        const imgNode = imgNodes[0];
+
         // dont save a empty dom
         if (!skipSavingMainDOM) {
           trimDOM(mainElem);
@@ -429,6 +440,18 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
         }
 
         continue;
+      } else if (!utils.isNullOrUndefined(imgNodes)) {
+        for (const [idx, imgNode] of imgNodes.entries()) {
+          if (styles[idx].verticalAlign !== 'middle') {
+            console.log(`Multiple images present, and at least one does not have align "middle"! file: "${currentInputFile}"`);
+            continue;
+          }
+
+          // inline image
+          const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
+          const imgIdData = options.genImageIdData(epubctx.optionsClass, imgFromPath, imgNode, entryType, epubh.ImgType.Inline);
+          await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId);
+        }
       }
 
       // skip all elements that are empty when the mainElem does not contain anything yet or only the header
@@ -668,6 +691,10 @@ export async function createIMGlnDOM(
   epubctx: epubh.EpubContext<any, any>,
   jsdomOptions = STATICS.JSDOM_XHTML_OPTIONS
 ): Promise<ReturnType<typeof xh.newJSDOM>> {
+  if (imgClass === epubh.ImgClass.Inline) {
+    throw new Error('Should not create a IMG DOM for a INLINE element');
+  }
+
   const epubType = imgClass === epubh.ImgClass.Cover ? epubh.EPubType.Cover : epubh.EPubType.BodyMatterChapter;
 
   const modXHTML = applyTemplate(await getTemplate('img-ln.xhtml'), {

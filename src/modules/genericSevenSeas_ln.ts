@@ -23,7 +23,7 @@ const TITLES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_TITLES_TO_FILTER_OUT_REGEX;
 // EXPORTS
 export const matcher = ssc.matcher(INPUT_MATCH_REGEX);
 
-export default function averbil_ln(): utils.ConverterModule {
+export default function genericSevenSeas_ln(): utils.ConverterModule {
   return { matcher, process };
 }
 

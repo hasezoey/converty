@@ -54,7 +54,7 @@
     "colors": "^1.4.0",
     "debug": "^4.4.3",
     "downloads-folder": "^3.0.3",
-    "fs-extra": "^11.2.0",
+    "fs-extra": "^11.3.3",
     "jsdom": "^23.0.1",
     "mime-types": "^2.1.35",
     "tslib": "^2.6.2",

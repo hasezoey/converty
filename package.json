@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "colors": "^1.4.0",
-    "debug": "^4.3.4",
+    "debug": "^4.4.3",
     "downloads-folder": "^3.0.3",
     "fs-extra": "^11.2.0",
     "jsdom": "^23.0.1",

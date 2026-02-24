@@ -13,6 +13,7 @@ import {
   finishEpubctx,
   PElemTracker,
   processCommonStyle,
+  STATICS,
   TextProcessingECOptions,
 } from '../helpers/htmlTextProcessing.js';
 import { getTextContentBody } from '../common/sevenseascommon.js';
@@ -26,7 +27,7 @@ const SERIES_MATCH_REGEX = /^(?<series>.+?)(?: (?:Vol\.|Volume) (?<num>\d+))?$/i
 const FILES_TO_FILTER_OUT_REGEX = /^$/gim;
 const COVER_XHTML_FILENAME = 'cover';
 const TITLES_TO_FILTER_OUT_REGEX = /other series/gim;
-const JSDOM_XHTML_OPTIONS = { contentType: xh.STATICS.XHTML_MIMETYPE };
+const JSDOM_XHTML_OPTIONS = STATICS.JSDOM_XHTML_OPTIONS;
 /** How many elements to check at the beginning to be a title */
 const TITLE_CHECK_NUMBER = 10;
 

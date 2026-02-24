@@ -17,7 +17,7 @@ Current modifications:
 const log = utils.createNameSpace('genericCopy');
 
 // STATIC OPTIONS
-const VERIFIED_MATCH_LIST = [];
+const VERIFIED_MATCH_LIST = ['Death March to the Parallel World Rhapsody', 'High School Prodigies Have It Easy Even in Another World!'];
 const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter/gim;

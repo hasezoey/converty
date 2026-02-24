@@ -22,7 +22,7 @@
     "test:coverage": "jest --collectCoverage",
     "test:watchCoverage": "jest --collectCoverage --watchAll",
     "watch": "tsc -w -p tsconfig.json",
-    "prepare": "husky install",
+    "prepare": "husky",
     "clean": "rm -rf lib"
   },
   "author": "hasezoey",
@@ -44,7 +44,7 @@
     "eslint": "^8.55.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
-    "husky": "^8.0.3",
+    "husky": "^9.1.7",
     "lint-staged": "^15.2.0",
     "prettier": "^3.8.1",
     "typescript": "^5.3.2"

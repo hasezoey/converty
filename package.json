@@ -30,7 +30,7 @@
   "devDependencies": {
     "@commitlint/cli": "^18.4.3",
     "@commitlint/config-conventional": "^18.4.3",
-    "@prettier/plugin-xml": "^3.2.2",
+    "@prettier/plugin-xml": "^3.4.2",
     "@types/debug": "^4.1.12",
     "@types/fs-extra": "^11.0.4",
     "@types/jsdom": "^21.1.6",

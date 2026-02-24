@@ -18,7 +18,7 @@ Note: This is mainly a personal project, so it may or may not get more useable.
 Requirements:
 
 - NodeJS 18 (it is the only version currently tested)
-- Yarn (or copy the command manually from the package.json)
+- npm (or copy the command manually from the package.json)
 
 ### Running
 
@@ -35,10 +35,10 @@ mkdir -p ~/Downloads/converty-in
 cp /path/to/input.epub ~/Downloads/converty-in
 
 # Making sure everything is installed
-yarn install
+npm install
 
 # And Running the Project
-yarn run run
+npm run run
 
 # Inspecting the output files
 ls -al ~/Downloads/converty-out

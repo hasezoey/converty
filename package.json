@@ -13,8 +13,8 @@
     "lib/**/*.d.ts"
   ],
   "scripts": {
-    "run": "yarn run build && node lib/bin/main.js",
-    "run:compare": "yarn run build && node lib/bin/compareGen.js",
+    "run": "npm run build && node lib/bin/main.js",
+    "run:compare": "npm run build && node lib/bin/compareGen.js",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint -c ./eslint.config.mjs \"./**/*.{js,ts,cjs,mjs,cts,mts}\"",
     "test": "jest",

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "lib": [
       "ESNext",
       "DOM"
@@ -10,8 +10,8 @@
     "moduleResolution": "Node16",
     "newLine": "LF",
     "declaration": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
     "allowJs": true,
     "outDir": "build",
     "importHelpers": true,

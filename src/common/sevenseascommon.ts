@@ -535,9 +535,7 @@ export function convertTitleCompare(title: string): string {
 export function genImgIdData(
   optionsClass: SevenSeasECOptions,
   inputPath: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _imgNode: Element,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   entryType: EntryInformation
 ): DoTextContentOptionsGenImageData {
   const ext = path.extname(inputPath);
@@ -843,7 +841,7 @@ export function generatePElementInnerTranslate(
         continue;
       }
 
-      console.error(`Unhandled Style found: \"${style}\"`.red);
+      console.error(`Unhandled Style found: "${style}"`.red);
     }
   }
 

@@ -122,6 +122,12 @@ export default tseslint.config(
           next: 'import',
         },
       ],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          caughtErrors: 'none',
+        },
+      ],
 
       'eol-last': 'warn',
     },

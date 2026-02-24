@@ -486,7 +486,6 @@ function genImgIdData(
  * @param parentElem The Element the new nodes are added to (will not be applied by this function), required for testing and applying styles
  * @returns The array of new Nodes
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: LastOfKindECOptions): Node[] {
   // if node is text, return as text
   if (origNode.nodeType === documentNew.TEXT_NODE) {
@@ -530,7 +529,7 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
         continue;
       }
 
-      console.error(`Unhandled Style found: \"${style}\"`.red);
+      console.error(`Unhandled Style found: "${style}"`.red);
     }
   }
 

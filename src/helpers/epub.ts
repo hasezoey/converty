@@ -162,7 +162,6 @@ export class BaseEpubOptions<
       return (this._numberTrackers[trackerName] = 0);
     }
 
-    // @ts-expect-error "undefined" is checked in the "if" above, so this is safe to ignore
     return this._numberTrackers[trackerName];
   }
 
@@ -529,7 +528,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
     const epubFileNamePart = epubFileName + '.part';
     const containerXMLFile = await getTemplate('container.xml');
 
-    await new Promise((res, rej) => {
+    await new Promise<void>((res, rej) => {
       const zipfile = new yazl.ZipFile();
       const writeStream = createWriteStream(epubFileNamePart);
       writeStream.once('close', res);
@@ -1133,7 +1132,6 @@ export async function serializeXML(dom: JSDOM): Promise<string> {
       plugins: ['@prettier/plugin-xml'],
       parser: 'xml',
       bracketSameLine: true,
-      // @ts-expect-error option from / for "@prettier/plugin-xml" which does not have types
       xmlWhitespaceSensitivity: 'ignore',
     });
   }

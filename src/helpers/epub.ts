@@ -145,6 +145,9 @@ export class BaseEpubOptions<
   NumberTrackersI extends BaseEpubContextTrackers = BaseEpubContextTrackers,
   NumberTrackers extends keyof NumberTrackersI = keyof NumberTrackersI,
 > {
+  /** The *output* Cover ID */
+  public coverImgId?: string;
+
   protected _numberTrackers: Partial<Record<NumberTrackers, number>> = {};
 
   /** Get all the trackers (get wrapper for "_numberTrackers") */
@@ -217,7 +220,7 @@ export interface EpubFinishFunctions {
   contentOPF: ContentOPFFn;
 }
 
-export class EpubContext<Options extends BaseEpubOptions, CustomData extends Record<string, any> = never> {
+export class EpubContext<Options extends BaseEpubOptions, CustomData extends Record<string | symbol, any> = never> {
   /** The Tmpdir where the epub files are stored */
   protected readonly _tmpdir: string;
   /** The Title of the Story */
@@ -993,7 +996,7 @@ export interface IdCounter {
 export function copyMetadata(
   document: Document,
   children: Element[],
-  epubctx: EpubContext<any, any>,
+  epubctx: EpubContext<BaseEpubOptions, any>,
   metadataElem: Element,
   packageElementOld: Element,
   idCounter: IdCounter
@@ -1003,6 +1006,15 @@ export function copyMetadata(
   for (const elem of children) {
     // special handling for "cover", just to be sure
     if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
+      // if there is already a image that fits, use that
+      if (epubctx.optionsClass.coverImgId) {
+        const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
+        newCoverNode.setAttribute('name', 'cover');
+        newCoverNode.setAttribute('content', epubctx.optionsClass.coverImgId);
+        metadataElem.appendChild(newCoverNode);
+        continue;
+      }
+
       // use provided element's content id, only if not available fallback to custom name
       const fileId = elem.getAttribute('content') ?? 'cover';
       const coverImgId = epubctx.files.find((v) => v.id.includes(fileId) && v.mediaType != xh.STATICS.XHTML_MIMETYPE);

@@ -55,7 +55,7 @@
     "debug": "^4.4.3",
     "downloads-folder": "^3.0.3",
     "fs-extra": "^11.3.3",
-    "jsdom": "^28.1.0",
+    "jsdom": "~28.0.0",
     "mime-types": "^3.0.2",
     "tslib": "^2.8.1",
     "yauzl": "^3.2.0",

@@ -312,19 +312,26 @@ async function copyCoverImg(
   epubctxInput: epubh.EpubContext<epubh.BaseEpubOptions, epubh.InputEpubCustomData>,
   epubctxOutput: epubh.EpubContext<GenericCopyECOptions>
 ) {
-  const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
   const manifestElementOld = xh.queryDefinedElement(contentOPFInput, 'manifest');
 
-  const coverId = xh.queryDefinedElement(metadataElementOld, 'meta[name="cover"]').getAttribute('content');
-  utils.assertionDefined(coverId, new Error(`Expected to find attribute "content" in "metadata > meta[name="cover"]`));
-  const coverImg = xh.queryDefinedElement(manifestElementOld, `item[id="${coverId}"]`).getAttribute('href');
-  utils.assertionDefined(coverImg, new Error(`Expected to find attribute "href" in "manifest > item[id="${coverId}"]`));
+  const coverHref = manifestElementOld.querySelector('item[properties="cover-image"]')?.getAttribute('href');
+  utils.assertionDefined(coverHref, new Error('Expected to find manifest item with `properties="cover-item"`'));
 
-  const ext = path.extname(coverImg);
+  // // if the "properties" is not set, try resolving via the "meta" element linking.
+  // if (utils.isNullOrUndefined(coverHref)) {
+  //   const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
+
+  //   const coverId = xh.queryDefinedElement(metadataElementOld, 'meta[name="cover"]').getAttribute('content');
+  //   utils.assertionDefined(coverId, new Error(`Expected to find attribute "content" in "metadata > meta[name="cover"]`));
+  //   coverHref = xh.queryDefinedElement(manifestElementOld, `item[id="${coverId}"]`).getAttribute('href');
+  //   utils.assertionDefined(coverHref, new Error(`Expected to find attribute "href" in "manifest > item[id="${coverId}"]`));
+  // }
+
+  const ext = path.extname(coverHref);
   const coverOutName = `cover${ext}`;
-  await copyImage(path.resolve(epubctxInput.contentOPFDir, coverImg), epubctxOutput, coverOutName, coverOutName);
+  await copyImage(path.resolve(epubctxInput.contentOPFDir, coverHref), epubctxOutput, coverOutName, coverOutName);
   epubctxOutput.optionsClass.coverImgId = coverOutName;
-  epubctxOutput.optionsClass.coverInputPath = coverImg;
+  epubctxOutput.optionsClass.coverInputPath = coverHref;
 }
 
 /**

@@ -205,7 +205,8 @@ async function processHTMLFile(
 
   // save dom to new location
   // trimDOM(mainElem);
-  const xhtmlNameMain = `${file.id}.xhtml`;
+  const xhtmlNameMain =
+    useType.type === epubh.EpubContextFileXHTMLTypes.IMG && useType.imgType === epubh.ImgType.Cover ? 'cover.xhtml' : `${file.id}.xhtml`;
   await epubh.finishDOMtoFile(dom, epubctxOutput.contentOPFDir, xhtmlNameMain, epubh.FileDir.Text, epubctxOutput, {
     id: xhtmlNameMain,
     seqIndex: isMain ? 0 : 1,

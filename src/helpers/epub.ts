@@ -1001,17 +1001,24 @@ export function copyMetadata(
   packageElementOld: Element,
   idCounter: IdCounter
 ) {
+  let appliedCover = false;
+
+  // if there is already a image that fits, use that
+  if (epubctx.optionsClass.coverImgId) {
+    const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
+    newCoverNode.setAttribute('name', 'cover');
+    newCoverNode.setAttribute('content', epubctx.optionsClass.coverImgId);
+    metadataElem.appendChild(newCoverNode);
+    appliedCover = true;
+  }
+
   // copy most metadata from old to new
   // using "children" to exclude text nodes
   for (const elem of children) {
     // special handling for "cover", just to be sure
     if (elem.localName === 'meta' && elem.getAttribute('name') === 'cover') {
-      // if there is already a image that fits, use that
-      if (epubctx.optionsClass.coverImgId) {
-        const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
-        newCoverNode.setAttribute('name', 'cover');
-        newCoverNode.setAttribute('content', epubctx.optionsClass.coverImgId);
-        metadataElem.appendChild(newCoverNode);
+      // already handled
+      if (epubctx.optionsClass.coverImgId || appliedCover) {
         continue;
       }
 
@@ -1024,6 +1031,7 @@ export function copyMetadata(
       newCoverNode.setAttribute('name', 'cover');
       newCoverNode.setAttribute('content', coverImgId.id);
       metadataElem.appendChild(newCoverNode);
+      appliedCover = true;
       continue;
     }
 

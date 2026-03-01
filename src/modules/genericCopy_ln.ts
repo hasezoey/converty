@@ -286,11 +286,22 @@ async function readTOC(
 
   for (const navpoint of navMap.children) {
     const title = xh.queryDefinedElement(navpoint, 'text');
-    const tocPath = xh.queryDefinedElement(navpoint, 'content').getAttribute('src');
+    let tocPath = xh.queryDefinedElement(navpoint, 'content').getAttribute('src');
     utils.assertionDefined(tocPath, new Error('Expected "content" to have attribute "src"'));
     const playorder = navpoint.getAttribute('playOrder');
     utils.assertionDefined(playorder, new Error('Expected "navPoint" to have attribute "playOrder"'));
     const playorderInt = parseInt(playorder);
+
+    // trim out linking to a specific element
+    const hashIndex = tocPath.indexOf('#');
+
+    if (hashIndex >= 0) {
+      tocPath = tocPath.slice(0, hashIndex);
+      utils.assertion(
+        tocPath.length > 7,
+        new Error(`Expected to have tocpath still be at least 7 in length after trimming, length: ${tocPath.length}`)
+      );
+    }
 
     const tocelem = new TOCElem(title.textContent, tocPath);
     tocElements.push([tocelem, playorderInt]);

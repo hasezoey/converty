@@ -83,6 +83,22 @@ export type EpubContextNewFileXHTMLType =
   | EpubContextFileXHTMLTocType;
 
 /**
+ * A file in the pub, special for IMG files (like actual PNG or JPG files, NOT XHTML Image files)
+ */
+export class EpubContextFileImg extends EpubContextFileBase {
+  /**
+   * The class this image is supposed to be.
+   * Mainly used for applying the proper `properties` attribute for the cover image.
+   */
+  public readonly imgClass: ImgClass;
+
+  constructor(input: { id: string; mediaType: string; filePath: string; imgClass: ImgClass }) {
+    super(input);
+    this.imgClass = input.imgClass;
+  }
+}
+
+/**
  * A file in the epub, special for XHTML files (like actual text files, or image xhtml files)
  */
 export class EpubContextFileXHTML extends EpubContextFileBase {
@@ -131,7 +147,7 @@ export class EpubContextFileXHTML extends EpubContextFileBase {
   }
 }
 
-export type EpubFile = EpubContextFileBase | EpubContextFileXHTML;
+export type EpubFile = EpubContextFileBase | EpubContextFileXHTML | EpubContextFileImg;
 
 export interface BaseEpubContextTrackers {
   /**
@@ -457,6 +473,9 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
 
       if (file.id === STATICS.TOC_XHTML_FILENAME) {
         newElem.setAttribute('properties', 'nav');
+      }
+      if (file instanceof EpubContextFileImg && file.imgClass === ImgClass.Cover) {
+        newElem.setAttribute('properties', 'cover-image');
       }
 
       manifestElem.appendChild(newElem);

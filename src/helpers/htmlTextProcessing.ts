@@ -405,7 +405,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
 
         const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
         const imgIdData = options.genImageIdData(epubctx.optionsClass, imgFromPath, imgNode, entryType);
-        await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId);
+        await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId, imgIdData.imgClass);
         const { dom: imgDOM } = await createIMGlnDOM(
           entryType,
           imgIdData.sectionId,
@@ -450,7 +450,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
           // inline image
           const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
           const imgIdData = options.genImageIdData(epubctx.optionsClass, imgFromPath, imgNode, entryType, epubh.ImgType.Inline);
-          await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId);
+          await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId, imgIdData.imgClass);
         }
       }
 
@@ -719,7 +719,13 @@ export async function createIMGlnDOM(
  * @param id The id to use for this iamge
  * @returns The copied-path
  */
-export async function copyImage(fromPath: string, epubctx: epubh.EpubContext<any, any>, filename: string, id: string): Promise<string> {
+export async function copyImage(
+  fromPath: string,
+  epubctx: epubh.EpubContext<any, any>,
+  filename: string,
+  id: string,
+  imgClass: epubh.ImgClass
+): Promise<string> {
   const copiedPath = path.resolve(epubctx.contentOPFDir, epubh.FileDir.Images, filename);
   await utils.mkdir(path.dirname(copiedPath));
   await fspromises.copyFile(fromPath, copiedPath);
@@ -729,10 +735,11 @@ export async function copyImage(fromPath: string, epubctx: epubh.EpubContext<any
   utils.assertionDefined(mimetype, new Error('Expected "mimetype" to be defined'));
 
   epubctx.addFile(
-    new epubh.EpubContextFileBase({
+    new epubh.EpubContextFileImg({
       filePath: copiedPath,
       mediaType: mimetype,
       id: id,
+      imgClass,
     })
   );
 

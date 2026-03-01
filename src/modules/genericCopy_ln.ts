@@ -329,7 +329,7 @@ async function copyCoverImg(
 
   const ext = path.extname(coverHref);
   const coverOutName = `cover${ext}`;
-  await copyImage(path.resolve(epubctxInput.contentOPFDir, coverHref), epubctxOutput, coverOutName, coverOutName);
+  await copyImage(path.resolve(epubctxInput.contentOPFDir, coverHref), epubctxOutput, coverOutName, coverOutName, epubh.ImgClass.Cover);
   epubctxOutput.optionsClass.coverImgId = coverOutName;
   epubctxOutput.optionsClass.coverInputPath = coverHref;
 }
@@ -383,7 +383,8 @@ async function copyImages(document: Document, epubctxOutput: epubh.EpubContext<G
 
     // ignore it if files already exist, for example cover is likely already copied. Also for inline elements, which might be common
     if (!(await utils.pathExists(imgOutPath))) {
-      await copyImage(imgPath, epubctxOutput, basename, basename);
+      const type = testForSingleImg(document) ? epubh.ImgClass.Insert : epubh.ImgClass.Inline;
+      await copyImage(imgPath, epubctxOutput, basename, basename, type);
     }
 
     const textPath = path.resolve(epubctxOutput.contentOPFDir, epubh.FileDir.Text);

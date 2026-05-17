@@ -799,11 +799,14 @@ export function generatePElementInnerTranslate(
     'C_No_Tail_Q__And__Times_New_Roman',
     // slightly lower letter-spacing (ignored) and setting italic (handled) in space merc 9
     'C_Current__And__Properties__And__Times_New_Roman__And__Italic',
+    // weird letter spacing for some empty space
+    'C_Current__And__Properties__OPENPAR_1_CLOSEPAR_',
 
     // literally empty class
     'C_Citation',
     'C_No_Break__And__Times_New_Roman',
     'C_Current__And__Segoe_UI_Symbol',
+    'C_No_Break',
 
     // normally sets font to monospace for code-like text, but handled above with "code" detection
     'C_Mecha-Birdie',

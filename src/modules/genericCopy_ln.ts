@@ -126,6 +126,12 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       continue;
     }
     if (file instanceof epubh.EpubContextFileXHTML) {
+      // ignore all files that are not listed in the spine
+      if (!file.customData?.spineIndex) {
+        log(`Skipping file "${file.id}" as it is not listed in the original spine!`);
+        continue;
+      }
+
       await processHTMLFile(epubctxInput, epubctxOutput, file);
       continue;
     }

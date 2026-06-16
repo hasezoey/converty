@@ -272,4 +272,6 @@ export default async function main(options?: MainOptions) {
     );
     finished.push(file);
   }
+
+  console.log('Finished processing all files'.grey);
 }

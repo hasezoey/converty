@@ -210,7 +210,9 @@ export default async function main(options?: MainOptions) {
 
   const waitingFiles: Set<string> = new Set();
 
-  for (const foundPath of await fspromises.readdir(converterINPUTPath)) {
+  const dirContent = (await fspromises.readdir(converterINPUTPath)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+
+  for (const foundPath of dirContent) {
     const fullPath = path.resolve(converterINPUTPath, foundPath);
     const stat = await utils.statPath(fullPath);
 

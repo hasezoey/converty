@@ -367,7 +367,14 @@ function testForSingleImg(document: Document): boolean {
       return false;
     }
 
+    // if there is only one image element and no other sibling anywhere, then this is a image xhtml (insert/cover, etc) file
     if (currentElem.nodeName === 'img') {
+      return true;
+    }
+
+    // for some reason some yenpress cover images have a random "<span>cover</span>" added before the image, invalidating the logic above
+    // but all covers practically dont have any other usable text, so this can be ignored.
+    if (currentElem.nodeName === 'section' && currentElem.attributes?.['epub:type']?.value === 'cover') {
       return true;
     }
   }

@@ -99,7 +99,8 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     }
 
     const mimetype = file.mediaType;
-    log(`Processing file "${file.id}", ${mimetype}`);
+    const file_basename = path.basename(file.filePath);
+    log(`Processing file "${file.id}"("${file_basename}"), ${mimetype}`);
 
     utils.assertion(typeof mimetype === 'string', new Error('Expected "mimetype" to be of string'));
 

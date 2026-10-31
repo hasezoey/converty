@@ -217,6 +217,7 @@ async function processHTMLFile(
   removeTOCLinks(documentInput);
   removeAllProcessingInstructions(documentInput);
   updateStyleLocation(documentInput, epubctxOutput);
+  cleanupHeaders(documentInput);
 
   const isMain = epubctxOutput.optionsClass.tocElements.findIndex((v) => v.textPath.endsWith(path.basename(file.filePath))) >= 0;
 
@@ -467,6 +468,23 @@ function updateStyleLocation(document: Document, epubctxOutput: epubh.EpubContex
     linkElem.type = 'text/css';
     const headElem = xh.queryDefinedElement(document, 'head');
     headElem.appendChild(linkElem);
+  }
+}
+
+/**
+ * Cleanup unnecessary headers.
+ * @param document The document to update the style location in
+ */
+function cleanupHeaders(document: Document) {
+  // cleanup empty styles
+  {
+    const styles = document.querySelectorAll('style');
+
+    for (const node of styles) {
+      if (node.innerHTML.trim().length == 0) {
+        node.remove();
+      }
+    }
   }
 }
 

@@ -425,7 +425,10 @@ async function copyImages(document: Document, epubctxOutput: epubh.EpubContext<G
     // ignore it if files already exist, for example cover is likely already copied. Also for inline elements, which might be common
     if (!(await utils.pathExists(imgOutPath))) {
       const type = testForSingleImg(document) ? epubh.ImgClass.Insert : epubh.ImgClass.Inline;
-      await copyImage(imgPath, epubctxOutput, basename, basename, type);
+
+      const id = /a-z/i.test(basename[0]) ? basename : 'img-' + basename;
+
+      await copyImage(imgPath, epubctxOutput, basename, id, type);
     }
 
     const textPath = path.resolve(epubctxOutput.contentOPFDir, epubh.FileDir.Text);

@@ -333,18 +333,22 @@ async function copyCoverImg(
 ) {
   const manifestElementOld = xh.queryDefinedElement(contentOPFInput, 'manifest');
 
-  const coverHref = manifestElementOld.querySelector('item[properties="cover-image"]')?.getAttribute('href');
-  utils.assertionDefined(coverHref, new Error('Expected to find manifest item with `properties="cover-item"`'));
+  let coverHref = manifestElementOld.querySelector('item[properties="cover-image"]')?.getAttribute('href');
 
-  // // if the "properties" is not set, try resolving via the "meta" element linking.
-  // if (utils.isNullOrUndefined(coverHref)) {
-  //   const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
+  if (!coverHref) {
+    const metadataOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
 
-  //   const coverId = xh.queryDefinedElement(metadataElementOld, 'meta[name="cover"]').getAttribute('content');
-  //   utils.assertionDefined(coverId, new Error(`Expected to find attribute "content" in "metadata > meta[name="cover"]`));
-  //   coverHref = xh.queryDefinedElement(manifestElementOld, `item[id="${coverId}"]`).getAttribute('href');
-  //   utils.assertionDefined(coverHref, new Error(`Expected to find attribute "href" in "manifest > item[id="${coverId}"]`));
-  // }
+    const metaCover = metadataOld.querySelector('meta[name="cover"]')?.getAttribute('content');
+
+    utils.assertionDefined(metaCover, new Error('Expected to find `metadata -> meta[name="cover"]` as a fallback'));
+
+    coverHref = manifestElementOld.querySelector(`item[id="${metaCover}"]`)?.getAttribute('href');
+  }
+
+  utils.assertionDefined(
+    coverHref,
+    new Error('Expected to find manifest item with `manifest -> item[properties="cover-item"]` or via `metadata -> meta[name="cover"]`')
+  );
 
   const ext = path.extname(coverHref);
   const coverOutName = `cover${ext}`;

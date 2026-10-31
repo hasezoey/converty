@@ -255,6 +255,8 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
   public customData?: CustomData;
   /** The filename of the css-stylesheet to be used */
   public readonly cssFilename: string;
+  /** The actualy root path the <name>.opf file is in */
+  public root_path: string = STATICS.ROOT_PATH;
 
   constructor(input: { title: string; optionsClass: Options; customData?: CustomData; cssName?: string }) {
     this.title = input.title;
@@ -284,7 +286,7 @@ export class EpubContext<Options extends BaseEpubOptions, CustomData extends Rec
 
   /** Get the absolute directory to where the content.opf file will be in */
   get contentOPFDir() {
-    return path.resolve(this.rootDir, STATICS.ROOT_PATH);
+    return path.resolve(this.rootDir, this.root_path);
   }
 
   /** Get all currently registered files that will be included in the EPUB */
@@ -851,14 +853,14 @@ export async function getInputContext(inputPath: string): Promise<EpubContext<Ba
   }
 
   /** Storage for less often executing a function */
-  const contentOPFDir = path.dirname(contentOPFPath);
+  epubctx.root_path = path.dirname(contentOPFPath);
   const spineChildren = Array.from(spineElem.childNodes);
 
   // get and set all the id's
   for (const item of Array.from(xh.queryDefinedElementAll(manifestElem, 'item'))) {
     const hrefAttr = item.getAttribute('href');
     utils.assertionDefined(hrefAttr, new Error(`Expected Attribute "href" to be on a "item" Element. Element: "${item.outerHTML}"`));
-    const found = epubctx.files.find((v) => path.relative(contentOPFDir, v.filePath) === hrefAttr);
+    const found = epubctx.files.find((v) => path.relative(epubctx.root_path, v.filePath) === hrefAttr);
 
     if (!found) {
       log(`Could not find a file in the epubctx matching the content.opf item, Item: "${item.outerHTML}"`);

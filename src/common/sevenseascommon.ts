@@ -749,6 +749,8 @@ export function generatePElementInnerTranslate(
     'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman',
     // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting letter-spacing (ignored) and font-size (ignored)
     'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Small_Capitals',
+    // smaller font size (80%)
+    'C_Nanomachines',
     // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-weight (handled)
     'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold',
     // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-style (handled)

@@ -12,8 +12,9 @@ List of currently Supported inputs with current modules:
 | `genericSevenSeas_ln` |                         `Reincarnated as a Sword`                          | Supports all volumes from 1 to 4              |
 | `genericSevenSeas_ln` | `Reborn as a Space Mercenary: I Woke Up Piloting the Strongest Starship!`  | Supports all volumes from 1 to 16             |
 | `genericSevenSeas_ln` |            `Modern Dungeon Capture Starting with Broken Skills`            | Supports all volumes from 1 to 3              |
-|   `genericCopy_ln`    |                `Death March to the Parallel World Rhapsody`                | Supports all volumes from 1 to 10              |
+|   `genericCopy_ln`    |                `Death March to the Parallel World Rhapsody`                | Supports all volumes from 1 to 10             |
 |   `genericCopy_ln`    |        `High School Prodigies Have It Easy Even in Another World!`         | Supports all volumes from 1 to 5              |
+|   `genericCopy_ln`    | `So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds`  | Supports all volumes from 1 to 1              |
 
 Notes:
 - All Conversions that process a EPUB output a EPUB3 and use html elements over css styles (like instead of `font-style: italic`, html element `em` is used)

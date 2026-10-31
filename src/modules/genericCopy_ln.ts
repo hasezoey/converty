@@ -17,7 +17,11 @@ Current modifications:
 const log = utils.createNameSpace('genericCopy');
 
 // STATIC OPTIONS
-const VERIFIED_MATCH_LIST = ['Death March to the Parallel World Rhapsody', 'High School Prodigies Have It Easy Even in Another World!'];
+const VERIFIED_MATCH_LIST = [
+  'Death March to the Parallel World Rhapsody',
+  'High School Prodigies Have It Easy Even in Another World!',
+  'So You Want to Live the Slow Life\\? A Guide to Life in the Beastly Wilds',
+];
 const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter/gim;
@@ -94,6 +98,7 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       continue;
     }
     // ignore toc XHTMLs as we re-generate those
+    // NOTE: some series dont name their files that way, so we have to later test via title / header after parsing the xhtml
     if (/^(?:toc|nav).xhtml$/.test(path.basename(filePath))) {
       continue;
     }
@@ -186,6 +191,11 @@ async function processHTMLFile(
   await copyImages(documentInput, epubctxOutput, file);
 
   const title = extractTitle(documentInput, epubctxOutput, file);
+
+  // Some series dont name the files to be this, so we have to detect it via title or headers after parsing the html
+  if (title.toLocaleLowerCase().includes('table of contents')) {
+    return;
+  }
 
   // determine type
   let useType: epubh.EpubContextNewFileXHTMLType = { type: epubh.EpubContextFileXHTMLTypes.TEXT };

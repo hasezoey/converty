@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { promises as fspromises } from 'fs';
+import * as path from 'path';
+import * as utils from '../../src/utils.js';
 import * as epubh from '../../src/helpers/epub.js';
 import * as htmltp from '../../src/helpers/htmlTextProcessing.js';
 import * as xh from '../../src/helpers/xml.js';
@@ -166,6 +169,92 @@ describe('htmlTextProcessing', () => {
 
       options.setImgTypeImplicit(epubh.ImgType.Insert);
       expect(options.imgTypeImplicit).toBe(epubh.ImgType.Insert);
+    });
+  });
+
+  describe('doTextContent', () => {
+    let ctx: epubh.EpubContext<htmltp.TextProcessingECOptions>;
+    let documentInput: Document;
+
+    const createInputDocument = (): Document => {
+      const { document } = xh.newJSDOM(
+        '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some mock text content for the chapter.</p></body></html>',
+        {
+          contentType: xh.STATICS.XHTML_MIMETYPE,
+        }
+      );
+
+      return document;
+    };
+
+    const createDoTextContentOptions = (): htmltp.DoTextContentOptions<htmltp.TextProcessingECOptions> => ({
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      genTextIdData: (_optionsClass, _entryType, _extra) => {
+        return {
+          sectionId: 'chapter1',
+          useType: {
+            type: epubh.EpubContextFileXHTMLTypes.TEXT,
+          },
+        };
+      },
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      genImageIdData: (_optionsClass, _inputImg, _imgNode, _entryType, _imgTypeHint) => {
+        return {
+          sectionId: 'insert1',
+          imgFilename: 'Insert1.png',
+          xhtmlFilename: 'insert1',
+          imgClass: epubh.ImgClass.Insert,
+          useType: {
+            type: epubh.EpubContextFileXHTMLTypes.IMG,
+            imgClass: epubh.ImgClass.Insert,
+            imgType: epubh.ImgType.Insert,
+          },
+        };
+      },
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      genChapterHeaderContent: (documentNew, entryType, h1Element: HTMLHeadingElement, _documentInput) => {
+        h1Element.appendChild(documentNew.createTextNode(entryType.title));
+      },
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      genPElemText: (origNode, documentNew, parentElem, _optionsClass) => {
+        const pElem = documentNew.createElement('p');
+        pElem.textContent = origNode.textContent ?? '';
+        parentElem.appendChild(pElem);
+
+        return [pElem];
+      },
+      getTextContent: (document) => Array.from(document.querySelector('body')?.children ?? []),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      isTitle: (document, elem, entryType, _optionsClass) => (elem.localName === 'h1' ? entryType.title : false),
+    });
+
+    beforeEach(() => {
+      ctx = new epubh.EpubContext<htmltp.TextProcessingECOptions>({
+        title: 'Some Story',
+        optionsClass: new htmltp.TextProcessingECOptions(),
+      });
+      documentInput = createInputDocument();
+    });
+
+    afterEach(async () => {
+      await utils.removeDir(ctx.rootDir);
+    });
+
+    it('should save the processed chapter into a new xhtml file', async () => {
+      const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+
+      await htmltp.doTextContent(documentInput, entryType, ctx, '/converty/input/chapter1.xhtml', createDoTextContentOptions());
+
+      expect(ctx.files).toHaveLength(1);
+      expect(ctx.files[0]).toBeInstanceOf(epubh.EpubContextFileXHTML);
+
+      const writtenPath = path.resolve(ctx.contentOPFDir, epubh.FileDir.Text, 'chapter1.xhtml');
+      const stat = await utils.statPath(writtenPath);
+
+      expect(stat).toBeDefined();
+
+      const content = await fspromises.readFile(writtenPath, 'utf-8');
+      expect(content).toContain('Chapter 1');
     });
   });
 });

@@ -19,6 +19,7 @@
     { "action": "shell", "resource": "head*", "effect": "allow" },
     { "action": "shell", "resource": "tail*", "effect": "allow" },
     { "action": "shell", "resource": "echo*", "effect": "allow" },
+    { "action": "shell", "resource": "wc *", "effect": "allow" },
     { "action": "shell", "resource": "sed *--in-place*", "effect": "deny" },
     { "action": "shell", "resource": "sed *-i*", "effect": "deny" },
     { "action": "shell", "resource": "sed*", "effect": "allow" },
@@ -31,17 +32,18 @@
     { "action": "shell", "resource": "npm test*", "effect": "allow" },
     { "action": "shell", "resource": "npm run test*", "effect": "allow" },
     { "action": "shell", "resource": "npm run build", "effect": "allow" },
-    { "action": "shell", "resource": "npm run lint", "effect": "allow" },
-    { "action": "shell", "resource": "npm run lint --fix", "effect": "ask" },
+    { "action": "shell", "resource": "npm run lint*", "effect": "allow" },
+    { "action": "shell", "resource": "npx vitest run *", "effect": "allow" },
+    { "action": "shell", "resource": "npx eslint *", "effect": "allow" },
     
     { "action": "shell", "resource": "rm -rf /", "effect": "deny" },
     { "action": "shell", "resource": "rm -rf ~*", "effect": "deny" },
     { "action": "shell", "resource": "sudo *", "effect": "deny" },
 
-    { "action": "write", "resource": "opencode.jsonc", "effect": "deny" },
-    { "action": "write", "resource": "AGENTS.md", "effect": "ask" },
-    { "action": "write", "resource": ".git/*", "effect": "deny" },
+    { "action": "edit", "resource": "opencode.jsonc", "effect": "deny" },
+    { "action": "edit", "resource": "AGENTS.md", "effect": "ask" },
+    { "action": "edit", "resource": ".git/*", "effect": "deny" },
 
-    { "action": "write", "resource": "test/*", "effect": "allow" }
+    { "action": "edit", "resource": "test/*", "effect": "allow" }
   ],
 }

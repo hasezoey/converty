@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../src/utils.js';
@@ -90,20 +90,20 @@ describe('utils', () => {
   });
 
   describe('debugOutputEnabled', () => {
+    afterEach(() => {
+      delete process.env['DEBUG_OUTPUT'];
+    });
+
     it('should return "true" when "DEBUG_OUTPUT" is enabled', () => {
       process.env['DEBUG_OUTPUT'] = '1';
 
       expect(utils.debugOutputEnabled()).toBe(true);
-
-      delete process.env['DEBUG_OUTPUT'];
     });
 
     it('should return "false" when "DEBUG_OUTPUT" is disabled', () => {
       process.env['DEBUG_OUTPUT'] = '0';
 
       expect(utils.debugOutputEnabled()).toBe(false);
-
-      delete process.env['DEBUG_OUTPUT'];
     });
   });
 
@@ -131,25 +131,37 @@ describe('utils', () => {
   });
 
   describe('mkdir', () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (!utils.isNullOrUndefined(tmpDir)) {
+        await utils.removeDir(tmpDir);
+      }
+    });
+
     it('should create nested directories', async () => {
-      const tmpDir = await utils.createTmpDir('converty-test-');
+      tmpDir = await utils.createTmpDir('converty-test-');
       const newPath = path.join(tmpDir, 'nested', 'deeper');
 
       await utils.mkdir(newPath);
 
       expect(await utils.pathExists(newPath)).toBe(true);
-
-      await utils.removeDir(tmpDir);
     });
   });
 
   describe('createTmpDir', () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (!utils.isNullOrUndefined(tmpDir)) {
+        await utils.removeDir(tmpDir);
+      }
+    });
+
     it('should create a temporary directory', async () => {
-      const tmpDir = await utils.createTmpDir('converty-test-');
+      tmpDir = await utils.createTmpDir('converty-test-');
 
       expect(await utils.pathExists(tmpDir)).toBe(true);
-
-      await utils.removeDir(tmpDir);
     });
   });
 
@@ -184,6 +196,14 @@ describe('utils', () => {
   });
 
   describe('searchForFile', () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (!utils.isNullOrUndefined(tmpDir)) {
+        await utils.removeDir(tmpDir);
+      }
+    });
+
     it('should throw an error for an empty filename', async () => {
       await expect(utils.searchForFile(process.cwd(), '')).rejects.toThrow(/"filename" length needs to be 1 or above/);
     });
@@ -193,7 +213,7 @@ describe('utils', () => {
     });
 
     it('should find a file within the search depth', async () => {
-      const tmpDir = await utils.createTmpDir('converty-test-');
+      tmpDir = await utils.createTmpDir('converty-test-');
       const subDir = path.join(tmpDir, 'sub');
 
       await utils.mkdir(subDir);
@@ -203,8 +223,6 @@ describe('utils', () => {
 
       expect(found).toHaveLength(1);
       expect(found?.[0]).toContain('combinerConfig.json');
-
-      await utils.removeDir(tmpDir);
     });
   });
 });

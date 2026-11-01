@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as ssc from '../../src/common/sevenseascommon.js';
 import * as epubh from '../../src/helpers/epub.js';
 import * as htmltp from '../../src/helpers/htmlTextProcessing.js';
@@ -7,6 +7,26 @@ import * as xh from '../../src/helpers/xml.js';
 describe('sevenseasCommon', () => {
   const emptyConfig: ssc.SevenSeasConfig = {};
   const { document } = xh.newJSDOM('<html><body></body></html>');
+
+  const mockedCompStyles = {
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    verticalAlign: 'top',
+    textDecoration: 'none',
+    textAlign: 'left',
+    marginLeft: '0px',
+    fontSize: '1em',
+    fontFamily: 'Times New Roman',
+  };
+
+  const createDocument = (html: string): Document => {
+    const { document: doc } = xh.newJSDOM(html);
+
+    // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for the style handling
+    vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue(mockedCompStyles as any);
+
+    return doc;
+  };
 
   const createEntryType = (overrides: Partial<ssc.EntryInformationExt> = {}): ssc.EntryInformationExt => ({
     type: htmltp.EntryType.Text,
@@ -325,6 +345,86 @@ describe('sevenseasCommon', () => {
       expect(children).toHaveLength(2);
       expect(children[0].localName).toBe('h1');
       expect(children[1].localName).toBe('p');
+    });
+  });
+
+  describe('generatePElementInner', () => {
+    it('should return text nodes as they are', () => {
+      const doc = createDocument('<html><body></body></html>');
+      const textNode = doc.createTextNode('Some text');
+
+      const elems = ssc.generatePElementInner(textNode, doc, doc.createElement('div'), new ssc.SevenSeasECOptions(), emptyConfig);
+
+      expect(elems).toHaveLength(1);
+      expect(elems[0].nodeType).toBe(3); // "Node.TEXT_NODE"
+      expect(elems[0].textContent).toBe('Some text');
+    });
+
+    it('should return the children of a plain element directly', () => {
+      const doc = createDocument('<html><body></body></html>');
+      const pElem = doc.createElement('p');
+      pElem.textContent = 'Some text';
+
+      const elems = ssc.generatePElementInner(pElem, doc, doc.createElement('div'), new ssc.SevenSeasECOptions(), emptyConfig);
+
+      expect(elems).toHaveLength(1);
+      expect(elems[0].nodeType).toBe(3); // "Node.TEXT_NODE"
+      expect(elems[0].textContent).toBe('Some text');
+    });
+
+    it('should wrap content into a "strong" element when bold', () => {
+      const doc = createDocument('<html><body></body></html>');
+      const strongElem = doc.createElement('strong');
+      strongElem.textContent = 'Bold text';
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...mockedCompStyles, fontWeight: 'bold' } as any);
+
+      const elems = ssc.generatePElementInner(strongElem, doc, doc.createElement('div'), new ssc.SevenSeasECOptions(), emptyConfig);
+
+      expect(elems).toHaveLength(1);
+      expect(elems[0].nodeName).toBe('STRONG');
+      expect(elems[0].textContent).toBe('Bold text');
+    });
+
+    it('should return "br" elements directly', () => {
+      const doc = createDocument('<html><body></body></html>');
+      const brElem = doc.createElement('br');
+
+      const elems = ssc.generatePElementInner(brElem, doc, doc.createElement('div'), new ssc.SevenSeasECOptions(), emptyConfig);
+
+      expect(elems).toHaveLength(1);
+      expect(elems[0].nodeName).toBe('BR');
+      expect(elems[0].nodeType).toBe(1); // "Node.ELEMENT_NODE"
+    });
+
+    it('should combine with the last node when the previous node did not end correctly', () => {
+      const doc = createDocument('<html><body><div class="main"><p>Some text </p></div></body></html>');
+      const mainElem = doc.querySelector('.main')!;
+      const parentElem = mainElem;
+
+      const origNode = doc.createElement('p');
+      origNode.textContent = 'More text here';
+
+      const elems = ssc.generatePElementInner(origNode, doc, parentElem, new ssc.SevenSeasECOptions(), emptyConfig);
+
+      expect(elems).toHaveLength(0);
+      expect(mainElem.lastChild?.textContent).toBe('Some text More text here');
+    });
+
+    it('should not combine when the custom combine hook prevents it', () => {
+      const doc = createDocument('<html><body><div class="main"><p>Some text </p></div></body></html>');
+      const mainElem = doc.querySelector('.main')!;
+      const parentElem = mainElem;
+
+      const origNode = doc.createElement('p');
+      origNode.textContent = 'More text here';
+
+      const config: ssc.SevenSeasConfig = { generatePElementCombineHook: () => true };
+      const elems = ssc.generatePElementInner(origNode, doc, parentElem, new ssc.SevenSeasECOptions(), config);
+
+      expect(elems).toHaveLength(1);
+      expect(elems[0].nodeType).toBe(3); // "Node.TEXT_NODE"
+      expect(mainElem.lastChild?.textContent).toBe('Some text ');
     });
   });
 });

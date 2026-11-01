@@ -53,7 +53,7 @@ export async function sleep(waitTime: number): Promise<void> {
 
 /**
  * Assert an condition, if "false" throw error
- * Note: it is not named "assert" to differentiate between node and jest types
+ * Note: it is not named "assert" to differentiate between node and vitest types
  * @param cond The Condition to throw
  * @param error An Custom Error to throw
  */

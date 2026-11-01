@@ -17,10 +17,8 @@
     "run:compare": "npm run build && node lib/bin/compareGen.js",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint -c ./eslint.config.mjs \"./**/*.{js,ts,cjs,mjs,cts,mts}\"",
-    "test": "jest",
-    "test:watch": "jest --watchAll",
-    "test:coverage": "jest --collectCoverage",
-    "test:watchCoverage": "jest --collectCoverage --watchAll",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "watch": "tsc -w -p tsconfig.json",
     "prepare": "husky",
     "clean": "rm -rf lib"
@@ -48,7 +46,8 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.50.0"
+    "typescript-eslint": "^8.50.0",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "colors": "^1.4.0",

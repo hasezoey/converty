@@ -682,6 +682,106 @@ function combineWithLastNode(documentNew: Document, config: SevenSeasConfig, ele
   return undefined;
 }
 
+// classes to ignore that are either unnecessary or are handled by different things (like "htmlTextProcessing"'s "processCommonStyle")
+// this is used to warn about new volume's different and maybe unhandled formatting
+const classesToIgnore: string[] = [
+  // default formatting for p, ignored
+  'P_Normal__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
+  'P_Prose_Formatting',
+  'P_Normal',
+  // default formatting for span, ignored
+  'C_Current__And__Times_New_Roman',
+  // random colored text, ignored
+  'C_Current__And__Coloured_Text__And__Times_New_Roman',
+  // random class for punctuation in first sentence of a chapter
+  'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
+  'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
+  'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_2_CLOSEPAR_',
+  'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_3_CLOSEPAR_',
+  'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_4_CLOSEPAR_',
+  'C_Current__And__Properties__And__Times_New_Roman__And__Italic__OPENPAR_1_CLOSEPAR_',
+  // name implies same as "C_Current__And__Times_New_Roman" but actually only sets text color to black, ignored
+  'C_Current__And__Black_Text__And__Times_New_Roman',
+  'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman',
+  // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting letter-spacing (ignored) and font-size (ignored)
+  'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Small_Capitals',
+  // smaller font size (80%)
+  'C_Nanomachines',
+  // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-weight (handled)
+  'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold',
+  // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-style (handled)
+  'C_Current__And__Black_Text__And__Times_New_Roman__And__Italic',
+  'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Italic',
+  'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Italic',
+  'C_No_Tail_Q__And__Times_New_Roman__And__Italic',
+  // in addition to the previous things, also sets text-transform (handled)
+  'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Capitals',
+  // default formatting for section markings, handled by "generatePElement"
+  'P__STAR__STAR__STAR__page_break',
+  'P_Prose_Formatting__And__Centre_Alignment',
+  'P__STAR__STAR__STAR__page_break__And__Page_Break',
+  'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
+  'P_TEXTBODY_CENTERALIGN',
+  'P_TEXTBODY_CENTERALIGN__And__Page_Break',
+  'P_Centre',
+  'C_Current__And__Black_Text__And__Cambria_Math',
+  'C_Current__And__Black_Text__And__Segoe_UI_Symbol',
+  // class to mark some headings
+  'P_Chapter_Header',
+  // random change in letter-spacing following the chapter start big character, but before actual text, ignored
+  'C_Current__And__Properties__And__Times_New_Roman',
+  // transform all text to uppercase, ignored because all text is already uppercase
+  'C_Nanomachines__And__Times_New_Roman__And__Capitals',
+  'C_Current__And__Times_New_Roman__And__Capitals',
+  // used in Space merc 11, which has "TT: uppercase", but only for symbols, so it does not matter; italics are already handled
+  'C_Current__And__Times_New_Roman__And__Italic__And__Capitals',
+  // author signature (afterword), handled by "generatePElement"
+  'P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
+  'P_Prose_Formatting__And__Right_Alignment',
+  'P_TEXTBODY_CENTERALIGN__And__Right_Alignment',
+  'P_Normal__And__Right_Alignment',
+  // handled earlier in the function
+  'C_Current__And__Times_New_Roman__And__Italic',
+  'C_Current__And__Times_New_Roman__And__Bold__And__Italic',
+  'C_Stat_Box_-_Name__And__Italic',
+  // "about the author" section things
+  'C_Current__And__Times_New_Roman__And__Bold',
+  // extra indentation (and margin), handled by "generatePElement"
+  'P_Prose_Formatting__And__Left_Indent',
+  'P_Prose_Formatting__And__Left_Indent__OPENPAR_1_CLOSEPAR_',
+  // this is always after a div with "page-break: always", but can be ignored
+  'P_Prose_Formatting__And__Page_Break',
+  // random change of font size for "About the Author" heading, ignored to keep same size
+  'C_Current__And__Small_Capitals',
+  // random class which is empty in space merc 9
+  'C_No_Tail_Q__And__Times_New_Roman',
+  // slightly lower letter-spacing (ignored) and setting italic (handled) in space merc 9
+  'C_Current__And__Properties__And__Times_New_Roman__And__Italic',
+  // weird letter spacing for some empty space
+  'C_Current__And__Properties__OPENPAR_1_CLOSEPAR_',
+
+  // literally empty class
+  'C_Citation',
+  'C_No_Break__And__Times_New_Roman',
+  'C_Current__And__Segoe_UI_Symbol',
+  'C_No_Break',
+
+  // normally sets font to monospace for code-like text, but handled above with "code" detection
+  'C_Mecha-Birdie',
+];
+// styles that are directly on a element to ignore that are either unnecessary or are handled already (mostly in "htmlTextProcessing"'s "processCommonStyle")
+// like "<p style=\"HERE\" class=\"NOT HERE\">"
+const stylesToIgnore: string[] = [
+  'font-style',
+  'font-weight',
+  'color',
+  'font-size',
+  'text-transform',
+  'vertical-align',
+  'letter-spacing',
+  'text-decoration',
+];
+
 /** Return formatted and only elements that are required */
 export function generatePElementInnerTranslate(
   origNode: Node,
@@ -725,106 +825,6 @@ export function generatePElementInnerTranslate(
   if (origElem.localName === 'br') {
     return [documentNew.createElement('br')];
   }
-
-  // classes to ignore that are either unnecessary or are handled by different things (like "htmlTextProcessing"'s "processCommonStyle")
-  // this is used to warn about new volume's different and maybe unhandled formatting
-  const classesToIgnore: string[] = [
-    // default formatting for p, ignored
-    'P_Normal__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
-    'P_Prose_Formatting',
-    'P_Normal',
-    // default formatting for span, ignored
-    'C_Current__And__Times_New_Roman',
-    // random colored text, ignored
-    'C_Current__And__Coloured_Text__And__Times_New_Roman',
-    // random class for punctuation in first sentence of a chapter
-    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
-    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_1_CLOSEPAR_',
-    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_2_CLOSEPAR_',
-    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_3_CLOSEPAR_',
-    'C_Current__And__Properties__And__Times_New_Roman__OPENPAR_4_CLOSEPAR_',
-    'C_Current__And__Properties__And__Times_New_Roman__And__Italic__OPENPAR_1_CLOSEPAR_',
-    // name implies same as "C_Current__And__Times_New_Roman" but actually only sets text color to black, ignored
-    'C_Current__And__Black_Text__And__Times_New_Roman',
-    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman',
-    // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting letter-spacing (ignored) and font-size (ignored)
-    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Small_Capitals',
-    // smaller font size (80%)
-    'C_Nanomachines',
-    // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-weight (handled)
-    'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold',
-    // same as "C_Current__And__Black_Text__And__Times_New_Roman" in addition also setting font-style (handled)
-    'C_Current__And__Black_Text__And__Times_New_Roman__And__Italic',
-    'C_Current__And__Properties__And__Black_Text__And__Times_New_Roman__And__Italic',
-    'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Italic',
-    'C_No_Tail_Q__And__Times_New_Roman__And__Italic',
-    // in addition to the previous things, also sets text-transform (handled)
-    'C_Current__And__Black_Text__And__Times_New_Roman__And__Bold__And__Capitals',
-    // default formatting for section markings, handled by "generatePElement"
-    'P__STAR__STAR__STAR__page_break',
-    'P_Prose_Formatting__And__Centre_Alignment',
-    'P__STAR__STAR__STAR__page_break__And__Page_Break',
-    'P_TEXTBODY_CENTERALIGN_PAGEBREAK',
-    'P_TEXTBODY_CENTERALIGN',
-    'P_TEXTBODY_CENTERALIGN__And__Page_Break',
-    'P_Centre',
-    'C_Current__And__Black_Text__And__Cambria_Math',
-    'C_Current__And__Black_Text__And__Segoe_UI_Symbol',
-    // class to mark some headings
-    'P_Chapter_Header',
-    // random change in letter-spacing following the chapter start big character, but before actual text, ignored
-    'C_Current__And__Properties__And__Times_New_Roman',
-    // transform all text to uppercase, ignored because all text is already uppercase
-    'C_Nanomachines__And__Times_New_Roman__And__Capitals',
-    'C_Current__And__Times_New_Roman__And__Capitals',
-    // used in Space merc 11, which has "TT: uppercase", but only for symbols, so it does not matter; italics are already handled
-    'C_Current__And__Times_New_Roman__And__Italic__And__Capitals',
-    // author signature (afterword), handled by "generatePElement"
-    'P_Normal__And__Right_Alignment__And__Left_Indent__And__Spacing_After__And__Spacing_Before',
-    'P_Prose_Formatting__And__Right_Alignment',
-    'P_TEXTBODY_CENTERALIGN__And__Right_Alignment',
-    'P_Normal__And__Right_Alignment',
-    // handled earlier in the function
-    'C_Current__And__Times_New_Roman__And__Italic',
-    'C_Current__And__Times_New_Roman__And__Bold__And__Italic',
-    'C_Stat_Box_-_Name__And__Italic',
-    // "about the author" section things
-    'C_Current__And__Times_New_Roman__And__Bold',
-    // extra indentation (and margin), handled by "generatePElement"
-    'P_Prose_Formatting__And__Left_Indent',
-    'P_Prose_Formatting__And__Left_Indent__OPENPAR_1_CLOSEPAR_',
-    // this is always after a div with "page-break: always", but can be ignored
-    'P_Prose_Formatting__And__Page_Break',
-    // random change of font size for "About the Author" heading, ignored to keep same size
-    'C_Current__And__Small_Capitals',
-    // random class which is empty in space merc 9
-    'C_No_Tail_Q__And__Times_New_Roman',
-    // slightly lower letter-spacing (ignored) and setting italic (handled) in space merc 9
-    'C_Current__And__Properties__And__Times_New_Roman__And__Italic',
-    // weird letter spacing for some empty space
-    'C_Current__And__Properties__OPENPAR_1_CLOSEPAR_',
-
-    // literally empty class
-    'C_Citation',
-    'C_No_Break__And__Times_New_Roman',
-    'C_Current__And__Segoe_UI_Symbol',
-    'C_No_Break',
-
-    // normally sets font to monospace for code-like text, but handled above with "code" detection
-    'C_Mecha-Birdie',
-  ];
-  // styles that are directly on a element to ignore that are either unnecessary or are handled already (mostly in "htmlTextProcessing"'s "processCommonStyle")
-  // like "<p style=\"HERE\" class=\"NOT HERE\">"
-  const stylesToIgnore: string[] = [
-    'font-style',
-    'font-weight',
-    'color',
-    'font-size',
-    'text-transform',
-    'vertical-align',
-    'letter-spacing',
-    'text-decoration',
-  ];
 
   if (!utils.isNullOrUndefined(config.generatePElementInnerHook)) {
     const ret = config.generatePElementInnerHook();

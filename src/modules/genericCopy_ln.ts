@@ -192,8 +192,9 @@ async function processHTMLFile(
 
   const title = extractTitle(documentInput, epubctxOutput, file);
 
-  // Some series dont name the files to be this, so we have to detect it via title or headers after parsing the html
-  if (title.toLocaleLowerCase().includes('table of contents')) {
+  // Some series dont name the files to be this, so we have to detect it via title or headers after parsing the html.
+  // Also search for images, so that a "Table of Contents Image" does not accidentally get ignored.
+  if (title.toLocaleLowerCase().includes('table of contents') && !documentInput.querySelector('img')) {
     return;
   }
 

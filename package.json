@@ -16,6 +16,7 @@
     "run": "npm run build && node lib/bin/main.js",
     "run:compare": "npm run build && node lib/bin/compareGen.js",
     "build": "tsc -p tsconfig.build.json",
+    "build:tests": "tsc -p tsconfig.json",
     "lint": "eslint -c ./eslint.config.mjs \"./**/*.{js,ts,cjs,mjs,cts,mts}\"",
     "test": "vitest run",
     "test:watch": "vitest",

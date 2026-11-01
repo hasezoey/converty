@@ -325,4 +325,124 @@ describe('htmlTextProcessing', () => {
       expect(content).toContain('Some text after the image');
     });
   });
+
+  describe('processCommonStyle', () => {
+    const createDoc = (): Document => {
+      const { document } = xh.newJSDOM('<html><body></body></html>');
+
+      // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for the style handling
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        verticalAlign: 'top',
+        textDecoration: 'none',
+        textAlign: 'left',
+      } as any);
+
+      return document;
+    };
+
+    it('should add a "strong" element when the font weight is bold', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ fontWeight: 'bold' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeDefined();
+      expect(tracker.currentElem?.nodeName).toBe('STRONG');
+      expect(res.window).toBeDefined();
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should add an "em" element when the font style is italic', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ fontStyle: 'italic' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeDefined();
+      expect(tracker.currentElem?.nodeName).toBe('EM');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should add a "sup" element when the vertical align is super', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ verticalAlign: 'super' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeDefined();
+      expect(tracker.currentElem?.nodeName).toBe('SUP');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should add a "u" element when the text decoration is underline', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ textDecoration: 'underline' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeDefined();
+      expect(tracker.currentElem?.nodeName).toBe('U');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should mark the parent element as centered when the text align is center', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ textAlign: 'center' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(parentElem.className).toBe('centerp section-marking');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should mark the parent element as a signature when the text align is right', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ textAlign: 'right' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(parentElem.className).toBe('signature');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should not add any element or style when the default styles are used', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeUndefined();
+      expect(tracker.topElem).toBeUndefined();
+      expect(parentElem.className).toBe('');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+  });
 });

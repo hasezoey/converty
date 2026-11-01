@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../../src/utils.js';
@@ -176,13 +176,14 @@ describe('htmlTextProcessing', () => {
     let ctx: epubh.EpubContext<htmltp.TextProcessingECOptions>;
     let documentInput: Document;
 
-    const createInputDocument = (): Document => {
-      const { document } = xh.newJSDOM(
-        '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some mock text content for the chapter.</p></body></html>',
-        {
-          contentType: xh.STATICS.XHTML_MIMETYPE,
-        }
-      );
+    const DEFAULT_INPUT_HTML =
+      '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some mock text content for the chapter.</p></body></html>';
+
+    const createInputDocument = (html: string): Document => {
+      const { document } = xh.newJSDOM(html, { contentType: xh.STATICS.XHTML_MIMETYPE });
+
+      // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for image handling
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ verticalAlign: 'top' } as any);
 
       return document;
     };
@@ -233,7 +234,7 @@ describe('htmlTextProcessing', () => {
         title: 'Some Story',
         optionsClass: new htmltp.TextProcessingECOptions(),
       });
-      documentInput = createInputDocument();
+      documentInput = createInputDocument(DEFAULT_INPUT_HTML);
     });
 
     afterEach(async () => {
@@ -242,6 +243,8 @@ describe('htmlTextProcessing', () => {
 
     it('should save the processed chapter into a new xhtml file', async () => {
       const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+
+      documentInput = createInputDocument(DEFAULT_INPUT_HTML);
 
       await htmltp.doTextContent(documentInput, entryType, ctx, '/converty/input/chapter1.xhtml', createDoTextContentOptions());
 
@@ -255,6 +258,71 @@ describe('htmlTextProcessing', () => {
 
       const content = await fspromises.readFile(writtenPath, 'utf-8');
       expect(content).toContain('Chapter 1');
+    });
+
+    it('should not save a chapter file when the document is fully empty', async () => {
+      documentInput = createInputDocument('<html><head><title>Some Story</title></head><body></body></html>');
+      const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+
+      await htmltp.doTextContent(documentInput, entryType, ctx, '/converty/input/chapter1.xhtml', createDoTextContentOptions());
+
+      expect(ctx.files).toHaveLength(0);
+    });
+
+    it('should save the image xhtml and not the chapter when a full size image is the last element', async () => {
+      const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
+      const imgAbsPath = path.resolve(path.dirname(currentInputFile), 'images', 'insert1.png');
+
+      await utils.mkdir(path.dirname(imgAbsPath));
+      await fspromises.writeFile(imgAbsPath, Buffer.from('fake-image-data'));
+
+      documentInput = createInputDocument(
+        '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some text before the image.<img src="images/insert1.png" /></p></body></html>'
+      );
+      const imgElem = documentInput.querySelector('img');
+      expect(imgElem).toBeDefined();
+      (imgElem as any).src = 'images/insert1.png';
+      const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+
+      await htmltp.doTextContent(documentInput, entryType, ctx, currentInputFile, createDoTextContentOptions());
+
+      // the image itself and the generated image-xhtml should be saved, but not the chapter
+      expect(ctx.files).toHaveLength(2);
+
+      const imgXhtmlFile = ctx.files.find((v) => v instanceof epubh.EpubContextFileXHTML);
+
+      expect(imgXhtmlFile).toBeDefined();
+      expect(imgXhtmlFile).toMatchObject({ id: 'insert1.xhtml' });
+    });
+
+    it('should save the chapter when text follows the full size image', async () => {
+      const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
+      const imgAbsPath = path.resolve(path.dirname(currentInputFile), 'images', 'insert1.png');
+
+      await utils.mkdir(path.dirname(imgAbsPath));
+      await fspromises.writeFile(imgAbsPath, Buffer.from('fake-image-data'));
+
+      documentInput = createInputDocument(
+        '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some text before the image.<img src="images/insert1.png" /></p><p>Some text after the image.</p></body></html>'
+      );
+      const imgElem = documentInput.querySelector('img');
+      expect(imgElem).toBeDefined();
+      (imgElem as any).src = 'images/insert1.png';
+      const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+
+      await htmltp.doTextContent(documentInput, entryType, ctx, currentInputFile, createDoTextContentOptions());
+
+      // the image gets saved, and because text follows it, the chapter itself also needs to be saved
+      expect(ctx.files).toHaveLength(3);
+
+      const chapterFile = ctx.files.find((v) => v instanceof epubh.EpubContextFileXHTML && v.id === 'chapter1.xhtml');
+
+      expect(chapterFile).toBeDefined();
+
+      const chapterPath = path.resolve(ctx.contentOPFDir, epubh.FileDir.Text, 'chapter1.xhtml');
+      const content = await fspromises.readFile(chapterPath, 'utf-8');
+
+      expect(content).toContain('Some text after the image');
     });
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { promises as fspromises } from 'fs';
+import { existsSync, promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../src/utils.js';
 
@@ -19,6 +19,10 @@ describe('utils', () => {
       expect(utils.envToBool('off')).toBe(false);
       expect(utils.envToBool('')).toBe(false);
     });
+
+    it('should return "false" for non-string inputs', () => {
+      expect(utils.envToBool(null as any)).toBe(false);
+    });
   });
 
   describe('parseChapterInputToNumber', () => {
@@ -32,7 +36,17 @@ describe('utils', () => {
       expect(utils.parseChapterInputToNumber('invalid')).toBeUndefined();
       expect(utils.parseChapterInputToNumber('c-1')).toBeUndefined();
       expect(utils.parseChapterInputToNumber('')).toBeUndefined();
+      expect(utils.parseChapterInputToNumber('c')).toBeUndefined();
       expect(utils.parseChapterInputToNumber(undefined)).toBeUndefined();
+    });
+
+    it('should return "undefined" for non-string, non-number inputs', () => {
+      expect(utils.parseChapterInputToNumber({} as any)).toBeUndefined();
+    });
+
+    it('should parse the leading number of a chapter input', () => {
+      expect(utils.parseChapterInputToNumber('c12.5')).toBe(12);
+      expect(utils.parseChapterInputToNumber(' 7 rest')).toBe(7);
     });
   });
 
@@ -120,6 +134,33 @@ describe('utils', () => {
     });
   });
 
+  describe('lstatPath', () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (!utils.isNullOrUndefined(tmpDir)) {
+        await utils.removeDir(tmpDir);
+      }
+    });
+
+    it('should return "undefined" for a path that does not exist', async () => {
+      expect(await utils.lstatPath('/converty/does/not/exist')).toBeUndefined();
+    });
+
+    it('should return the stats without following symlinks', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+      const targetPath = path.join(tmpDir, 'target.txt');
+      const linkPath = path.join(tmpDir, 'link.txt');
+
+      await fspromises.writeFile(targetPath, 'test');
+      await fspromises.symlink(targetPath, linkPath);
+
+      const linkStat = await utils.lstatPath(linkPath);
+
+      expect(linkStat?.isSymbolicLink()).toBe(true);
+    });
+  });
+
   describe('pathExists', () => {
     it('should return "true" for existing paths', async () => {
       expect(await utils.pathExists(process.cwd())).toBe(true);
@@ -162,6 +203,69 @@ describe('utils', () => {
       tmpDir = await utils.createTmpDir('converty-test-');
 
       expect(await utils.pathExists(tmpDir)).toBe(true);
+    });
+
+    it('should create the temporary directory in the given path', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+      const nestedTmpDir = await utils.createTmpDir('nested-', tmpDir);
+
+      expect(await utils.pathExists(nestedTmpDir)).toBe(true);
+      expect(path.dirname(nestedTmpDir)).toBe(tmpDir);
+    });
+  });
+
+  describe('createTmpDirSync', () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (!utils.isNullOrUndefined(tmpDir)) {
+        await utils.removeDir(tmpDir);
+      }
+    });
+
+    it('should create a temporary directory synchronously', () => {
+      tmpDir = utils.createTmpDirSync('converty-test-');
+
+      expect(existsSync(tmpDir)).toBe(true);
+    });
+
+    it('should create the temporary directory in the given path', () => {
+      tmpDir = utils.createTmpDirSync('converty-test-');
+      const nestedTmpDir = utils.createTmpDirSync('nested-', tmpDir);
+
+      expect(existsSync(nestedTmpDir)).toBe(true);
+      expect(path.dirname(nestedTmpDir)).toBe(tmpDir);
+    });
+  });
+
+  describe('removeDir', () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (!utils.isNullOrUndefined(tmpDir)) {
+        await utils.removeDir(tmpDir);
+      }
+    });
+
+    it('should remove an existing directory', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+
+      await utils.removeDir(tmpDir);
+
+      expect(await utils.pathExists(tmpDir)).toBe(false);
+    });
+
+    it('should not throw for a path that does not exist', async () => {
+      await expect(utils.removeDir('/converty/does/not/exist')).resolves.toBeUndefined();
+    });
+
+    it('should throw when the path is not a directory', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+      const filePath = path.join(tmpDir, 'file.txt');
+
+      await fspromises.writeFile(filePath, 'test');
+
+      await expect(utils.removeDir(filePath)).rejects.toThrow(/Given Path is not a directory/);
     });
   });
 
@@ -223,6 +327,43 @@ describe('utils', () => {
 
       expect(found).toHaveLength(1);
       expect(found?.[0]).toContain('combinerConfig.json');
+    });
+
+    it('should find a file when the start path is the file itself', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+      const filePath = path.join(tmpDir, 'combinerConfig.json');
+
+      await fspromises.writeFile(filePath, '{}');
+
+      expect(await utils.searchForFile(filePath, 'combinerConfig.json')).toEqual([filePath]);
+    });
+
+    it('should return "undefined" when the start path is a different file', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+      const filePath = path.join(tmpDir, 'other.json');
+
+      await fspromises.writeFile(filePath, '{}');
+
+      expect(await utils.searchForFile(filePath, 'combinerConfig.json')).toBeUndefined();
+    });
+
+    it('should return "undefined" for a path that does not exist', async () => {
+      expect(await utils.searchForFile('/converty/does/not/exist', 'combinerConfig.json')).toBeUndefined();
+    });
+
+    it('should find multiple files within the search depth', async () => {
+      tmpDir = await utils.createTmpDir('converty-test-');
+      const firstDir = path.join(tmpDir, 'first');
+      const secondDir = path.join(tmpDir, 'second');
+
+      await utils.mkdir(firstDir);
+      await utils.mkdir(secondDir);
+      await fspromises.writeFile(path.join(firstDir, 'combinerConfig.json'), '{}');
+      await fspromises.writeFile(path.join(secondDir, 'combinerConfig.json'), '{}');
+
+      const found = await utils.searchForFile(tmpDir, 'combinerConfig.json');
+
+      expect(found).toHaveLength(2);
     });
   });
 });

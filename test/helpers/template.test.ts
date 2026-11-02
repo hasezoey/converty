@@ -27,6 +27,10 @@ describe('templateHelpers', () => {
     it('should throw an error for a template that does not exist', async () => {
       await expect(th.getTemplate('does_not_exist.xhtml')).rejects.toThrow(/Could not find template path/);
     });
+
+    it('should throw an error for a template path that is not a file', async () => {
+      await expect(th.getTemplate('.')).rejects.toThrow(/Template Path is not a file/);
+    });
   });
 
   describe('clearTemplates', () => {

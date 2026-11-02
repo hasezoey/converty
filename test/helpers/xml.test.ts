@@ -81,6 +81,12 @@ describe('xmlHelpers', () => {
       expect(document).toBeDefined();
       expect(document.querySelector('head > title')?.textContent).toBe('Test');
     });
+
+    it('should accept buffer input', () => {
+      const { document } = xh.newJSDOM(Buffer.from('<html><head><title>Test</title></head><body></body></html>'));
+
+      expect(document.querySelector('head > title')?.textContent).toBe('Test');
+    });
   });
 
   describe('applyAttributes', () => {

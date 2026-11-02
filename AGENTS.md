@@ -21,6 +21,7 @@ We also make use of packages like `jsdom` for complete xhtml and style reading a
 
 - Dont ever use copyrighted material directly from the books. Change it to be mock words / skeleton or use public domain text (like lorem ipsum) before using in tests.
 - Tests that need to clean-up like global variables (ex. `process.env`) or files / directories should happen outside of tests (jest equivalent of `afterEach`, or more specific to tests if available)
+- When using code oneliners, pretty print them so that they can be easily reviewed.
 
 ## Styling
 

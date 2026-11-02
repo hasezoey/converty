@@ -402,6 +402,32 @@ describe('sevenseasCommon', () => {
       expect(elems[0].textContent).toBe('Bold text');
     });
 
+    it('should remove colored styles from the output', () => {
+      const doc = createDocument('<html><body><p style="color: #fff">test</p></body></html>');
+      const pElem = doc.querySelector('p')!;
+      const parentElem = doc.createElement('div');
+
+      const elems = ssc.generatePElementInner(pElem, doc, parentElem, new ssc.SevenSeasECOptions(), emptyConfig);
+
+      // the parent element must not be modified, for example by applying the color style to it
+      expect(parentElem.outerHTML).toBe('<div></div>');
+      expect(parentElem.attributes).toHaveLength(0);
+      expect(parentElem.childNodes).toHaveLength(0);
+
+      expect(elems).toHaveLength(1);
+      expect(elems[0].nodeType).toBe(doc.TEXT_NODE);
+      expect(elems[0].textContent).toBe('test');
+
+      for (const elem of elems) {
+        expect(elem.textContent).not.toContain('color');
+        expect(elem.textContent).not.toContain('#fff');
+
+        if (elem.nodeType === doc.ELEMENT_NODE) {
+          expect((elem as Element).getAttribute('style')).toBeNull();
+        }
+      }
+    });
+
     it('should return "br" elements directly', () => {
       const doc = createDocument('<html><body></body></html>');
       const brElem = doc.createElement('br');

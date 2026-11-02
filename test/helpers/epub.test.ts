@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { promises as fspromises } from 'fs';
 import * as path from 'path';
+import * as utils from '../../src/utils.js';
 import * as epubh from '../../src/helpers/epub.js';
 import * as xh from '../../src/helpers/xml.js';
 
@@ -146,6 +148,70 @@ describe('epubHelpers', () => {
       expect(positionElem.textContent).toBe('4');
 
       expect(idCounter.c).toBe(1);
+    });
+  });
+
+  describe('finishDOMtoFile', () => {
+    let ctx: epubh.EpubContext<epubh.BaseEpubOptions>;
+    let epubfileOptions: Omit<ConstructorParameters<typeof epubh.EpubContextFileXHTML>[0], 'filePath'>;
+
+    beforeEach(() => {
+      ctx = new epubh.EpubContext<epubh.BaseEpubOptions>({
+        title: 'Some Story',
+        optionsClass: new epubh.BaseEpubOptions(),
+      });
+
+      epubfileOptions = {
+        id: 'chapter1.xhtml',
+        title: 'Chapter 1',
+        type: {
+          type: epubh.EpubContextFileXHTMLTypes.TEXT,
+        },
+        seqIndex: 0,
+        globalSeqIndex: 0,
+      };
+    });
+
+    afterEach(async () => {
+      await utils.removeDir(ctx.rootDir);
+    });
+
+    it('should write the serialized dom into the given file and add it to the context', async () => {
+      const { dom } = xh.newJSDOM('<html><body><p>Some text</p></body></html>');
+
+      const writtenPath = await epubh.finishDOMtoFile(dom, ctx.contentOPFDir, 'chapter1.xhtml', epubh.FileDir.Text, ctx, epubfileOptions);
+
+      expect(writtenPath).toBe(path.resolve(ctx.contentOPFDir, epubh.FileDir.Text, 'chapter1.xhtml'));
+
+      const content = await fspromises.readFile(writtenPath, 'utf-8');
+      expect(content).toContain('<?xml version="1.0" encoding="utf-8"?>');
+      expect(content).toContain('Some text');
+
+      expect(ctx.files).toHaveLength(1);
+      expect(ctx.files[0]).toBeInstanceOf(epubh.EpubContextFileXHTML);
+    });
+
+    it('should overwrite an already existing file and add it again to the context', async () => {
+      const { dom } = xh.newJSDOM('<html><body><p>Some text</p></body></html>');
+
+      const firstPath = await epubh.finishDOMtoFile(dom, ctx.contentOPFDir, 'chapter1.xhtml', epubh.FileDir.Text, ctx, epubfileOptions);
+
+      const secondDom = xh.newJSDOM('<html><body><p>Other text</p></body></html>');
+
+      const secondPath = await epubh.finishDOMtoFile(
+        secondDom.dom,
+        ctx.contentOPFDir,
+        'chapter1.xhtml',
+        epubh.FileDir.Text,
+        ctx,
+        epubfileOptions
+      );
+
+      expect(secondPath).toBe(firstPath);
+      expect(ctx.files).toHaveLength(2);
+
+      const content = await fspromises.readFile(firstPath, 'utf-8');
+      expect(content).toContain('Other text');
     });
   });
 });

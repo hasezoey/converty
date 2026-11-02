@@ -15,6 +15,7 @@
     { "action": "shell", "resource": "pwd", "effect": "allow" },
     { "action": "shell", "resource": "cat *", "effect": "allow" },
     { "action": "shell", "resource": "find *", "effect": "allow" },
+    { "action": "shell", "resource": "rg *", "effect": "allow" },
     { "action": "shell", "resource": "sort*", "effect": "allow" },
     { "action": "shell", "resource": "head*", "effect": "allow" },
     { "action": "shell", "resource": "tail*", "effect": "allow" },

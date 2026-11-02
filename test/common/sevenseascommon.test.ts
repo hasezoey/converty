@@ -334,6 +334,22 @@ describe('sevenseasCommon', () => {
 
       expect(ssc.isTitle(document, elem, entryType, optionsClass)).toBe(true);
     });
+
+    it('should detect a new chapter heading by content when the head title does not match', () => {
+      const doc = createDocument('<html><body><h1>Different Chapter Heading</h1></body></html>');
+      const elem = doc.querySelector('h1')!;
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockImplementation((styleElem) => {
+        return {
+          ...mockedCompStyles,
+          fontSize: styleElem === doc.body ? '10px' : '20px',
+        } as any;
+      });
+
+      expect(ssc.isTitle(doc, elem, createEntryType({ title: 'Chapter 1' }), new ssc.SevenSeasECOptions())).toBe(
+        'Different Chapter Heading'
+      );
+    });
   });
 
   describe('getTextContentBody', () => {

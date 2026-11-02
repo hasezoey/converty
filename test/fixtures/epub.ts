@@ -15,8 +15,31 @@ export interface EpubFixtureOptions {
   title?: string;
   /** Whether to add cover metadata to the content.opf (defaults to true) */
   coverImage?: boolean;
+  /** How the cover image should be referenced in the content.opf (defaults to the metadata fallback) */
+  coverLookup?: 'meta' | 'properties';
   /** The order of the chapters in the spine (defaults to natural order) */
   spineOrder?: 'natural' | 'reversed';
+  /** Additional chapters to add to the manifest and spine */
+  chapters?: EpubFixtureChapter[];
+  /** Additional files to write, relative to the content.opf directory */
+  extraFiles?: EpubFixtureFile[];
+}
+
+export interface EpubFixtureChapter {
+  /** The manifest id of the chapter */
+  id: string;
+  /** Path relative to the content.opf directory */
+  href: string;
+  /** The title used in "head > title" */
+  title: string;
+  /** The XML content of the body element */
+  body: string;
+}
+
+export interface EpubFixtureFile {
+  /** Path relative to the content.opf directory */
+  path: string;
+  content: string | Buffer;
 }
 
 /**
@@ -27,11 +50,33 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
   const rootDir = await utils.createTmpDir('converty-fixture-');
   const contentOPFDir = path.join(rootDir, 'OEBPS');
   const title = options.title ?? '  Some   Story  ';
-  const coverMeta = options.coverImage === false ? '' : '<meta name="cover" content="cover-img" />';
-  const spineItems =
-    options.spineOrder === 'reversed'
-      ? '<itemref idref="chapter-2" />\n    <itemref idref="chapter-1" />'
-      : '<itemref idref="chapter-1" />\n    <itemref idref="chapter-2" />';
+  const coverMeta = options.coverImage === false || options.coverLookup === 'properties' ? '' : '<meta name="cover" content="cover-img" />';
+  const coverManifest =
+    options.coverImage === false
+      ? ''
+      : options.coverLookup === 'properties'
+        ? '<item id="cover-img" href="Images/cover.png" media-type="image/png" properties="cover-image" />'
+        : '<item id="cover-img" href="Images/cover.png" media-type="image/png" />';
+  const chapters: EpubFixtureChapter[] = [
+    {
+      id: 'chapter-1',
+      href: 'Text/chapter1.xhtml',
+      title: 'Chapter 1',
+      body: '<h1>Chapter 1</h1>\n    <p>Lorem ipsum dolor sit amet.</p>',
+    },
+    {
+      id: 'chapter-2',
+      href: 'Text/chapter2.xhtml',
+      title: 'Chapter 2',
+      body: '<h1>Chapter 2</h1>\n    <p>Consectetur adipiscing elit.</p>',
+    },
+    ...(options.chapters ?? []),
+  ];
+  const spineChapters = options.spineOrder === 'reversed' ? [chapters[1], chapters[0], ...chapters.slice(2)] : chapters;
+  const spineItems = spineChapters.map((chapter) => `<itemref idref="${chapter.id}" />`).join('\n    ');
+  const chapterManifest = chapters
+    .map((chapter) => `<item id="${chapter.id}" href="${chapter.href}" media-type="application/xhtml+xml" />`)
+    .join('\n    ');
 
   await utils.mkdir(contentOPFDir);
   await Promise.all([
@@ -65,44 +110,15 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
     ${coverMeta}
   </metadata>
   <manifest>
-    <item id="chapter-2" href="Text/chapter2.xhtml" media-type="application/xhtml+xml" />
-    <item id="chapter-1" href="Text/chapter1.xhtml" media-type="application/xhtml+xml" />
+    ${coverManifest}
     <item id="styles" href="Styles/stylesheet.css" media-type="text/css" />
-    <item id="cover-img" href="Images/cover.png" media-type="image/png" />
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml" />
+    ${chapterManifest}
   </manifest>
   <spine toc="ncx">
     ${spineItems}
   </spine>
 </package>
-`
-    ),
-    fspromises.writeFile(
-      path.join(contentOPFDir, 'Text', 'chapter1.xhtml'),
-      `<?xml version="1.0" encoding="utf-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title>Chapter 1</title>
-  </head>
-  <body>
-    <h1>Chapter 1</h1>
-    <p>Lorem ipsum dolor sit amet.</p>
-  </body>
-</html>
-`
-    ),
-    fspromises.writeFile(
-      path.join(contentOPFDir, 'Text', 'chapter2.xhtml'),
-      `<?xml version="1.0" encoding="utf-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title>Chapter 2</title>
-  </head>
-  <body>
-    <h1>Chapter 2</h1>
-    <p>Consectetur adipiscing elit.</p>
-  </body>
-</html>
 `
     ),
     fspromises.writeFile(path.join(contentOPFDir, 'Styles', 'stylesheet.css'), 'body { color: black; }\n'),
@@ -117,6 +133,30 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
     ),
     // files that should be ignored by "getInputContext"
     fspromises.writeFile(path.join(rootDir, 'calibre_bookmarks.txt'), 'bookmarks'),
+    ...chapters.map(async (chapter) => {
+      const chapterPath = path.join(contentOPFDir, chapter.href);
+
+      await utils.mkdir(path.dirname(chapterPath));
+      await fspromises.writeFile(
+        chapterPath,
+        `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>${chapter.title}</title>
+  </head>
+  <body>
+    ${chapter.body}
+  </body>
+</html>
+`
+      );
+    }),
+    ...(options.extraFiles ?? []).map(async (file) => {
+      const filePath = path.join(contentOPFDir, file.path);
+
+      await utils.mkdir(path.dirname(filePath));
+      await fspromises.writeFile(filePath, file.content);
+    }),
   ]);
 
   return {

@@ -19,6 +19,8 @@ export interface EpubFixtureOptions {
   coverLookup?: 'meta' | 'properties';
   /** The order of the chapters in the spine (defaults to natural order) */
   spineOrder?: 'natural' | 'reversed';
+  /** Directory containing the content.opf, relative to the fixture root (defaults to "OEBPS") */
+  contentOPFDirName?: string;
   /** Additional chapters to add to the manifest and spine */
   chapters?: EpubFixtureChapter[];
   /** Additional files to write, relative to the content.opf directory */
@@ -32,6 +34,8 @@ export interface EpubFixtureChapter {
   href: string;
   /** The title used in "head > title" */
   title: string;
+  /** Extra XML content to add to the head element */
+  head?: string;
   /** The XML content of the body element */
   body: string;
 }
@@ -48,7 +52,8 @@ export interface EpubFixtureFile {
  */
 export async function createEpubFixture(options: EpubFixtureOptions = {}): Promise<EpubFixture> {
   const rootDir = await utils.createTmpDir('converty-fixture-');
-  const contentOPFDir = path.join(rootDir, 'OEBPS');
+  const contentOPFDirName = options.contentOPFDirName ?? 'OEBPS';
+  const contentOPFDir = path.join(rootDir, contentOPFDirName);
   const title = options.title ?? '  Some   Story  ';
   const coverMeta = options.coverImage === false || options.coverLookup === 'properties' ? '' : '<meta name="cover" content="cover-img" />';
   const coverManifest =
@@ -93,7 +98,7 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
       `<?xml version="1.0" encoding="utf-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
-    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
+    <rootfile full-path="${contentOPFDirName}/content.opf" media-type="application/oebps-package+xml" />
   </rootfiles>
 </container>
 `
@@ -143,6 +148,7 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <title>${chapter.title}</title>
+    ${chapter.head ?? ''}
   </head>
   <body>
     ${chapter.body}

@@ -86,6 +86,74 @@ describe('genericCopy_ln process', () => {
     expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'Images', 'cover.png'))).toBe(true);
   });
 
+  it('should process an epub with a non-standard content.opf directory', async () => {
+    const fixture = await createEpubFixture({
+      title: SERIES_TITLE,
+      coverLookup: 'properties',
+      contentOPFDirName: 'OBPS',
+    });
+    cleanupPaths.push(fixture.rootDir);
+
+    const { resultPath } = await runGenericCopy(fixture);
+
+    expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'content.opf'))).toBe(true);
+
+    const textDir = path.join(resultPath, 'OEBPS', 'Text');
+    const textFiles = (await fspromises.readdir(textDir)).sort();
+    expect(textFiles).toEqual(['chapter-1.xhtml', 'chapter-2.xhtml', 'toc.xhtml']);
+
+    const chapter1 = await fspromises.readFile(path.join(textDir, 'chapter-1.xhtml'), 'utf-8');
+    expect(chapter1).toContain('Lorem ipsum dolor sit amet.');
+  });
+
+  it('should copy data mostly as-is without further processing', async () => {
+    const fixture = await createEpubFixture({
+      title: SERIES_TITLE,
+      coverLookup: 'properties',
+      chapters: [
+        {
+          id: 'as-is',
+          href: 'Text/as-is.xhtml',
+          title: 'As-Is',
+          body: '<p class="custom-class" data-note="keep-me">Original <em>emphasis</em> and <span class="inner">text</span>.</p>',
+        },
+      ],
+    });
+    cleanupPaths.push(fixture.rootDir);
+
+    const { resultPath } = await runGenericCopy(fixture);
+
+    const contents = await fspromises.readFile(path.join(resultPath, 'OEBPS', 'Text', 'as-is.xhtml'), 'utf-8');
+    expect(contents).toContain('class="custom-class"');
+    expect(contents).toContain('data-note="keep-me"');
+    expect(contents).toContain('Original');
+    expect(contents).toContain('<em>emphasis</em>');
+    expect(contents).toContain('<span class="inner">text</span>');
+  });
+
+  it('should remove empty head style elements', async () => {
+    const fixture = await createEpubFixture({
+      title: SERIES_TITLE,
+      coverLookup: 'properties',
+      chapters: [
+        {
+          id: 'styles',
+          href: 'Text/styles.xhtml',
+          title: 'Styles',
+          head: '<style></style><style>body { color: black; }</style>',
+          body: '<p>Styled content</p>',
+        },
+      ],
+    });
+    cleanupPaths.push(fixture.rootDir);
+
+    const { resultPath } = await runGenericCopy(fixture);
+
+    const contents = await fspromises.readFile(path.join(resultPath, 'OEBPS', 'Text', 'styles.xhtml'), 'utf-8');
+    expect(contents).toContain('body { color: black; }');
+    expect(contents).not.toMatch(/<style[^>]*>\s*<\/style>/);
+  });
+
   it('should skip an input toc that is detected by filename', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,

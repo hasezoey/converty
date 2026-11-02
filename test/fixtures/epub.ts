@@ -13,6 +13,10 @@ export interface EpubFixture {
 export interface EpubFixtureOptions {
   /** The title to use in the content.opf metadata */
   title?: string;
+  /** Whether to add cover metadata to the content.opf (defaults to true) */
+  coverImage?: boolean;
+  /** The order of the chapters in the spine (defaults to natural order) */
+  spineOrder?: 'natural' | 'reversed';
 }
 
 /**
@@ -23,33 +27,42 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
   const rootDir = await utils.createTmpDir('converty-fixture-');
   const contentOPFDir = path.join(rootDir, 'OEBPS');
   const title = options.title ?? '  Some   Story  ';
+  const coverMeta = options.coverImage === false ? '' : '<meta name="cover" content="cover-img" />';
+  const spineItems =
+    options.spineOrder === 'reversed'
+      ? '<itemref idref="chapter-2" />\n    <itemref idref="chapter-1" />'
+      : '<itemref idref="chapter-1" />\n    <itemref idref="chapter-2" />';
 
-  await utils.mkdir(path.join(rootDir, 'META-INF'));
-  await utils.mkdir(path.join(contentOPFDir, 'Text'));
-  await utils.mkdir(path.join(contentOPFDir, 'Styles'));
-  await utils.mkdir(path.join(contentOPFDir, 'Images'));
+  await utils.mkdir(contentOPFDir);
+  await Promise.all([
+    utils.mkdir(path.join(rootDir, 'META-INF')),
+    utils.mkdir(path.join(contentOPFDir, 'Text')),
+    utils.mkdir(path.join(contentOPFDir, 'Styles')),
+    utils.mkdir(path.join(contentOPFDir, 'Images')),
+  ]);
 
-  await fspromises.writeFile(path.join(rootDir, 'mimetype'), 'application/epub+zip');
-  await fspromises.writeFile(
-    path.join(rootDir, 'META-INF', 'container.xml'),
-    `<?xml version="1.0" encoding="utf-8"?>
+  await Promise.all([
+    fspromises.writeFile(path.join(rootDir, 'mimetype'), 'application/epub+zip'),
+    fspromises.writeFile(
+      path.join(rootDir, 'META-INF', 'container.xml'),
+      `<?xml version="1.0" encoding="utf-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
     <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
   </rootfiles>
 </container>
 `
-  );
-  await fspromises.writeFile(
-    path.join(contentOPFDir, 'content.opf'),
-    `<?xml version="1.0" encoding="utf-8"?>
+    ),
+    fspromises.writeFile(
+      path.join(contentOPFDir, 'content.opf'),
+      `<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>${title}</dc:title>
     <dc:creator>Test Author</dc:creator>
     <dc:language>en</dc:language>
     <dc:identifier id="pub-id">urn:uuid:test</dc:identifier>
-    <meta name="cover" content="cover-img" />
+    ${coverMeta}
   </metadata>
   <manifest>
     <item id="chapter-2" href="Text/chapter2.xhtml" media-type="application/xhtml+xml" />
@@ -59,15 +72,14 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml" />
   </manifest>
   <spine toc="ncx">
-    <itemref idref="chapter-2" />
-    <itemref idref="chapter-1" />
+    ${spineItems}
   </spine>
 </package>
 `
-  );
-  await fspromises.writeFile(
-    path.join(contentOPFDir, 'Text', 'chapter1.xhtml'),
-    `<?xml version="1.0" encoding="utf-8"?>
+    ),
+    fspromises.writeFile(
+      path.join(contentOPFDir, 'Text', 'chapter1.xhtml'),
+      `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <title>Chapter 1</title>
@@ -78,10 +90,10 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
   </body>
 </html>
 `
-  );
-  await fspromises.writeFile(
-    path.join(contentOPFDir, 'Text', 'chapter2.xhtml'),
-    `<?xml version="1.0" encoding="utf-8"?>
+    ),
+    fspromises.writeFile(
+      path.join(contentOPFDir, 'Text', 'chapter2.xhtml'),
+      `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <title>Chapter 2</title>
@@ -92,19 +104,20 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
   </body>
 </html>
 `
-  );
-  await fspromises.writeFile(path.join(contentOPFDir, 'Styles', 'stylesheet.css'), 'body { color: black; }\n');
-  await fspromises.writeFile(path.join(contentOPFDir, 'Images', 'cover.png'), Buffer.from('fake-image-data'));
-  await fspromises.writeFile(
-    path.join(contentOPFDir, 'toc.ncx'),
-    `<?xml version="1.0" encoding="utf-8"?>
+    ),
+    fspromises.writeFile(path.join(contentOPFDir, 'Styles', 'stylesheet.css'), 'body { color: black; }\n'),
+    fspromises.writeFile(path.join(contentOPFDir, 'Images', 'cover.png'), Buffer.from('fake-image-data')),
+    fspromises.writeFile(
+      path.join(contentOPFDir, 'toc.ncx'),
+      `<?xml version="1.0" encoding="utf-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <navMap></navMap>
 </ncx>
 `
-  );
-  // files that should be ignored by "getInputContext"
-  await fspromises.writeFile(path.join(rootDir, 'calibre_bookmarks.txt'), 'bookmarks');
+    ),
+    // files that should be ignored by "getInputContext"
+    fspromises.writeFile(path.join(rootDir, 'calibre_bookmarks.txt'), 'bookmarks'),
+  ]);
 
   return {
     rootDir,
@@ -128,7 +141,17 @@ export async function createEpubZip(fixture: EpubFixture, zipPath: string): Prom
   });
 
   zipfile.addFile(path.join(fixture.rootDir, 'mimetype'), 'mimetype', { compress: false });
-  await addDirectoryToZip(zipfile, fixture.rootDir, fixture.rootDir);
+
+  const entries = await collectZipEntries(fixture.rootDir, fixture.rootDir);
+  for (const entry of entries) {
+    // already added manually to make sure it is stored uncompressed first
+    if (entry.name === 'mimetype') {
+      continue;
+    }
+
+    zipfile.addFile(entry.filePath, entry.name);
+  }
+
   zipfile.end();
 
   await writePromise;
@@ -136,23 +159,24 @@ export async function createEpubZip(fixture: EpubFixture, zipPath: string): Prom
   return zipPath;
 }
 
-async function addDirectoryToZip(zipfile: yazl.ZipFile, dirPath: string, rootDir: string): Promise<void> {
+interface ZipEntry {
+  filePath: string;
+  name: string;
+}
+
+async function collectZipEntries(dirPath: string, rootDir: string): Promise<ZipEntry[]> {
   const entries = await fspromises.readdir(dirPath, { withFileTypes: true });
+  const collected = await Promise.all(
+    entries.map(async (entry): Promise<ZipEntry[]> => {
+      const entryPath = path.join(dirPath, entry.name);
 
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const entryPath = path.join(dirPath, entry.name);
-    const entryName = path.relative(rootDir, entryPath);
+      if (entry.isDirectory()) {
+        return collectZipEntries(entryPath, rootDir);
+      }
 
-    if (entry.isDirectory()) {
-      await addDirectoryToZip(zipfile, entryPath, rootDir);
-      continue;
-    }
+      return [{ filePath: entryPath, name: path.relative(rootDir, entryPath) }];
+    })
+  );
 
-    // already added manually to make sure it is stored uncompressed first
-    if (entryName === 'mimetype') {
-      continue;
-    }
-
-    zipfile.addFile(entryPath, entryName);
-  }
+  return collected.flat().sort((a, b) => a.name.localeCompare(b.name));
 }

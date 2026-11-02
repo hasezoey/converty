@@ -20,7 +20,7 @@ describe('getInputContext', () => {
   };
 
   it('should read a directory based epub', async () => {
-    const fixture = await createEpubFixture();
+    const fixture = await createEpubFixture({ spineOrder: 'reversed' });
     cleanupPaths.push(fixture.rootDir);
 
     const ctx = await epubh.getInputContext(fixture.rootDir);
@@ -55,7 +55,7 @@ describe('getInputContext', () => {
   });
 
   it('should read a zip based epub', async () => {
-    const fixture = await createEpubFixture();
+    const fixture = await createEpubFixture({ spineOrder: 'reversed' });
     cleanupPaths.push(fixture.rootDir);
 
     const zipDir = await utils.createTmpDir('converty-zip-');

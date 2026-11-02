@@ -31,10 +31,12 @@
 
     { "action": "shell", "resource": "npm test*", "effect": "allow" },
     { "action": "shell", "resource": "npm run test*", "effect": "allow" },
-    { "action": "shell", "resource": "npm run build", "effect": "allow" },
+    { "action": "shell", "resource": "npm run build*", "effect": "allow" },
     { "action": "shell", "resource": "npm run lint*", "effect": "allow" },
     { "action": "shell", "resource": "npx vitest run *", "effect": "allow" },
     { "action": "shell", "resource": "npx eslint *", "effect": "allow" },
+    { "action": "shell", "resource": "npx tsc -p tsconfig.json", "effect": "allow" },
+    { "action": "shell", "resource": "npx tsc -p tsconfig.build.json", "effect": "allow" },
     
     { "action": "shell", "resource": "rm -rf /", "effect": "deny" },
     { "action": "shell", "resource": "rm -rf ~*", "effect": "deny" },

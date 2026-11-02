@@ -106,6 +106,27 @@ describe('genericCopy_ln process', () => {
     expect(chapter1).toContain('Lorem ipsum dolor sit amet.');
   });
 
+  it('should process an epub with a non-standard content.opf filename', async () => {
+    const fixture = await createEpubFixture({
+      title: SERIES_TITLE,
+      coverLookup: 'properties',
+      contentOPFFilename: 'package.opf',
+    });
+    cleanupPaths.push(fixture.rootDir);
+
+    const { resultPath } = await runGenericCopy(fixture);
+
+    expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'content.opf'))).toBe(true);
+    expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'package.opf'))).toBe(false);
+
+    const textDir = path.join(resultPath, 'OEBPS', 'Text');
+    const textFiles = (await fspromises.readdir(textDir)).sort();
+    expect(textFiles).toEqual(['chapter-1.xhtml', 'chapter-2.xhtml', 'toc.xhtml']);
+
+    const chapter1 = await fspromises.readFile(path.join(textDir, 'chapter-1.xhtml'), 'utf-8');
+    expect(chapter1).toContain('Lorem ipsum dolor sit amet.');
+  });
+
   it('should copy data mostly as-is without further processing', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,

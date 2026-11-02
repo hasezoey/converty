@@ -21,6 +21,8 @@ export interface EpubFixtureOptions {
   spineOrder?: 'natural' | 'reversed';
   /** Directory containing the content.opf, relative to the fixture root (defaults to "OEBPS") */
   contentOPFDirName?: string;
+  /** Filename of the content.opf (defaults to "content.opf") */
+  contentOPFFilename?: string;
   /** Additional chapters to add to the manifest and spine */
   chapters?: EpubFixtureChapter[];
   /** Additional files to write, relative to the content.opf directory */
@@ -54,6 +56,7 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
   const rootDir = await utils.createTmpDir('converty-fixture-');
   const contentOPFDirName = options.contentOPFDirName ?? 'OEBPS';
   const contentOPFDir = path.join(rootDir, contentOPFDirName);
+  const contentOPFFilename = options.contentOPFFilename ?? 'content.opf';
   const title = options.title ?? '  Some   Story  ';
   const coverMeta = options.coverImage === false || options.coverLookup === 'properties' ? '' : '<meta name="cover" content="cover-img" />';
   const coverManifest =
@@ -98,13 +101,13 @@ export async function createEpubFixture(options: EpubFixtureOptions = {}): Promi
       `<?xml version="1.0" encoding="utf-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
-    <rootfile full-path="${contentOPFDirName}/content.opf" media-type="application/oebps-package+xml" />
+    <rootfile full-path="${contentOPFDirName}/${contentOPFFilename}" media-type="application/oebps-package+xml" />
   </rootfiles>
 </container>
 `
     ),
     fspromises.writeFile(
-      path.join(contentOPFDir, 'content.opf'),
+      path.join(contentOPFDir, contentOPFFilename),
       `<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">

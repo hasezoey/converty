@@ -97,6 +97,35 @@ describe('sevenseasCommon process', () => {
     expect(tocXHTML.indexOf('Chapter 1')).toBeLessThan(tocXHTML.indexOf('Chapter 2'));
   });
 
+  it('should process an epub with a non-standard content.opf filename', async () => {
+    const fixture = await createEpubFixture({
+      coverImage: false,
+      contentOPFFilename: 'package.opf',
+    });
+    cleanupPaths.push(fixture.rootDir);
+
+    const workDir = await utils.createTmpDir('converty-process-');
+    cleanupPaths.push(workDir);
+    const outputDir = path.join(workDir, 'output');
+    await utils.mkdir(outputDir);
+
+    const resultPath = await ssc.process(
+      {
+        converterInputPath: fixture.rootDir,
+        converterOutputPath: outputDir,
+        fileInputPath: fixture.rootDir,
+      },
+      {}
+    );
+
+    expect(resultPath).toBe(path.resolve(outputDir, 'Some Story'));
+    expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'content.opf'))).toBe(true);
+    expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'package.opf'))).toBe(false);
+
+    const textFiles = (await fspromises.readdir(path.join(resultPath, 'OEBPS', 'Text'))).sort();
+    expect(textFiles).toEqual(['chapter1.xhtml', 'chapter2.xhtml', 'toc.xhtml']);
+  });
+
   it('should use the configured processHTMLFile hook for each spine file', async () => {
     const fixture = await createEpubFixture({ coverImage: false });
     cleanupPaths.push(fixture.rootDir);

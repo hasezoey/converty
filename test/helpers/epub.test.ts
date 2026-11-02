@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../../src/utils.js';
@@ -154,6 +154,7 @@ describe('epubHelpers', () => {
   describe('finishDOMtoFile', () => {
     let ctx: epubh.EpubContext<epubh.BaseEpubOptions>;
     let epubfileOptions: Omit<ConstructorParameters<typeof epubh.EpubContextFileXHTML>[0], 'filePath'>;
+    let consoleErrorSpy: MockInstance<typeof console.error>;
 
     beforeEach(() => {
       ctx = new epubh.EpubContext<epubh.BaseEpubOptions>({
@@ -173,6 +174,10 @@ describe('epubHelpers', () => {
     });
 
     afterEach(async () => {
+      if (consoleErrorSpy) {
+        consoleErrorSpy.mockRestore();
+      }
+
       await utils.removeDir(ctx.rootDir);
     });
 
@@ -192,6 +197,7 @@ describe('epubHelpers', () => {
     });
 
     it('should overwrite an already existing file and add it again to the context', async () => {
+      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const { dom } = xh.newJSDOM('<html><body><p>Some text</p></body></html>');
 
       const firstPath = await epubh.finishDOMtoFile(dom, ctx.contentOPFDir, 'chapter1.xhtml', epubh.FileDir.Text, ctx, epubfileOptions);
@@ -212,6 +218,8 @@ describe('epubHelpers', () => {
 
       const content = await fspromises.readFile(firstPath, 'utf-8');
       expect(content).toContain('Other text');
+
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
   });
 });

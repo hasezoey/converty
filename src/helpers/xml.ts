@@ -24,7 +24,7 @@ export function definedElement<T extends Node>(elem: T | undefined | null, elemN
  */
 export function definedElementAll<T extends NodeListOf<Node>>(elem: T | undefined | null, elemName: string): T {
   utils.assertionDefined(elem, new Error(`Expected NodeList for "${elemName}" to be defined`));
-  utils.assertion(elem.length > 0, new Error('Expected NodeList for "${elemName}" to not be 0'));
+  utils.assertion(elem.length > 0, new Error(`Expected NodeList for "${elemName}" to not be 0`));
 
   return elem;
 }

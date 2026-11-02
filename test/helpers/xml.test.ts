@@ -29,9 +29,7 @@ describe('xmlHelpers', () => {
     it('should throw an error when the element list is empty', () => {
       const { document } = xh.newJSDOM('<html><body></body></html>');
 
-      expect(() => xh.definedElementAll(document.querySelectorAll('div'), 'divs')).toThrow(
-        'Expected NodeList for "${elemName}" to not be 0'
-      );
+      expect(() => xh.definedElementAll(document.querySelectorAll('div'), 'divs')).toThrow('Expected NodeList for "divs" to not be 0');
     });
 
     it('should throw an error when the element list is not defined', () => {
@@ -69,7 +67,7 @@ describe('xmlHelpers', () => {
     it('should throw an error when no elements can be found', () => {
       const { document } = xh.newJSDOM('<html><body></body></html>');
 
-      expect(() => xh.queryDefinedElementAll(document, 'section')).toThrow('Expected NodeList for "${elemName}" to not be 0');
+      expect(() => xh.queryDefinedElementAll(document, 'section')).toThrow('Expected NodeList for "section" to not be 0');
     });
   });
 

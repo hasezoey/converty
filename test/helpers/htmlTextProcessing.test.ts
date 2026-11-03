@@ -444,5 +444,50 @@ describe('htmlTextProcessing', () => {
       expect(parentElem.className).toBe('');
       expect(res.elemCompStyle).toBeDefined();
     });
+
+    it('should add a <small> element when font-size is smaller than the body', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ fontSize: '80%' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeDefined();
+      expect(tracker.currentElem?.nodeName).toBe('SMALL');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
+    it('should not add <small> when the element has vertical-align <sub>', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ verticalAlign: 'sub', fontSize: '80%' } as any);
+
+      htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      // should add sub, not small
+      expect(tracker.currentElem?.nodeName).toBe('SUB');
+      expect(parentElem.querySelector('small')).toBeNull();
+    });
+
+    it('should not add <small> when the element has vertical-align <sup>', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ verticalAlign: 'super', fontSize: '80%' } as any);
+
+      htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      // should add sup, not small (order: small added after sup check, but we skip small if sup present)
+      expect(tracker.currentElem?.nodeName).toBe('SUP');
+      expect(parentElem.querySelector('small')).toBeNull();
+    });
   });
 });

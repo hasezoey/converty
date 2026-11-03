@@ -785,6 +785,84 @@ export interface ProcessCommonStyleReturn {
   elemCompStyle: CSSStyleDeclaration;
 }
 
+/** The default font size in pixels to use when no other base size is available */
+export const DEFAULT_FONT_SIZE_PX = 16;
+
+/** Absolute CSS font-size keywords and their pixel equivalents */
+const FONT_SIZE_KEYWORDS: Record<string, number> = {
+  'xx-small': 9,
+  'x-small': 10,
+  small: 13,
+  medium: 16,
+  large: 18,
+  'x-large': 24,
+  'xx-large': 32,
+  'xxx-large': 48,
+};
+
+/**
+ * Convert a CSS font-size value to pixels
+ * @param fontSize The CSS font-size value (like "16px", "80%" or "0.8em")
+ * @param baseFontSizePx The base font size to use for relative values
+ * @returns The font-size in pixels, or "undefined" if the value could not be parsed
+ */
+export function fontSizeToPx(fontSize: string | undefined, baseFontSizePx = DEFAULT_FONT_SIZE_PX): number | undefined {
+  if (utils.isNullOrUndefined(fontSize)) {
+    return undefined;
+  }
+
+  const normalized = fontSize.trim().toLowerCase();
+
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  const keywordSize = FONT_SIZE_KEYWORDS[normalized];
+
+  if (!utils.isNullOrUndefined(keywordSize)) {
+    return keywordSize;
+  }
+
+  const matches = /^(?<value>[+-]?(?:\d+(?:\.\d+)?|\.\d+))(?<unit>px|pt|pc|in|cm|mm|em|rem|%)?$/.exec(normalized);
+
+  if (utils.isNullOrUndefined(matches)) {
+    log(`Unknown font size: ${normalized}`);
+
+    return undefined;
+  }
+
+  const value = Number(matches.groups?.['value']);
+  const unit = matches.groups?.['unit'] ?? '';
+
+  if (Number.isNaN(value)) {
+    return undefined;
+  }
+
+  switch (unit) {
+    case '':
+    case 'px':
+      return value;
+    case '%':
+      return (baseFontSizePx * value) / 100;
+    case 'em':
+      return baseFontSizePx * value;
+    case 'rem':
+      return DEFAULT_FONT_SIZE_PX * value;
+    case 'pt':
+      return (value * 96) / 72;
+    case 'pc':
+      return value * 16;
+    case 'in':
+      return value * 96;
+    case 'cm':
+      return (value * 96) / 2.54;
+    case 'mm':
+      return (value * 96) / 25.4;
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Process Common styles for a element
  * @param pelemTracker The PElemTracker to keep track of where to add elements
@@ -804,24 +882,44 @@ export function processCommonStyle(
   const elemCompStyle = window.getComputedStyle(elem);
 
   // Note: if "strong" and css setting "font-weight" are set to "bold", then it will always be "bold", but in chrome & firefox it will be a number (700)
-  if (!parentHas(pelemTracker.currentElem, 'strong') && elemCompStyle.fontWeight === 'bold') {
+  if (!hasInChain(pelemTracker.currentElem, 'strong') && elemCompStyle.fontWeight === 'bold') {
     pelemTracker.setNewElem(documentNew.createElement('strong'));
   }
-  if (!parentHas(pelemTracker.currentElem, 'em') && elemCompStyle.fontStyle === 'italic') {
+  if (!hasInChain(pelemTracker.currentElem, 'em') && elemCompStyle.fontStyle === 'italic') {
     pelemTracker.setNewElem(documentNew.createElement('em'));
   }
-  if (!parentHas(pelemTracker.currentElem, 'sup') && elemCompStyle.verticalAlign === 'super') {
+  if (!hasInChain(pelemTracker.currentElem, 'sup') && elemCompStyle.verticalAlign === 'super') {
     pelemTracker.setNewElem(documentNew.createElement('sup'));
   }
-  if (!parentHas(pelemTracker.currentElem, 'sub') && elemCompStyle.verticalAlign === 'sub') {
+  if (!hasInChain(pelemTracker.currentElem, 'sub') && elemCompStyle.verticalAlign === 'sub') {
     pelemTracker.setNewElem(documentNew.createElement('sub'));
   }
-  if (!parentHas(pelemTracker.currentElem, 'u') && elemCompStyle.textDecoration === 'underline') {
+  if (!hasInChain(pelemTracker.currentElem, 'u') && elemCompStyle.textDecoration === 'underline') {
     pelemTracker.setNewElem(documentNew.createElement('u'));
   }
-  if (!parentHas(pelemTracker.currentElem, 's') && elemCompStyle.textDecoration === 'line-through') {
+  if (!hasInChain(pelemTracker.currentElem, 's') && elemCompStyle.textDecoration === 'line-through') {
     pelemTracker.setNewElem(documentNew.createElement('s'));
   }
+
+  // cover smaller font sizes (like "font-size: 80%"), but do not stack multiple "small" elements
+  {
+    const bodyElem = elem.ownerDocument.body;
+    const bodyFontSizePx = !utils.isNullOrUndefined(bodyElem)
+      ? (fontSizeToPx(window.getComputedStyle(bodyElem).fontSize) ?? DEFAULT_FONT_SIZE_PX)
+      : DEFAULT_FONT_SIZE_PX;
+    const elemFontSizePx = fontSizeToPx(elemCompStyle.fontSize, bodyFontSizePx);
+
+    if (
+      !utils.isNullOrUndefined(elemFontSizePx) &&
+      elemFontSizePx < bodyFontSizePx &&
+      !hasInChain(pelemTracker.currentElem, 'small') &&
+      !hasInChain(pelemTracker.currentElem, 'sup') &&
+      !hasInChain(pelemTracker.currentElem, 'sub')
+    ) {
+      pelemTracker.setNewElem(documentNew.createElement('small'));
+    }
+  }
+
   if (elemCompStyle.textAlign === 'center') {
     parentElem.setAttribute('class', 'centerp section-marking');
   }
@@ -873,12 +971,53 @@ export function parentHas(
 }
 
 /**
+ * Check for a given element "tagName" upwards, until "until" is encountered, upwards.
+ * Checks the starting element as well.
+ * @param startElem The element to start searching on
+ * @param tagName The element name (tagName) to search for
+ * @param until Search for "tagName" until "until" is encountered
+ * @returns "true" if the given "tagName" is found, "false" otherwise
+ */
+export function hasInChain(
+  startElem: Element | undefined,
+  tagName: keyof HTMLElementTagNameMap,
+  until: keyof HTMLElementTagNameMap = 'body'
+): boolean {
+  if (utils.isNullOrUndefined(startElem)) {
+    return false;
+  }
+
+  for (const elem of traverseParent(startElem, true)) {
+    // In HTML mode, the "tagName" is UPPERCASE,
+    // whereas in XHTML(+XML) mode, the "tagName" is as defined.
+    const elemTagName = elem.tagName.toLowerCase();
+
+    // return if requested element is found
+    if (elemTagName === tagName) {
+      return true;
+    }
+    // early return "false" if "until" has been found
+    else if (elemTagName === until) {
+      return false;
+    }
+
+    continue;
+  }
+
+  return false; // base case
+}
+
+/**
  * Traverse a given "initElem" upwards (through ".parentElement") until there is no parent anymore
  * @param initElem The Starting Element (will not be given as a output)
  * @returns A Generator to traverse a given element upwards
  */
-export function* traverseParent(initElem: Element): Generator<Element> {
+export function* traverseParent(initElem: Element, includeStart: boolean = false): Generator<Element> {
   let currentElem: Element | null = initElem;
+
+  if (includeStart) {
+    yield initElem;
+  }
 
   while (!utils.isNullOrUndefined((currentElem = currentElem.parentElement))) {
     yield currentElem;

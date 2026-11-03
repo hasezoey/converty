@@ -190,6 +190,58 @@ describe('htmlTextProcessing helpers', () => {
     });
   });
 
+  describe('hasInChain', () => {
+    const createNestedDocument = (setContentType: boolean = true) => {
+      const { document } = xh.newJSDOM(
+        '<html><body><div><span><em id="target"></em></span></div></body></html>',
+        setContentType
+          ? {
+              contentType: xh.STATICS.XHTML_MIMETYPE,
+            }
+          : undefined
+      );
+
+      return xh.queryDefinedElement(document, '#target');
+    };
+
+    it('should find a matching parent element', () => {
+      const targetElem = createNestedDocument();
+
+      expect(htmltp.hasInChain(targetElem, 'span')).toBe(true);
+      expect(htmltp.hasInChain(targetElem, 'div')).toBe(true);
+    });
+
+    it('should return "false" for a non-matching parent element', () => {
+      const targetElem = createNestedDocument();
+
+      expect(htmltp.hasInChain(targetElem, 'section')).toBe(false);
+    });
+
+    it('should return "true" for matching the self element', () => {
+      const targetElem = createNestedDocument();
+
+      expect(htmltp.hasInChain(targetElem, 'em')).toBe(true);
+    });
+
+    it('should stop searching when the "until" element is reached', () => {
+      const targetElem = createNestedDocument();
+
+      expect(htmltp.hasInChain(targetElem, 'span', 'div')).toBe(true);
+      expect(htmltp.hasInChain(targetElem, 'body', 'div')).toBe(false);
+    });
+
+    it('should correctly determine parent characteristics when contentType is unset (default HTML)', () => {
+      const targetElem = createNestedDocument(false);
+
+      // Actual parent that should always be found
+      expect(htmltp.hasInChain(targetElem, 'div')).toBe(true);
+      // Self element should not be found
+      expect(htmltp.hasInChain(targetElem, 'em')).toBe(true);
+      // Non-existant element, should never be found
+      expect(htmltp.hasInChain(targetElem, 'section')).toBe(false);
+    });
+  });
+
   describe('processCommonStyle sub and strikethrough', () => {
     it('should add a "sub" element when the vertical align is sub', () => {
       const document = createDocument('<html><body></body></html>');

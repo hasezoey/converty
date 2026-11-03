@@ -1,0 +1,42 @@
+name: Node.js Tests
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - 'gh-pages'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [26.x]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Dependencies
+        run: npm ci
+      - name: Run Audit
+        run: (npm audit || exit 0)
+      - name: Test Compiling Everything
+        run: npm run build:tests
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm run test:coverage
+        env:
+          CI: true
+      - name: Send codecov.io stats
+        if: matrix.node-version == '24.x'
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

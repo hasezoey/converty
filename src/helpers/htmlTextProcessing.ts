@@ -863,6 +863,35 @@ export function fontSizeToPx(fontSize: string | undefined, baseFontSizePx = DEFA
   }
 }
 
+/** Return object from the {@link getBodyFontPx} function */
+export interface GetBodyFontPxRet {
+  /** `body`'s font size in `px` */
+  bodyFontSizePx: number;
+  /** The `window` reference */
+  window: Window;
+}
+
+/**
+ * Fetch the body's default font size.
+ * Because the `window` needs to be resolved anyway and in many cases used after this function, it is also returned.
+ * @param doc The document to calculate the `body`'s font size of
+ * @returns The `body`'s font size and the window reference
+ */
+export function getBodyFontPx(doc: Document): GetBodyFontPxRet {
+  const window = doc.defaultView;
+  utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
+
+  const bodyElem = xh.queryDefinedElement(doc, 'body');
+  const bodyFontSizePx = !utils.isNullOrUndefined(bodyElem)
+    ? (fontSizeToPx(window.getComputedStyle(bodyElem).fontSize) ?? DEFAULT_FONT_SIZE_PX)
+    : DEFAULT_FONT_SIZE_PX;
+
+  return {
+    bodyFontSizePx,
+    window,
+  };
+}
+
 /**
  * Process Common styles for a element
  * @param pelemTracker The PElemTracker to keep track of where to add elements

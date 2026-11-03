@@ -330,4 +330,66 @@ describe('htmlTextProcessing helpers', () => {
       expect(await utils.pathExists(ctx.rootDir)).toBe(false);
     });
   });
+
+  describe('getBodyFontPx', () => {
+    const createDoc = (contentType?: boolean, bodySize?: string): Document => {
+      const { document } = xh.newJSDOM(
+        `<html><body><p>Test</p></body></html>`,
+        contentType
+          ? {
+              contentType: xh.STATICS.XHTML_MIMETYPE,
+            }
+          : undefined
+      );
+
+      const extraProps = bodySize ? { fontSize: bodySize } : {};
+
+      // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for the style handling
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        verticalAlign: 'top',
+        textDecoration: 'none',
+        textAlign: 'left',
+        ...extraProps,
+      } as any);
+
+      return document;
+    };
+
+    it('should provide the default sizes', () => {
+      const doc = createDoc();
+
+      const result = htmltp.getBodyFontPx(doc);
+
+      expect(result.bodyFontSizePx).toBe(16);
+      expect(result.window).toStrictEqual(doc.defaultView);
+    });
+
+    it('should provide the changed body sizes in XHTML', () => {
+      const doc = createDoc(true, '30px');
+
+      const result = htmltp.getBodyFontPx(doc);
+
+      expect(result.bodyFontSizePx).toBe(30);
+    });
+
+    it('should provide the changed body sizes in HTML', () => {
+      const doc = createDoc(false, '30px');
+
+      const result = htmltp.getBodyFontPx(doc);
+
+      expect(result.bodyFontSizePx).toBe(30);
+    });
+
+    it("should provide the window, but not match another doc's window", () => {
+      const doc1 = createDoc();
+      const doc2 = createDoc();
+
+      const result = htmltp.getBodyFontPx(doc1);
+
+      expect(result.window).toStrictEqual(doc1.defaultView);
+      expect(result.window).not.toStrictEqual(doc2.defaultView);
+    });
+  });
 });

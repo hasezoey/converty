@@ -16,7 +16,7 @@ import {
   STATICS,
   TextProcessingECOptions,
 } from '../helpers/htmlTextProcessing.js';
-import { getTextContentBody } from '../common/sevenseascommon.js';
+import * as ssc from '../common/sevenseascommon.js';
 
 const log = utils.createNameSpace('lastofkind_ln');
 
@@ -381,17 +381,7 @@ async function doGenericPage(
       h1Element.appendChild(document.createTextNode(entryType.title));
     },
     genPElemText: generatePElementInner,
-    cachedIsTitleOptions(document, optionsClass) {
-      const window = documentInput.defaultView;
-      utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
-      const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(documentInput, 'body'));
-      const bodyFontSizePx = parseInt(bodyCompStyle.fontSize);
-
-      optionsClass.titleCache = {
-        bodyFontSizePx,
-        window,
-      };
-    },
+    cachedIsTitleOptions: ssc.cachedIsTitleOptions,
     isTitle: isTitle,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     determineReset(document, entryType, _optionsClass) {
@@ -403,7 +393,7 @@ async function doGenericPage(
 
       return true;
     },
-    getTextContent: getTextContentBody,
+    getTextContent: ssc.getTextContentBody,
 
     skipElements,
     headerSearchCount: TITLE_CHECK_NUMBER,

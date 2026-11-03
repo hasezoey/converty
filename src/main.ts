@@ -136,6 +136,11 @@ async function createDownloadsSymlink() {
   }
 }
 
+/**
+ * Read the global config, if one can be found.
+ * # Errors
+ * This function only errors if a file can be found, but not read or parsed.
+ */
 export async function readConfig() {
   // multiple "../" because "import.meta.url" resolves to "lib/main.js"
   const configPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../', CONFIG_PATH);
@@ -148,6 +153,7 @@ export async function readConfig() {
       log('Loaded config at path', configPath);
     } catch (err) {
       console.log('Failed to load Config:'.red, err);
+      throw err;
     }
   } else {
     log('No Config found at', configPath);

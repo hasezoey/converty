@@ -72,7 +72,7 @@ describe('sevenseasCommon helpers', () => {
 
       ssc.cachedIsTitleOptions(document, options);
 
-      expect(options.titleCache?.bodyFontSizePx).toBe(1);
+      expect(options.titleCache?.bodyFontSizePx).toBe(16);
       expect(options.titleCache?.window).toBe(document.defaultView);
     });
   });

@@ -18,6 +18,7 @@ import {
   DoTextContentOptionsGenTextIdDataExtra,
   finishEpubctx,
   parentHas,
+  getBodyFontPx,
 } from '../helpers/htmlTextProcessing.js';
 
 const log = utils.createNameSpace('sevenseascommon');
@@ -438,14 +439,7 @@ export function genChapterHeaderContent(document: Document, entryType: EntryInfo
 
 /** Base function for "cachedIsTitleOptions" */
 export function cachedIsTitleOptions(document: Document, optionsClass: SevenSeasECOptions) {
-  const window = document.defaultView;
-  utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
-  const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(document, 'body'));
-  const bodyFontSizePx = parseInt(bodyCompStyle.fontSize);
-  optionsClass.titleCache = {
-    bodyFontSizePx,
-    window,
-  };
+  optionsClass.titleCache = getBodyFontPx(document);
 }
 
 /** Cache Object for {@link isTitle} */
@@ -501,11 +495,9 @@ export function isTitle(
     bodyFontSize = optionsClass.titleCache.bodyFontSizePx;
     window = optionsClass.titleCache.window;
   } else {
-    const windowTMP = document.defaultView;
-    utils.assertionDefined(windowTMP, new Error('Expected to get a "window" from "defaultView"'));
-    window = windowTMP;
-    const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(document, 'body'));
-    bodyFontSize = parseInt(bodyCompStyle.fontSize);
+    const ret = getBodyFontPx(document);
+    window = ret.window;
+    bodyFontSize = ret.bodyFontSizePx;
   }
 
   const innerElem = elem.querySelector(':first-child');

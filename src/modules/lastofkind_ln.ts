@@ -11,6 +11,7 @@ import {
   EntryInformation,
   EntryType,
   finishEpubctx,
+  getBodyFontPx,
   PElemTracker,
   processCommonStyle,
   STATICS,
@@ -285,11 +286,9 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
     bodyFontSize = optionsClass.titleCache.bodyFontSizePx;
     window = optionsClass.titleCache.window;
   } else {
-    const windowTMP = document.defaultView;
-    utils.assertionDefined(windowTMP, new Error('Expected to get a "window" from "defaultView"'));
-    window = windowTMP;
-    const bodyCompStyle = window.getComputedStyle(xh.queryDefinedElement(document, 'body'));
-    bodyFontSize = parseInt(bodyCompStyle.fontSize);
+    const ret = getBodyFontPx(document);
+    window = ret.window;
+    bodyFontSize = ret.bodyFontSizePx;
   }
 
   const innerElem = elem.querySelector(':first-child');

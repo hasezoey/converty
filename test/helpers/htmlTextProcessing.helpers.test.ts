@@ -139,10 +139,15 @@ describe('htmlTextProcessing helpers', () => {
   });
 
   describe('parentHas', () => {
-    const createNestedDocument = () => {
-      const { document } = xh.newJSDOM('<html><body><div><span><em id="target"></em></span></div></body></html>', {
-        contentType: xh.STATICS.XHTML_MIMETYPE,
-      });
+    const createNestedDocument = (setContentType: boolean = true) => {
+      const { document } = xh.newJSDOM(
+        '<html><body><div><span><em id="target"></em></span></div></body></html>',
+        setContentType
+          ? {
+              contentType: xh.STATICS.XHTML_MIMETYPE,
+            }
+          : undefined
+      );
 
       return xh.queryDefinedElement(document, '#target');
     };
@@ -160,6 +165,12 @@ describe('htmlTextProcessing helpers', () => {
       expect(htmltp.parentHas(targetElem, 'section')).toBe(false);
     });
 
+    it('should return "false" for matching the self element', () => {
+      const targetElem = createNestedDocument();
+
+      expect(htmltp.parentHas(targetElem, 'em')).toBe(false);
+    });
+
     it('should stop searching when the "until" element is reached', () => {
       const targetElem = createNestedDocument();
 
@@ -167,8 +178,15 @@ describe('htmlTextProcessing helpers', () => {
       expect(htmltp.parentHas(targetElem, 'body', 'div')).toBe(false);
     });
 
-    it('should return "false" for an undefined element', () => {
-      expect(htmltp.parentHas(undefined, 'span')).toBe(false);
+    it('should correctly determine parent characteristics when contentType is unset (default HTML)', () => {
+      const targetElem = createNestedDocument(false);
+
+      // Actual parent that should always be found
+      expect(htmltp.parentHas(targetElem, 'div')).toBe(true);
+      // Self element should not be found
+      expect(htmltp.parentHas(targetElem, 'em')).toBe(false);
+      // Non-existant element, should never be found
+      expect(htmltp.parentHas(targetElem, 'section')).toBe(false);
     });
   });
 

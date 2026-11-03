@@ -836,7 +836,8 @@ export function processCommonStyle(
 }
 
 /**
- * Check for a given element "tagName" upwards, until "until" is encountered, upwards
+ * Check for a given element "tagName" upwards, until "until" is encountered, upwards.
+ * Does not check the starting element.
  * @param startElem The element to start searching on
  * @param tagName The element name (tagName) to search for
  * @param until Search for "tagName" until "until" is encountered
@@ -852,12 +853,16 @@ export function parentHas(
   }
 
   for (const elem of traverseParent(startElem)) {
+    // In HTML mode, the "tagName" is UPPERCASE,
+    // whereas in XHTML(+XML) mode, the "tagName" is as defined.
+    const elemTagName = elem.tagName.toLowerCase();
+
     // return if requested element is found
-    if (elem.tagName === tagName) {
+    if (elemTagName === tagName) {
       return true;
     }
     // early return "false" if "until" has been found
-    else if (elem.tagName === until) {
+    else if (elemTagName === until) {
       return false;
     }
 

@@ -30,7 +30,7 @@ function hasDoneInitialCommit(compareOutPath: string): boolean {
   }
 }
 
-async function compareGen() {
+export async function compareGen() {
   console.log('Running compare generation script\n'.green);
 
   // ensure git is installed before running anything else

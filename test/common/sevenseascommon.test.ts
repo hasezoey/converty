@@ -8,7 +8,7 @@ describe('sevenseasCommon', () => {
   const emptyConfig: ssc.SevenSeasConfig = {};
   const { document } = xh.newJSDOM('<html><body></body></html>');
 
-  const mockedCompStyles = {
+  const mockedCompStyles: Partial<CSSStyleDeclaration> = {
     fontWeight: 'normal',
     fontStyle: 'normal',
     verticalAlign: 'top',
@@ -23,7 +23,7 @@ describe('sevenseasCommon', () => {
     const { document: doc } = xh.newJSDOM(html);
 
     // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for the style handling
-    vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue(mockedCompStyles as any);
+    vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue(mockedCompStyles as CSSStyleDeclaration);
 
     return doc;
   };

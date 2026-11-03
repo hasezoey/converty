@@ -6,7 +6,7 @@ import * as epubh from '../../src/helpers/epub.js';
 import * as htmltp from '../../src/helpers/htmlTextProcessing.js';
 import * as xh from '../../src/helpers/xml.js';
 
-const DEFAULT_STYLE = {
+const DEFAULT_STYLE: Partial<CSSStyleDeclaration> = {
   fontWeight: 'normal',
   fontStyle: 'normal',
   verticalAlign: 'top',
@@ -21,7 +21,7 @@ const createDocument = (html: string): Document => {
   const { document } = xh.newJSDOM(html);
 
   // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for the style handling
-  vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue(DEFAULT_STYLE as any);
+  vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue(DEFAULT_STYLE as CSSStyleDeclaration);
 
   return document;
 };
@@ -249,7 +249,10 @@ describe('htmlTextProcessing helpers', () => {
       const parentElem = document.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, verticalAlign: 'sub' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({
+        ...DEFAULT_STYLE,
+        verticalAlign: 'sub',
+      } as CSSStyleDeclaration);
 
       htmltp.processCommonStyle(tracker, parentElem, document, elem);
 
@@ -262,7 +265,10 @@ describe('htmlTextProcessing helpers', () => {
       const parentElem = document.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, textDecoration: 'line-through' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({
+        ...DEFAULT_STYLE,
+        textDecoration: 'line-through',
+      } as CSSStyleDeclaration);
 
       htmltp.processCommonStyle(tracker, parentElem, document, elem);
 

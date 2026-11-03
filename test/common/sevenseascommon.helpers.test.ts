@@ -4,7 +4,7 @@ import * as epubh from '../../src/helpers/epub.js';
 import * as htmltp from '../../src/helpers/htmlTextProcessing.js';
 import * as xh from '../../src/helpers/xml.js';
 
-const DEFAULT_STYLE = {
+const DEFAULT_STYLE: Partial<CSSStyleDeclaration> = {
   fontWeight: 'normal',
   fontStyle: 'normal',
   verticalAlign: 'top',
@@ -19,7 +19,7 @@ const createDocument = (html: string): Document => {
   const { document } = xh.newJSDOM(html);
 
   // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for the style handling
-  vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue(DEFAULT_STYLE as any);
+  vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue(DEFAULT_STYLE as CSSStyleDeclaration);
 
   return document;
 };
@@ -143,7 +143,7 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Indented text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, marginLeft: '10px' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, marginLeft: '10px' } as CSSStyleDeclaration);
 
       ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 
@@ -177,7 +177,10 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Code text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, fontFamily: 'monospace' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({
+        ...DEFAULT_STYLE,
+        fontFamily: 'monospace',
+      } as CSSStyleDeclaration);
 
       const elems = ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 
@@ -193,7 +196,7 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Bold text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, fontWeight: 'bold' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, fontWeight: 'bold' } as CSSStyleDeclaration);
 
       const elems = ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 

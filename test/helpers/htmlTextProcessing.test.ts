@@ -183,7 +183,7 @@ describe('htmlTextProcessing', () => {
       const { document } = xh.newJSDOM(html, { contentType: xh.STATICS.XHTML_MIMETYPE });
 
       // jsdom's "getComputedStyle" is currently broken in this environment, so mock the styles needed for image handling
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ verticalAlign: 'top' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ verticalAlign: 'top' } as CSSStyleDeclaration);
 
       return document;
     };

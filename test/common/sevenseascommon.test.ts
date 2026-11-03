@@ -393,7 +393,7 @@ describe('sevenseasCommon', () => {
       const strongElem = doc.createElement('strong');
       strongElem.textContent = 'Bold text';
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...mockedCompStyles, fontWeight: 'bold' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ ...mockedCompStyles, fontWeight: 'bold' } as any);
 
       const elems = ssc.generatePElementInner(strongElem, doc, doc.createElement('div'), new ssc.SevenSeasECOptions(), emptyConfig);
 

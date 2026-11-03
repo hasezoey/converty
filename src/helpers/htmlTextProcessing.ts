@@ -906,8 +906,7 @@ export function processCommonStyle(
   documentNew: Document,
   elem: Element
 ): ProcessCommonStyleReturn {
-  const window = elem.ownerDocument.defaultView;
-  utils.assertionDefined(window, new Error('Expected to get a "window" from "defaultView"'));
+  const { bodyFontSizePx, window } = getBodyFontPx(elem.ownerDocument);
   const elemCompStyle = window.getComputedStyle(elem);
 
   // Note: if "strong" and css setting "font-weight" are set to "bold", then it will always be "bold", but in chrome & firefox it will be a number (700)
@@ -932,10 +931,6 @@ export function processCommonStyle(
 
   // cover smaller font sizes (like "font-size: 80%"), but do not stack multiple "small" elements
   {
-    const bodyElem = elem.ownerDocument.body;
-    const bodyFontSizePx = !utils.isNullOrUndefined(bodyElem)
-      ? (fontSizeToPx(window.getComputedStyle(bodyElem).fontSize) ?? DEFAULT_FONT_SIZE_PX)
-      : DEFAULT_FONT_SIZE_PX;
     const elemFontSizePx = fontSizeToPx(elemCompStyle.fontSize, bodyFontSizePx);
 
     if (

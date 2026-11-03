@@ -348,7 +348,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ fontWeight: 'bold' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ fontWeight: 'bold' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -364,7 +364,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ fontStyle: 'italic' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ fontStyle: 'italic' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -379,7 +379,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ verticalAlign: 'super' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ verticalAlign: 'super' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -394,7 +394,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ textDecoration: 'underline' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ textDecoration: 'underline' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -409,7 +409,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ textAlign: 'center' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ textAlign: 'center' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -423,7 +423,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ textAlign: 'right' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ textAlign: 'right' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -451,7 +451,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ fontSize: '80%' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ fontSize: '80%' } as any);
 
       const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -466,7 +466,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ verticalAlign: 'sub', fontSize: '80%' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ verticalAlign: 'sub', fontSize: '80%' } as any);
 
       htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 
@@ -481,7 +481,7 @@ describe('htmlTextProcessing', () => {
       const parentElem = doc.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValueOnce({ verticalAlign: 'super', fontSize: '80%' } as any);
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ verticalAlign: 'super', fontSize: '80%' } as any);
 
       htmltp.processCommonStyle(tracker, parentElem, doc, elem);
 

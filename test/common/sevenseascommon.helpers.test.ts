@@ -143,7 +143,7 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Indented text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...DEFAULT_STYLE, marginLeft: '10px' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, marginLeft: '10px' } as any);
 
       ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 
@@ -156,7 +156,13 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Big text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...DEFAULT_STYLE, fontSize: '3.00em' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockImplementation((elem) => {
+        if (elem.tagName.toLowerCase() === 'body') {
+          return DEFAULT_STYLE;
+        }
+
+        return { ...DEFAULT_STYLE, fontSize: '3.00em' } as any;
+      });
 
       const elems = ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 
@@ -171,7 +177,7 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Code text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...DEFAULT_STYLE, fontFamily: 'monospace' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, fontFamily: 'monospace' } as any);
 
       const elems = ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 
@@ -187,7 +193,7 @@ describe('sevenseasCommon helpers', () => {
       pElem.textContent = 'Bold text';
       const parentElem = document.createElement('div');
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...DEFAULT_STYLE, fontWeight: 'bold' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, fontWeight: 'bold' } as any);
 
       const elems = ssc.generatePElementInnerTranslate(pElem, document, parentElem, new ssc.SevenSeasECOptions(), {});
 

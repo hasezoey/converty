@@ -249,7 +249,7 @@ describe('htmlTextProcessing helpers', () => {
       const parentElem = document.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...DEFAULT_STYLE, verticalAlign: 'sub' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, verticalAlign: 'sub' } as any);
 
       htmltp.processCommonStyle(tracker, parentElem, document, elem);
 
@@ -262,7 +262,7 @@ describe('htmlTextProcessing helpers', () => {
       const parentElem = document.createElement('div');
       const tracker = new htmltp.PElemTracker();
 
-      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValueOnce({ ...DEFAULT_STYLE, textDecoration: 'line-through' } as any);
+      vi.spyOn(document.defaultView!, 'getComputedStyle').mockReturnValue({ ...DEFAULT_STYLE, textDecoration: 'line-through' } as any);
 
       htmltp.processCommonStyle(tracker, parentElem, document, elem);
 

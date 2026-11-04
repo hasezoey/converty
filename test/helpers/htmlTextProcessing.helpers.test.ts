@@ -132,61 +132,20 @@ describe('htmlTextProcessing helpers', () => {
       const { document } = xh.newJSDOM('<html><body><div><span><em id="target"></em></span></div></body></html>');
       const targetElem = xh.queryDefinedElement(document, '#target');
 
-      const parents = Array.from(htmltp.traverseParent(targetElem)).map((elem) => elem.tagName);
+      const parents = Array.from(htmltp.traverseElements(targetElem)).map((elem) => elem.tagName);
 
-      expect(parents).toEqual(['SPAN', 'DIV', 'BODY', 'HTML']);
-    });
-  });
-
-  describe('parentHas', () => {
-    const createNestedDocument = (setContentType: boolean = true) => {
-      const { document } = xh.newJSDOM(
-        '<html><body><div><span><em id="target"></em></span></div></body></html>',
-        setContentType
-          ? {
-              contentType: xh.STATICS.XHTML_MIMETYPE,
-            }
-          : undefined
-      );
-
-      return xh.queryDefinedElement(document, '#target');
-    };
-
-    it('should find a matching parent element', () => {
-      const targetElem = createNestedDocument();
-
-      expect(htmltp.parentHas(targetElem, 'span')).toBe(true);
-      expect(htmltp.parentHas(targetElem, 'div')).toBe(true);
+      expect(parents).toEqual(['EM', 'SPAN', 'DIV', 'BODY', 'HTML']);
     });
 
-    it('should return "false" for a non-matching parent element', () => {
-      const targetElem = createNestedDocument();
+    it('should traverse all parents upwards XHTML', () => {
+      const { document } = xh.newJSDOM('<html><body><div><span><em id="target"></em></span></div></body></html>', {
+        contentType: xh.STATICS.XHTML_MIMETYPE,
+      });
+      const targetElem = xh.queryDefinedElement(document, '#target');
 
-      expect(htmltp.parentHas(targetElem, 'section')).toBe(false);
-    });
+      const parents = Array.from(htmltp.traverseElements(targetElem)).map((elem) => elem.tagName);
 
-    it('should return "false" for matching the self element', () => {
-      const targetElem = createNestedDocument();
-
-      expect(htmltp.parentHas(targetElem, 'em')).toBe(false);
-    });
-
-    it('should stop searching when the "until" element is reached', () => {
-      const targetElem = createNestedDocument();
-
-      expect(htmltp.parentHas(targetElem, 'span', 'div')).toBe(true);
-      expect(htmltp.parentHas(targetElem, 'body', 'div')).toBe(false);
-    });
-
-    it('should correctly determine parent characteristics when contentType is unset (default HTML)', () => {
-      const targetElem = createNestedDocument(false);
-
-      // Actual parent that should always be found
-      expect(htmltp.parentHas(targetElem, 'div')).toBe(true);
-      // Self element should not be found
-      expect(htmltp.parentHas(targetElem, 'em')).toBe(false);
-      // Non-existant element, should never be found
-      expect(htmltp.parentHas(targetElem, 'section')).toBe(false);
+      expect(parents).toEqual(['em', 'span', 'div', 'body', 'html']);
     });
   });
 

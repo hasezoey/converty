@@ -16,8 +16,8 @@ import {
   DoTextContentOptions,
   DoTextContentOptionsGenTextIdDataExtra,
   finishEpubctx,
-  parentHas,
   getBodyFontPx,
+  hasInChain,
 } from '../helpers/htmlTextProcessing.js';
 import * as common from './common.js';
 
@@ -701,12 +701,12 @@ export function generatePElementInnerTranslate(
   }
 
   // cover initial missing boldness but having big font-size (chapter start first letter after heading)
-  if (!parentHas(elemObj.currentElem, 'strong') && elemCompStyle.fontSize === '3.00em') {
+  if (!hasInChain(elemObj.currentElem, 'strong') && elemCompStyle.fontSize === '3.00em') {
     elemObj.setNewElem(documentNew.createElement('strong'));
   }
 
   // cover css having "monospace" but not a "code" segment
-  if (!parentHas(elemObj.currentElem, 'code') && elemCompStyle.fontFamily.includes('monospace')) {
+  if (!hasInChain(elemObj.currentElem, 'code') && elemCompStyle.fontFamily.includes('monospace')) {
     elemObj.setNewElem(documentNew.createElement('code'));
   }
 

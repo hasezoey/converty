@@ -959,43 +959,6 @@ export function processCommonStyle(
 
 /**
  * Check for a given element "tagName" upwards, until "until" is encountered, upwards.
- * Does not check the starting element.
- * @param startElem The element to start searching on
- * @param tagName The element name (tagName) to search for
- * @param until Search for "tagName" until "until" is encountered
- * @returns "true" if the given "tagName" is found, "false" otherwise
- */
-export function parentHas(
-  startElem: Element | undefined,
-  tagName: keyof HTMLElementTagNameMap,
-  until: keyof HTMLElementTagNameMap = 'body'
-): boolean {
-  if (utils.isNullOrUndefined(startElem)) {
-    return false;
-  }
-
-  for (const elem of traverseParent(startElem)) {
-    // In HTML mode, the "tagName" is UPPERCASE,
-    // whereas in XHTML(+XML) mode, the "tagName" is as defined.
-    const elemTagName = elem.tagName.toLowerCase();
-
-    // return if requested element is found
-    if (elemTagName === tagName) {
-      return true;
-    }
-    // early return "false" if "until" has been found
-    else if (elemTagName === until) {
-      return false;
-    }
-
-    continue;
-  }
-
-  return false; // base case
-}
-
-/**
- * Check for a given element "tagName" upwards, until "until" is encountered, upwards.
  * Checks the starting element as well.
  * @param startElem The element to start searching on
  * @param tagName The element name (tagName) to search for
@@ -1011,7 +974,7 @@ export function hasInChain(
     return false;
   }
 
-  for (const elem of traverseParent(startElem, true)) {
+  for (const elem of traverseElements(startElem)) {
     // In HTML mode, the "tagName" is UPPERCASE,
     // whereas in XHTML(+XML) mode, the "tagName" is as defined.
     const elemTagName = elem.tagName.toLowerCase();
@@ -1032,16 +995,14 @@ export function hasInChain(
 }
 
 /**
- * Traverse a given "initElem" upwards (through ".parentElement") until there is no parent anymore
- * @param initElem The Starting Element (will not be given as a output)
+ * Traverse a given "initElem" upwards (through ".parentElement") until there is no parent anymore.
+ * Includes the given element.
  * @returns A Generator to traverse a given element upwards
  */
-export function* traverseParent(initElem: Element, includeStart: boolean = false): Generator<Element> {
-  let currentElem: Element | null = initElem;
+export function* traverseElements(initElem: Element): Generator<Element> {
+  yield initElem;
 
-  if (includeStart) {
-    yield initElem;
-  }
+  let currentElem: Element | null = initElem;
 
   while (!utils.isNullOrUndefined((currentElem = currentElem.parentElement))) {
     yield currentElem;

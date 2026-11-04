@@ -139,6 +139,71 @@ describe('htmlTextProcessing doTextContent branches', () => {
   });
 
   it('should copy middle-aligned images inline', async () => {
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const ctx = createContext();
+    const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
+    const firstImgPath = path.resolve(path.dirname(currentInputFile), 'images', 'first.png');
+    const secondImgPath = path.resolve(path.dirname(currentInputFile), 'images', 'second.png');
+
+    await utils.mkdir(path.dirname(firstImgPath));
+    await fspromises.writeFile(firstImgPath, Buffer.from('fake-first-image'));
+    await fspromises.writeFile(secondImgPath, Buffer.from('fake-second-image'));
+
+    const documentInput = createInputDocument(
+      '<html><head><title>Chapter 1</title></head><body><h1>Chapter 1</h1><p><img src="images/first.png" /><img src="images/second.png" /></p><p>Some text</p></body></html>',
+      [{ verticalAlign: 'middle' }, { verticalAlign: 'middle' }]
+    );
+    const imgElems = documentInput.querySelectorAll('img');
+    (imgElems[0] as any).src = 'images/first.png';
+    (imgElems[1] as any).src = 'images/second.png';
+    const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+    const genImageIdData = vi.fn(createOptions().genImageIdData);
+
+    await htmltp.doTextContent(
+      documentInput,
+      entryType,
+      ctx,
+      currentInputFile,
+      createOptions({
+        genImageIdData,
+      })
+    );
+
+    expect(genImageIdData).toHaveBeenCalledTimes(2);
+    expect(genImageIdData).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.stringContaining('first.png'),
+      expect.anything(),
+      entryType,
+      epubh.ImgType.Inline
+    );
+    expect(genImageIdData).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.stringContaining('second.png'),
+      expect.anything(),
+      entryType,
+      epubh.ImgType.Inline
+    );
+
+    expect(consoleLogSpy).not.toHaveBeenCalled();
+
+    const textDir = path.join(ctx.contentOPFDir, epubh.FileDir.Text);
+    const copiedImagePath = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert1.png');
+
+    // inline images are only copied, they do not get their own xhtml file
+    expect(await utils.pathExists(path.join(textDir, 'insert1.xhtml'))).toBe(false);
+    expect(await utils.pathExists(path.join(textDir, 'chapter1.xhtml'))).toBe(true);
+    expect(await utils.pathExists(copiedImagePath)).toBe(true);
+    expect(await fspromises.readFile(copiedImagePath)).toEqual(await fspromises.readFile(secondImgPath));
+
+    const chapter = await fspromises.readFile(path.join(textDir, 'chapter1.xhtml'), 'utf-8');
+    expect(chapter).toContain('Some text');
+  });
+
+  it('should log a warning and skip non-middle-aligned images when multiple are present', async () => {
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const ctx = createContext();
     const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
     const firstImgPath = path.resolve(path.dirname(currentInputFile), 'images', 'first.png');
@@ -168,6 +233,11 @@ describe('htmlTextProcessing doTextContent branches', () => {
       })
     );
 
+    expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`Multiple images present, and at least one does not have align "middle"! file: "${currentInputFile}"`)
+    );
+
     expect(genImageIdData).toHaveBeenCalledTimes(1);
     expect(genImageIdData).toHaveBeenCalledWith(
       expect.anything(),
@@ -176,18 +246,6 @@ describe('htmlTextProcessing doTextContent branches', () => {
       entryType,
       epubh.ImgType.Inline
     );
-
-    const textDir = path.join(ctx.contentOPFDir, epubh.FileDir.Text);
-    const copiedImagePath = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert1.png');
-
-    // inline images are only copied, they do not get their own xhtml file
-    expect(await utils.pathExists(path.join(textDir, 'insert1.xhtml'))).toBe(false);
-    expect(await utils.pathExists(path.join(textDir, 'chapter1.xhtml'))).toBe(true);
-    expect(await utils.pathExists(copiedImagePath)).toBe(true);
-    expect(await fspromises.readFile(copiedImagePath)).toEqual(await fspromises.readFile(secondImgPath));
-
-    const chapter = await fspromises.readFile(path.join(textDir, 'chapter1.xhtml'), 'utf-8');
-    expect(chapter).toContain('Some text');
   });
 
   it('should skip empty elements before the content', async () => {

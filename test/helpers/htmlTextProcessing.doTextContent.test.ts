@@ -157,7 +157,18 @@ describe('htmlTextProcessing doTextContent branches', () => {
     (imgElems[0] as any).src = 'images/first.png';
     (imgElems[1] as any).src = 'images/second.png';
     const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
-    const genImageIdData = vi.fn(createOptions().genImageIdData);
+    let genImageIdDataCallCount = 0;
+    const genImageIdData = vi.fn((optionsClass, imgFromPath, imgNode, entryType) => {
+      genImageIdDataCallCount += 1;
+      const base = createOptions().genImageIdData(optionsClass, imgFromPath, imgNode, entryType);
+      // give each image a unique xhtmlFilename and sectionId so that the EPUB id is unique
+      // and the "Overwriting file!" warning is not triggered
+      base.xhtmlFilename = `Insert${genImageIdDataCallCount}`;
+      base.sectionId = `insert${genImageIdDataCallCount}.png`;
+      base.imgFilename = `Insert${genImageIdDataCallCount}.png`;
+
+      return base;
+    });
 
     await htmltp.doTextContent(
       documentInput,
@@ -190,13 +201,17 @@ describe('htmlTextProcessing doTextContent branches', () => {
     expect(consoleLogSpy).not.toHaveBeenCalled();
 
     const textDir = path.join(ctx.contentOPFDir, epubh.FileDir.Text);
-    const copiedImagePath = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert1.png');
+    const copiedImagePath1 = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert1.png');
+    const copiedImagePath2 = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert2.png');
 
     // inline images are only copied, they do not get their own xhtml file
     expect(await utils.pathExists(path.join(textDir, 'insert1.xhtml'))).toBe(false);
+    expect(await utils.pathExists(path.join(textDir, 'insert2.xhtml'))).toBe(false);
     expect(await utils.pathExists(path.join(textDir, 'chapter1.xhtml'))).toBe(true);
-    expect(await utils.pathExists(copiedImagePath)).toBe(true);
-    expect(await fspromises.readFile(copiedImagePath)).toEqual(await fspromises.readFile(secondImgPath));
+    expect(await utils.pathExists(copiedImagePath1)).toBe(true);
+    expect(await fspromises.readFile(copiedImagePath1)).toEqual(await fspromises.readFile(firstImgPath));
+    expect(await utils.pathExists(copiedImagePath2)).toBe(true);
+    expect(await fspromises.readFile(copiedImagePath2)).toEqual(await fspromises.readFile(secondImgPath));
 
     const chapter = await fspromises.readFile(path.join(textDir, 'chapter1.xhtml'), 'utf-8');
     expect(chapter).toContain('Some text');
@@ -221,7 +236,18 @@ describe('htmlTextProcessing doTextContent branches', () => {
     (imgElems[0] as any).src = 'images/first.png';
     (imgElems[1] as any).src = 'images/second.png';
     const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
-    const genImageIdData = vi.fn(createOptions().genImageIdData);
+    let genImageIdDataCallCount = 0;
+    const genImageIdData = vi.fn((optionsClass, imgFromPath, imgNode, entryType) => {
+      genImageIdDataCallCount += 1;
+      const base = createOptions().genImageIdData(optionsClass, imgFromPath, imgNode, entryType);
+      // give each image a unique xhtmlFilename and sectionId so that the EPUB id is unique
+      // and the "Overwriting file!" warning is not triggered
+      base.xhtmlFilename = `insert${genImageIdDataCallCount}`;
+      base.sectionId = `insert${genImageIdDataCallCount}.png`;
+      base.imgFilename = `Insert${genImageIdDataCallCount}.png`;
+
+      return base;
+    });
 
     await htmltp.doTextContent(
       documentInput,
@@ -246,6 +272,22 @@ describe('htmlTextProcessing doTextContent branches', () => {
       entryType,
       epubh.ImgType.Inline
     );
+
+    const textDir = path.join(ctx.contentOPFDir, epubh.FileDir.Text);
+    const copiedImagePath1 = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert1.png');
+    const copiedImagePath2 = path.join(ctx.contentOPFDir, epubh.FileDir.Images, 'Insert2.png');
+
+    // inline images are only copied, they do not get their own xhtml file
+    expect(await utils.pathExists(path.join(textDir, 'insert1.xhtml'))).toBe(false);
+    expect(await utils.pathExists(path.join(textDir, 'insert2.xhtml'))).toBe(false);
+    expect(await utils.pathExists(path.join(textDir, 'chapter1.xhtml'))).toBe(true);
+    expect(await utils.pathExists(copiedImagePath1)).toBe(true);
+    expect(await fspromises.readFile(copiedImagePath1)).toEqual(await fspromises.readFile(secondImgPath));
+    // due to the first image not being marked "middle", it will not be copied (or will be overwritten with the same id)
+    expect(await utils.pathExists(copiedImagePath2)).toBe(false);
+
+    const chapter = await fspromises.readFile(path.join(textDir, 'chapter1.xhtml'), 'utf-8');
+    expect(chapter).toContain('Some text');
   });
 
   it.concurrent('should skip empty elements before the content', async () => {

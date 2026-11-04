@@ -235,6 +235,8 @@ describe('htmlTextProcessing helpers', () => {
     });
   });
 
+  // NOTE: This suite needs to remain sequential because the tests explicitly set and unset process.env['DEBUG_OUTPUT'],
+  // creating a dependency that prevents safe concurrent execution!
   describe('finishEpubctx', () => {
     const addChapter = async (ctx: epubh.EpubContext<htmltp.TextProcessingECOptions>) => {
       const { dom } = xh.newJSDOM('<html><head><title>Chapter 1</title></head><body><p>Some text</p></body></html>', {

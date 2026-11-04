@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../../src/utils.js';
@@ -37,19 +37,19 @@ vi.mock('../../src/helpers/xml.js', async (importOriginal) => {
 describe('lastofkind_ln process', () => {
   const cleanupPaths: string[] = [];
 
-  beforeEach(() => {
+  beforeAll(() => {
     process.env['DEBUG_OUTPUT'] = '1';
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     delete process.env['DEBUG_OUTPUT'];
 
-    for (const cleanupPath of cleanupPaths.splice(0)) {
+    for (const cleanupPath of cleanupPaths) {
       await utils.removeDir(cleanupPath);
     }
   });
 
-  it('should process a basic epub into an output directory', async () => {
+  it.concurrent('should process a basic epub into an output directory', async () => {
     const fixture = await createEpubFixture({ title: 'Reincarnated as the Last of My Kind Vol. 1', coverImage: false });
     cleanupPaths.push(fixture.rootDir);
 
@@ -87,7 +87,7 @@ describe('lastofkind_ln process', () => {
     expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'Styles', 'stylesheet.css'))).toBe(true);
   });
 
-  it('should skip a "contents.xhtml" file from the spine', async () => {
+  it.concurrent('should skip a "contents.xhtml" file from the spine', async () => {
     const fixture = await createEpubFixture({
       title: 'Reincarnated as the Last of My Kind Vol. 1',
       coverImage: false,

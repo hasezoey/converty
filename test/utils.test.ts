@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { existsSync, promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../src/utils.js';
@@ -122,11 +122,11 @@ describe('utils', () => {
   });
 
   describe('statPath', () => {
-    it('should return "undefined" for a path that does not exist', async () => {
+    it.concurrent('should return "undefined" for a path that does not exist', async () => {
       expect(await utils.statPath('/converty/does/not/exist')).toBeUndefined();
     });
 
-    it('should return the stats of an existing path', async () => {
+    it.concurrent('should return the stats of an existing path', async () => {
       const stat = await utils.statPath(process.cwd());
 
       expect(stat).toBeDefined();
@@ -135,20 +135,22 @@ describe('utils', () => {
   });
 
   describe('lstatPath', () => {
-    let tmpDir: string;
+    const cleanupPaths: string[] = [];
 
-    afterEach(async () => {
-      if (!utils.isNullOrUndefined(tmpDir)) {
-        await utils.removeDir(tmpDir);
+    afterAll(async () => {
+      for (const cleanupPath of cleanupPaths) {
+        await utils.removeDir(cleanupPath);
       }
     });
 
-    it('should return "undefined" for a path that does not exist', async () => {
+    it.concurrent('should return "undefined" for a path that does not exist', async () => {
       expect(await utils.lstatPath('/converty/does/not/exist')).toBeUndefined();
     });
 
-    it('should return the stats without following symlinks', async () => {
-      tmpDir = await utils.createTmpDir('converty-test-');
+    it.concurrent('should return the stats without following symlinks', async () => {
+      const tmpDir = await utils.createTmpDir('converty-test-');
+      cleanupPaths.push(tmpDir);
+
       const targetPath = path.join(tmpDir, 'target.txt');
       const linkPath = path.join(tmpDir, 'link.txt');
 
@@ -300,24 +302,26 @@ describe('utils', () => {
   });
 
   describe('searchForFile', () => {
-    let tmpDir: string;
+    const cleanupPaths: string[] = [];
 
-    afterEach(async () => {
-      if (!utils.isNullOrUndefined(tmpDir)) {
-        await utils.removeDir(tmpDir);
+    afterAll(async () => {
+      for (const cleanupPath of cleanupPaths) {
+        await utils.removeDir(cleanupPath);
       }
     });
 
-    it('should throw an error for an empty filename', async () => {
+    it.concurrent('should throw an error for an empty filename', async () => {
       await expect(utils.searchForFile(process.cwd(), '')).rejects.toThrow(/"filename" length needs to be 1 or above/);
     });
 
-    it('should return "undefined" for a depth of 0', async () => {
+    it.concurrent('should return "undefined" for a depth of 0', async () => {
       expect(await utils.searchForFile(process.cwd(), 'package.json', 0)).toBeUndefined();
     });
 
-    it('should find a file within the search depth', async () => {
-      tmpDir = await utils.createTmpDir('converty-test-');
+    it.concurrent('should find a file within the search depth', async () => {
+      const tmpDir = await utils.createTmpDir('converty-test-');
+      cleanupPaths.push(tmpDir);
+
       const subDir = path.join(tmpDir, 'sub');
 
       await utils.mkdir(subDir);
@@ -329,8 +333,10 @@ describe('utils', () => {
       expect(found?.[0]).toContain('combinerConfig.json');
     });
 
-    it('should find a file when the start path is the file itself', async () => {
-      tmpDir = await utils.createTmpDir('converty-test-');
+    it.concurrent('should find a file when the start path is the file itself', async () => {
+      const tmpDir = await utils.createTmpDir('converty-test-');
+      cleanupPaths.push(tmpDir);
+
       const filePath = path.join(tmpDir, 'combinerConfig.json');
 
       await fspromises.writeFile(filePath, '{}');
@@ -338,8 +344,10 @@ describe('utils', () => {
       expect(await utils.searchForFile(filePath, 'combinerConfig.json')).toEqual([filePath]);
     });
 
-    it('should return "undefined" when the start path is a different file', async () => {
-      tmpDir = await utils.createTmpDir('converty-test-');
+    it.concurrent('should return "undefined" when the start path is a different file', async () => {
+      const tmpDir = await utils.createTmpDir('converty-test-');
+      cleanupPaths.push(tmpDir);
+
       const filePath = path.join(tmpDir, 'other.json');
 
       await fspromises.writeFile(filePath, '{}');
@@ -347,12 +355,14 @@ describe('utils', () => {
       expect(await utils.searchForFile(filePath, 'combinerConfig.json')).toBeUndefined();
     });
 
-    it('should return "undefined" for a path that does not exist', async () => {
+    it.concurrent('should return "undefined" for a path that does not exist', async () => {
       expect(await utils.searchForFile('/converty/does/not/exist', 'combinerConfig.json')).toBeUndefined();
     });
 
-    it('should find multiple files within the search depth', async () => {
-      tmpDir = await utils.createTmpDir('converty-test-');
+    it.concurrent('should find multiple files within the search depth', async () => {
+      const tmpDir = await utils.createTmpDir('converty-test-');
+      cleanupPaths.push(tmpDir);
+
       const firstDir = path.join(tmpDir, 'first');
       const secondDir = path.join(tmpDir, 'second');
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../../src/utils.js';
@@ -9,6 +9,18 @@ const SERIES_TITLE = 'Death March to the Parallel World Rhapsody Vol. 1';
 
 describe('genericCopy_ln process', () => {
   const cleanupPaths: string[] = [];
+
+  beforeAll(() => {
+    process.env['DEBUG_OUTPUT'] = '1';
+  });
+
+  afterAll(async () => {
+    delete process.env['DEBUG_OUTPUT'];
+
+    for (const cleanupPath of cleanupPaths) {
+      await utils.removeDir(cleanupPath);
+    }
+  });
 
   const runGenericCopy = async (fixture: EpubFixture) => {
     const workDir = await utils.createTmpDir('converty-generic-copy-');
@@ -25,19 +37,7 @@ describe('genericCopy_ln process', () => {
     return { resultPath, outputDir };
   };
 
-  beforeEach(() => {
-    process.env['DEBUG_OUTPUT'] = '1';
-  });
-
-  afterEach(async () => {
-    delete process.env['DEBUG_OUTPUT'];
-
-    for (const cleanupPath of cleanupPaths.splice(0)) {
-      await utils.removeDir(cleanupPath);
-    }
-  });
-
-  it('should process a basic epub and find the cover via the metadata fallback', async () => {
+  it.concurrent('should process a basic epub and find the cover via the metadata fallback', async () => {
     const fixture = await createEpubFixture({ title: SERIES_TITLE });
     cleanupPaths.push(fixture.rootDir);
 
@@ -69,7 +69,7 @@ describe('genericCopy_ln process', () => {
     expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'Styles', 'stylesheet.css'))).toBe(true);
   });
 
-  it('should find the cover via the manifest properties', async () => {
+  it.concurrent('should find the cover via the manifest properties', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -86,7 +86,7 @@ describe('genericCopy_ln process', () => {
     expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'Images', 'cover.png'))).toBe(true);
   });
 
-  it('should process an epub with a non-standard content.opf directory', async () => {
+  it.concurrent('should process an epub with a non-standard content.opf directory', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -106,7 +106,7 @@ describe('genericCopy_ln process', () => {
     expect(chapter1).toContain('Lorem ipsum dolor sit amet.');
   });
 
-  it('should process an epub with a non-standard content.opf filename', async () => {
+  it.concurrent('should process an epub with a non-standard content.opf filename', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -127,7 +127,7 @@ describe('genericCopy_ln process', () => {
     expect(chapter1).toContain('Lorem ipsum dolor sit amet.');
   });
 
-  it('should copy data mostly as-is without further processing', async () => {
+  it.concurrent('should copy data mostly as-is without further processing', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -152,7 +152,7 @@ describe('genericCopy_ln process', () => {
     expect(contents).toContain('<span class="inner">text</span>');
   });
 
-  it('should remove empty head style elements', async () => {
+  it.concurrent('should remove empty head style elements', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -175,7 +175,7 @@ describe('genericCopy_ln process', () => {
     expect(contents).not.toMatch(/<style[^>]*>\s*<\/style>/);
   });
 
-  it('should skip an input toc that is detected by filename', async () => {
+  it.concurrent('should skip an input toc that is detected by filename', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -200,7 +200,7 @@ describe('genericCopy_ln process', () => {
     expect(generatedTOC).not.toContain('INPUT_NAV_MARKER');
   });
 
-  it('should skip an input toc that is detected by title', async () => {
+  it.concurrent('should skip an input toc that is detected by title', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -225,7 +225,7 @@ describe('genericCopy_ln process', () => {
     expect(generatedTOC).not.toContain('INPUT_TITLE_MARKER');
   });
 
-  it('should preserve an input toc that contains images', async () => {
+  it.concurrent('should preserve an input toc that contains images', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',
@@ -258,7 +258,7 @@ describe('genericCopy_ln process', () => {
     expect(await fspromises.readFile(copiedImagePath)).toEqual(Buffer.from('fake-toc-image-data'));
   });
 
-  it('should remove processing instructions', async () => {
+  it.concurrent('should remove processing instructions', async () => {
     const fixture = await createEpubFixture({
       title: SERIES_TITLE,
       coverLookup: 'properties',

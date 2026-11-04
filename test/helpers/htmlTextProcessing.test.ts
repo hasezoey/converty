@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../../src/utils.js';
@@ -173,8 +173,13 @@ describe('htmlTextProcessing', () => {
   });
 
   describe('doTextContent', () => {
-    let ctx: epubh.EpubContext<htmltp.TextProcessingECOptions>;
-    let documentInput: Document;
+    const cleanupPaths: string[] = [];
+
+    afterAll(async () => {
+      for (const cleanupPath of cleanupPaths) {
+        await utils.removeDir(cleanupPath);
+      }
+    });
 
     const DEFAULT_INPUT_HTML =
       '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some mock text content for the chapter.</p></body></html>';
@@ -229,22 +234,22 @@ describe('htmlTextProcessing', () => {
       isTitle: (document, elem, entryType, _optionsClass) => (elem.localName === 'h1' ? entryType.title : false),
     });
 
-    beforeEach(() => {
-      ctx = new epubh.EpubContext<htmltp.TextProcessingECOptions>({
+    const createContext = (): epubh.EpubContext<htmltp.TextProcessingECOptions> => {
+      const ctx = new epubh.EpubContext<htmltp.TextProcessingECOptions>({
         title: 'Some Story',
         optionsClass: new htmltp.TextProcessingECOptions(),
       });
-      documentInput = createInputDocument(DEFAULT_INPUT_HTML);
-    });
 
-    afterEach(async () => {
-      await utils.removeDir(ctx.rootDir);
-    });
+      cleanupPaths.push(ctx.rootDir);
 
-    it('should save the processed chapter into a new xhtml file', async () => {
+      return ctx;
+    };
+
+    it.concurrent('should save the processed chapter into a new xhtml file', async () => {
+      const ctx = createContext();
       const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
 
-      documentInput = createInputDocument(DEFAULT_INPUT_HTML);
+      const documentInput = createInputDocument(DEFAULT_INPUT_HTML);
 
       await htmltp.doTextContent(documentInput, entryType, ctx, '/converty/input/chapter1.xhtml', createDoTextContentOptions());
 
@@ -260,8 +265,9 @@ describe('htmlTextProcessing', () => {
       expect(content).toContain('Chapter 1');
     });
 
-    it('should not save a chapter file when the document is fully empty', async () => {
-      documentInput = createInputDocument('<html><head><title>Some Story</title></head><body></body></html>');
+    it.concurrent('should not save a chapter file when the document is fully empty', async () => {
+      const ctx = createContext();
+      const documentInput = createInputDocument('<html><head><title>Some Story</title></head><body></body></html>');
       const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
 
       await htmltp.doTextContent(documentInput, entryType, ctx, '/converty/input/chapter1.xhtml', createDoTextContentOptions());
@@ -269,14 +275,15 @@ describe('htmlTextProcessing', () => {
       expect(ctx.files).toHaveLength(0);
     });
 
-    it('should save the image xhtml and not the chapter when a full size image is the last element', async () => {
+    it.concurrent('should save the image xhtml and not the chapter when a full size image is the last element', async () => {
+      const ctx = createContext();
       const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
       const imgAbsPath = path.resolve(path.dirname(currentInputFile), 'images', 'insert1.png');
 
       await utils.mkdir(path.dirname(imgAbsPath));
       await fspromises.writeFile(imgAbsPath, Buffer.from('fake-image-data'));
 
-      documentInput = createInputDocument(
+      const documentInput = createInputDocument(
         '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some text before the image.<img src="images/insert1.png" /></p></body></html>'
       );
       const imgElem = documentInput.querySelector('img');
@@ -295,14 +302,15 @@ describe('htmlTextProcessing', () => {
       expect(imgXhtmlFile).toMatchObject({ id: 'insert1.xhtml' });
     });
 
-    it('should save the chapter when text follows the full size image', async () => {
+    it.concurrent('should save the chapter when text follows the full size image', async () => {
+      const ctx = createContext();
       const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
       const imgAbsPath = path.resolve(path.dirname(currentInputFile), 'images', 'insert1.png');
 
       await utils.mkdir(path.dirname(imgAbsPath));
       await fspromises.writeFile(imgAbsPath, Buffer.from('fake-image-data'));
 
-      documentInput = createInputDocument(
+      const documentInput = createInputDocument(
         '<html><head><title>Some Story</title></head><body><h1>Chapter 1</h1><p>Some text before the image.<img src="images/insert1.png" /></p><p>Some text after the image.</p></body></html>'
       );
       const imgElem = documentInput.querySelector('img');

@@ -18,12 +18,12 @@ import {
   TextProcessingECOptions,
 } from '../helpers/htmlTextProcessing.js';
 import * as ssc from '../common/sevenseascommon.js';
+import * as common from '../common/common.js';
 
 const log = utils.createNameSpace('lastofkind_ln');
 
 // STATIC OPTIONS
 const INPUT_MATCH_REGEX = /Reincarnated as the Last of My Kind/gim;
-const SERIES_MATCH_REGEX = /^(?<series>.+?)(?: (?:Vol\.|Volume) (?<num>\d+))?$/im;
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /^$/gim;
 const COVER_XHTML_FILENAME = 'cover';
@@ -138,31 +138,8 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   utils.assertionDefined(epubctxInput.customData, new Error('Expected "epubctxInput.customData" to be defined at this point'));
   const contentOPFInput = epubctxInput.customData.contentOPFDoc;
 
-  function contentOPFHook({ document, idCounter, metadataElem }: Parameters<epubh.ContentOPFFn>[0]) {
-    const packageElementOld = xh.queryDefinedElement(contentOPFInput, 'package');
-    const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
-
-    const idCounterO: epubh.IdCounter = { c: idCounter };
-    epubh.copyMetadata(document, Array.from(metadataElementOld.children), epubctxOut, metadataElem, packageElementOld, idCounterO);
-
-    // Regex to extract the series title and if available the volume position
-    const caps = SERIES_MATCH_REGEX.exec(epubctxOut.title);
-
-    if (!utils.isNullOrUndefined(caps)) {
-      const seriesTitleNoVolume = utils.regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
-      const seriesPos = utils.regexMatchGroup(caps, 'num');
-
-      epubh.applySeriesMetadata(document, metadataElem, idCounterO, {
-        name: seriesTitleNoVolume,
-        volume: seriesPos ?? '1',
-      });
-    } else {
-      log('Found no series captures for: "'.red + epubctxOut.title.grey + '"'.red);
-    }
-  }
-
   return await finishEpubctx(epubctxOut, options, [epubctxInput], {
-    contentOPF: contentOPFHook,
+    contentOPF: common.createCommonOPFHook(contentOPFInput, epubctxOut),
   });
 }
 

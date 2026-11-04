@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as xh from '../helpers/xml.js';
 import * as epubh from '../helpers/epub.js';
 import { copyImage, finishEpubctx, STATICS, TextProcessingECOptions } from '../helpers/htmlTextProcessing.js';
+import * as common from '../common/common.js';
 
 /*
 This is a module that does *not* apply the normal templates, but rather copies
@@ -145,35 +146,8 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
     console.error(`Unhandled "mimetype": ${mimetype}`.red, file);
   }
 
-  function contentOPFHook({ document, idCounter, metadataElem }: Parameters<epubh.ContentOPFFn>[0]) {
-    const packageElementOld = xh.queryDefinedElement(contentOPFInput, 'package');
-    const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
-
-    const idCounterO: epubh.IdCounter = { c: idCounter };
-    epubh.copyMetadata(document, Array.from(metadataElementOld.children), epubctxOutput, metadataElem, packageElementOld, idCounterO);
-
-    // Regex to extract the series title and if available the volume position
-    const caps = SERIES_MATCH_REGEX.exec(epubctxOutput.title);
-
-    if (!utils.isNullOrUndefined(caps)) {
-      const seriesTitleNoVolume = utils.regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
-      const seriesPos = utils.regexMatchGroup(caps, 'num');
-
-      if (!seriesPos) {
-        console.log('Failed to extra series position information!'.yellow);
-      }
-
-      epubh.applySeriesMetadata(document, metadataElem, idCounterO, {
-        name: seriesTitleNoVolume,
-        volume: seriesPos ?? '1',
-      });
-    } else {
-      log('Found no series captures for: "'.red + epubctxOutput.title.grey + '"'.red);
-    }
-  }
-
   return await finishEpubctx(epubctxOutput, options, [epubctxInput], {
-    contentOPF: contentOPFHook,
+    contentOPF: common.createCommonOPFHook(contentOPFInput, epubctxOutput, SERIES_MATCH_REGEX),
   });
 }
 

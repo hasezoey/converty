@@ -20,6 +20,7 @@ import {
   parentHas,
   getBodyFontPx,
 } from '../helpers/htmlTextProcessing.js';
+import * as common from './common.js';
 
 const log = utils.createNameSpace('sevenseascommon');
 
@@ -28,8 +29,6 @@ const log = utils.createNameSpace('sevenseascommon');
 export const DEFAULT_FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 /** Regex of titles to filter out (to not include in the output) */
 export const DEFAULT_TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
-/** Regex for detecting the series in the ContentOPF */
-export const SERIES_MATCH_REGEX = /^(?<series>.+?)( (?:Vol\.|Volume) (?<num>\d+))?$/im;
 /** Cover file name (without extension) for the xhtml file */
 export const COVER_XHTML_FILENAME = 'cover';
 
@@ -206,31 +205,8 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
   utils.assertionDefined(epubctxInput.customData, new Error('Expected "epubctxInput.customData" to be defined at this point'));
   const contentOPFInput = epubctxInput.customData.contentOPFDoc;
 
-  function contentOPFHook({ document, idCounter, metadataElem }: Parameters<epubh.ContentOPFFn>[0]) {
-    const packageElementOld = xh.queryDefinedElement(contentOPFInput, 'package');
-    const metadataElementOld = xh.queryDefinedElement(contentOPFInput, 'metadata');
-
-    const idCounterO: epubh.IdCounter = { c: idCounter };
-    epubh.copyMetadata(document, Array.from(metadataElementOld.children), epubctxOut, metadataElem, packageElementOld, idCounterO);
-
-    // Regex to extract the series title and if available the volume position
-    const caps = SERIES_MATCH_REGEX.exec(epubctxOut.title);
-
-    if (!utils.isNullOrUndefined(caps)) {
-      const seriesTitleNoVolume = utils.regexMatchGroupRequired(caps, 'series', 'contentOPFHook meta collection');
-      const seriesPos = utils.regexMatchGroup(caps, 'num');
-
-      epubh.applySeriesMetadata(document, metadataElem, idCounterO, {
-        name: seriesTitleNoVolume,
-        volume: seriesPos ?? '1',
-      });
-    } else {
-      log('Found no series captures for: "'.red + epubctxOut.title.grey + '"'.red);
-    }
-  }
-
   return await finishEpubctx(epubctxOut, options, [epubctxInput], {
-    contentOPF: config.contentOPFHook ?? contentOPFHook,
+    contentOPF: config.contentOPFHook ?? common.createCommonOPFHook(contentOPFInput, epubctxOut),
   });
 }
 

@@ -73,7 +73,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
     }
   });
 
-  it('should skip the configured number of elements', async () => {
+  it.concurrent('should skip the configured number of elements', async () => {
     const ctx = createContext();
     const documentInput = createInputDocument(
       '<html><head><title>Chapter 1</title></head><body><h1>Chapter 1</h1><p>skipped</p><p>kept</p></body></html>'
@@ -93,7 +93,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
     expect(content).not.toContain('skipped');
   });
 
-  it('should skip elements matched by the custom checkElement function', async () => {
+  it.concurrent('should skip elements matched by the custom checkElement function', async () => {
     const ctx = createContext();
     const documentInput = createInputDocument(
       '<html><head><title>Chapter 1</title></head><body><h1>Chapter 1</h1><p class="skip">skipped</p><p>kept</p></body></html>'
@@ -113,7 +113,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
     expect(content).not.toContain('skipped');
   });
 
-  it('should save the content before a full size image and continue with a new document', async () => {
+  it.concurrent('should save the content before a full size image and continue with a new document', async () => {
     const ctx = createContext();
     const currentInputFile = path.join(ctx.rootDir, 'input', 'chapter1.xhtml');
     const imgAbsPath = path.resolve(path.dirname(currentInputFile), 'images', 'insert1.png');
@@ -248,7 +248,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
     );
   });
 
-  it('should skip empty elements before the content', async () => {
+  it.concurrent('should skip empty elements before the content', async () => {
     const ctx = createContext();
     const documentInput = createInputDocument(
       '<html><head><title>Chapter 1</title></head><body><h1>Chapter 1</h1><p></p><p>kept</p></body></html>'
@@ -262,7 +262,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
     expect(content).toContain('</h1><p>kept');
   });
 
-  it('should omit paragraph elements generated without content', async () => {
+  it.concurrent('should omit paragraph elements generated without content', async () => {
     const ctx = createContext();
     const documentInput = createInputDocument(
       '<html><head><title>Chapter 1</title></head><body><h1>Chapter 1</h1><p>one</p><p>empty</p></body></html>'
@@ -291,7 +291,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
     expect(content).not.toContain('empty');
   });
 
-  it('should reset the previous image state and increment the subchapter', async () => {
+  it.concurrent('should reset the previous image state and increment the subchapter', async () => {
     const ctx = createContext();
     ctx.optionsClass.setLastType(htmltp.LastProcessedType.Image);
     ctx.optionsClass.setImgTypeImplicit(epubh.ImgType.Insert);
@@ -313,7 +313,7 @@ describe('htmlTextProcessing doTextContent branches', () => {
   });
 
   describe('trimDOM whitespace element', () => {
-    it('should trim an element that only contains whitespace text', () => {
+    it.concurrent('should trim an element that only contains whitespace text', () => {
       const { document } = xh.newJSDOM('<html><body></body></html>');
       const mainElem = document.createElement('div');
       const whitespaceElem = document.createElement('p');

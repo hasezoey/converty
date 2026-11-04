@@ -53,6 +53,8 @@ Test fixtures live in `fixtures/`.
 End-to-End tests should be separate from unit tests.
 The `src/bin/main.ts` file does not need to be tested as it is just a call of `src/main.ts`.
 
+If there are any uncertainties, ask for clarification.
+
 ## Change size
 
 - We follow the "a commit should be minimal", at least in a reasonable amount.

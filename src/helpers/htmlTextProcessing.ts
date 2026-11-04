@@ -892,6 +892,34 @@ export function getBodyFontPx(doc: Document): GetBodyFontPxRet {
   };
 }
 
+/** A single "computed CSS value -> inline element" rule for {@link processCommonStyle} */
+export interface StyleElementConvertRule {
+  /**
+   * The element to create when the rule matches
+   * This element name is also checked to not already exist in the chain.
+   */
+  tagName: keyof HTMLElementTagNameMap;
+  /** The computed-style property to read */
+  property: keyof CSSStyleDeclaration;
+  /** Values of the property that should trigger the wrapping element */
+  values: string[];
+}
+
+/**
+ * Rules applied by {@link processCommonStyle}.
+ * Order matters, because the elements are nested in the order they are applied.
+ */
+const COMMON_STYLE_RULES: StyleElementConvertRule[] = [
+  // Note: if "strong" and css setting "font-weight" are set to "bold", then it will always be "bold",
+  // but in chrome & firefox it will be a number (700)
+  { tagName: 'strong', property: 'fontWeight', values: ['bold', '700'] },
+  { tagName: 'em', property: 'fontStyle', values: ['italic'] },
+  { tagName: 'sup', property: 'verticalAlign', values: ['super'] },
+  { tagName: 'sub', property: 'verticalAlign', values: ['sub'] },
+  { tagName: 'u', property: 'textDecoration', values: ['underline'] },
+  { tagName: 's', property: 'textDecoration', values: ['line-through'] },
+];
+
 /**
  * Process Common styles for a element
  * @param pelemTracker The PElemTracker to keep track of where to add elements
@@ -909,24 +937,14 @@ export function processCommonStyle(
   const { bodyFontSizePx, window } = getBodyFontPx(elem.ownerDocument);
   const elemCompStyle = window.getComputedStyle(elem);
 
-  // Note: if "strong" and css setting "font-weight" are set to "bold", then it will always be "bold", but in chrome & firefox it will be a number (700)
-  if (!hasInChain(pelemTracker.currentElem, 'strong') && elemCompStyle.fontWeight === 'bold') {
-    pelemTracker.setNewElem(documentNew.createElement('strong'));
-  }
-  if (!hasInChain(pelemTracker.currentElem, 'em') && elemCompStyle.fontStyle === 'italic') {
-    pelemTracker.setNewElem(documentNew.createElement('em'));
-  }
-  if (!hasInChain(pelemTracker.currentElem, 'sup') && elemCompStyle.verticalAlign === 'super') {
-    pelemTracker.setNewElem(documentNew.createElement('sup'));
-  }
-  if (!hasInChain(pelemTracker.currentElem, 'sub') && elemCompStyle.verticalAlign === 'sub') {
-    pelemTracker.setNewElem(documentNew.createElement('sub'));
-  }
-  if (!hasInChain(pelemTracker.currentElem, 'u') && elemCompStyle.textDecoration === 'underline') {
-    pelemTracker.setNewElem(documentNew.createElement('u'));
-  }
-  if (!hasInChain(pelemTracker.currentElem, 's') && elemCompStyle.textDecoration === 'line-through') {
-    pelemTracker.setNewElem(documentNew.createElement('s'));
+  for (const rule of COMMON_STYLE_RULES) {
+    if (
+      !hasInChain(pelemTracker.currentElem, rule.tagName) &&
+      elemCompStyle[rule.property] &&
+      rule.values.includes(elemCompStyle[rule.property] as string)
+    ) {
+      pelemTracker.setNewElem(documentNew.createElement(rule.tagName));
+    }
   }
 
   // cover smaller font sizes (like "font-size: 80%"), but do not stack multiple "small" elements

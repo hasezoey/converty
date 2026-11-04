@@ -358,6 +358,21 @@ describe('htmlTextProcessing', () => {
       expect(res.elemCompStyle).toBeDefined();
     });
 
+    it('should add a "strong" element when the font weight is 700', () => {
+      const doc = createDoc();
+      const elem = doc.createElement('div');
+      const parentElem = doc.createElement('div');
+      const tracker = new htmltp.PElemTracker();
+
+      vi.spyOn(doc.defaultView!, 'getComputedStyle').mockReturnValue({ fontWeight: '700' } as any);
+
+      const res = htmltp.processCommonStyle(tracker, parentElem, doc, elem);
+
+      expect(tracker.currentElem).toBeDefined();
+      expect(tracker.currentElem?.nodeName).toBe('STRONG');
+      expect(res.elemCompStyle).toBeDefined();
+    });
+
     it('should add an "em" element when the font style is italic', () => {
       const doc = createDoc();
       const elem = doc.createElement('div');

@@ -1,6 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "shell": "/usr/bin/fish",
   "permissions": [
     { "action": "*", "resource": "*", "effect": "ask" },
     
@@ -16,6 +15,7 @@
     { "action": "shell", "resource": "cat *", "effect": "allow" },
     { "action": "shell", "resource": "find *", "effect": "allow" },
     { "action": "shell", "resource": "rg *", "effect": "allow" },
+    { "action": "shell", "resource": "grep *", "effect": "allow" },
     { "action": "shell", "resource": "sort*", "effect": "allow" },
     { "action": "shell", "resource": "head*", "effect": "allow" },
     { "action": "shell", "resource": "tail*", "effect": "allow" },

@@ -170,7 +170,7 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
 
 // extends, because otherwise it would complain about types being not correct in a alias
 export class SevenSeasECOptions extends TextProcessingECOptions {
-  public titleCache?: IsTitleCache;
+  public titleCache?: common.IsTitleCache;
   /** The {@link EntryInformationExt} of the last processed file */
   public lastEntryType?: EntryInformationExt;
 }
@@ -374,19 +374,13 @@ export function cachedIsTitleOptions(document: Document, optionsClass: SevenSeas
   optionsClass.titleCache = getBodyFontPx(document);
 }
 
-/** Cache Object for {@link isTitle} */
-export interface IsTitleCache {
-  bodyFontSizePx: number;
-  window: Window;
-}
-
 /**
  * Determine if the element is a Heading
  * @param document The Document to work on
  * @param elem The Element to check
  * @param entryType The Entry Information
  * @param cache Optional Cache to not compute styles too often when not required
- * @returns A String with the detected content of the element if a title, "false" otherwise
+ * @returns A String with the detected content of the element if a title, "true" if the title is the same as known, "false" otherwise
  */
 export function isTitle(
   document: Document,
@@ -418,38 +412,8 @@ export function isTitle(
   }
 
   // below is a alternative way of detecting a heading by using fontsize
-  // works in this case because fonsize is 150% (1.5 the size)
-
-  let bodyFontSize: number;
-  let window: Window;
-
-  if (!utils.isNullOrUndefined(optionsClass.titleCache)) {
-    bodyFontSize = optionsClass.titleCache.bodyFontSizePx;
-    window = optionsClass.titleCache.window;
-  } else {
-    const ret = getBodyFontPx(document);
-    window = ret.window;
-    bodyFontSize = ret.bodyFontSizePx;
-  }
-
-  const innerElem = elem.querySelector(':first-child');
-
-  // use first inner elements, because headers are wrapped in a span that has the font-size style
-  const useElem = innerElem ? innerElem : elem;
-
-  const elemCompStyle = window.getComputedStyle(useElem);
-  let elemFontSizePx: number;
-
-  {
-    const elemFontSizePxTMP = parseInt(elemCompStyle.fontSize);
-    elemFontSizePx = Number.isNaN(elemFontSizePxTMP) ? bodyFontSize : elemFontSizePxTMP;
-  }
-
-  if (elemFontSizePx >= bodyFontSize * 1.1) {
-    return sh.xmlToString(useElem.textContent ?? '') || false;
-  }
-
-  return false;
+  // works in this case because fonsize is 130% (1.3 the size)
+  return common.detectTitleByFontSize(elem, optionsClass.titleCache);
 }
 
 /**

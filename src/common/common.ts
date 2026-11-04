@@ -5,6 +5,8 @@ import * as utils from '../utils.js';
 import * as path from 'node:path';
 import * as fspromises from 'node:fs/promises';
 import { getTemplate } from '../helpers/template.js';
+import * as htmltp from '../helpers/htmlTextProcessing.js';
+import * as sh from '../helpers/string.js';
 
 const log = utils.createNameSpace('common/common');
 
@@ -206,4 +208,49 @@ export async function copyStylesheet(
       filePath: stylesheetpath,
     })
   );
+}
+
+/** Cache Object for {@link isTitle} */
+export interface IsTitleCache {
+  bodyFontSizePx: number;
+  window: Window;
+}
+
+/**
+ * Determine if the given element is a title by comparing font sizes.
+ * @param elem The Element to check
+ * @param titleCache Optional Cache to not compute styles too often when not required
+ * @returns A String with the detected content of the element if a title, "false" otherwise
+ */
+export function detectTitleByFontSize(elem: Element, titleCache?: IsTitleCache): false | string {
+  let bodyFontSize: number;
+  let window: Window;
+
+  if (!utils.isNullOrUndefined(titleCache)) {
+    bodyFontSize = titleCache.bodyFontSizePx;
+    window = titleCache.window;
+  } else {
+    const ret = htmltp.getBodyFontPx(elem.ownerDocument);
+    window = ret.window;
+    bodyFontSize = ret.bodyFontSizePx;
+  }
+
+  const innerElem = elem.querySelector(':first-child');
+
+  // use first inner elements, because headers are wrapped in a span that has the font-size style
+  const useElem = innerElem ? innerElem : elem;
+
+  const elemCompStyle = window.getComputedStyle(useElem);
+  let elemFontSizePx: number;
+
+  {
+    const elemFontSizePxTMP = parseInt(elemCompStyle.fontSize);
+    elemFontSizePx = Number.isNaN(elemFontSizePxTMP) ? bodyFontSize : elemFontSizePxTMP;
+  }
+
+  if (elemFontSizePx >= bodyFontSize * 1.3) {
+    return sh.xmlToString(useElem.textContent ?? '') || false;
+  }
+
+  return false;
 }

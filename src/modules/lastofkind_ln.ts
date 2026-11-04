@@ -10,7 +10,6 @@ import {
   EntryInformation,
   EntryType,
   finishEpubctx,
-  getBodyFontPx,
   PElemTracker,
   processCommonStyle,
   STATICS,
@@ -54,7 +53,7 @@ function matcher(name: string): boolean {
 // LOCAL CODE
 
 class LastOfKindECOptions extends TextProcessingECOptions {
-  public titleCache?: IsTitleCache;
+  public titleCache?: common.IsTitleCache;
 }
 
 /**
@@ -184,12 +183,6 @@ function determineType(document: Document): EntryInformation {
   };
 }
 
-/** Cache Object for {@link isTitle} */
-interface IsTitleCache {
-  bodyFontSizePx: number;
-  window: Window;
-}
-
 /**
  * Determine if the element is a Heading
  * @param document The Document to work on
@@ -198,7 +191,7 @@ interface IsTitleCache {
  * @param cache Optional Cache to not compute styles too often when not required
  * @returns A String with the detected content of the element if a title, "false" otherwise
  */
-function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: LastOfKindECOptions): boolean | string {
+function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: LastOfKindECOptions): false | string {
   const processedTitle = sh.xmlToString(elem.textContent ?? '');
 
   // basic fast test if the content matches the parsed title
@@ -208,38 +201,8 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
   }
 
   // below is a alternative way of detecting a heading by using fontsize
-  // works in this case because fonsize is 150% (1.5 the size)
-
-  let bodyFontSize: number;
-  let window: Window;
-
-  if (!utils.isNullOrUndefined(optionsClass.titleCache)) {
-    bodyFontSize = optionsClass.titleCache.bodyFontSizePx;
-    window = optionsClass.titleCache.window;
-  } else {
-    const ret = getBodyFontPx(document);
-    window = ret.window;
-    bodyFontSize = ret.bodyFontSizePx;
-  }
-
-  const innerElem = elem.querySelector(':first-child');
-
-  // use first inner elements, because headers are wrapped in a span that has the font-size style
-  const useElem = innerElem ? innerElem : elem;
-
-  const elemCompStyle = window.getComputedStyle(useElem);
-  let elemFontSizePx: number;
-
-  {
-    const elemFontSizePxTMP = parseInt(elemCompStyle.fontSize);
-    elemFontSizePx = Number.isNaN(elemFontSizePxTMP) ? bodyFontSize : elemFontSizePxTMP;
-  }
-
-  if (elemFontSizePx >= bodyFontSize * 1.5) {
-    return sh.xmlToString(useElem.textContent ?? '') || false;
-  }
-
-  return false;
+  // works in this case because fonsize is 130% (1.3 the size)
+  return common.detectTitleByFontSize(elem, optionsClass.titleCache);
 }
 
 /**

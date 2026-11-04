@@ -3,6 +3,8 @@ import { TextProcessingECOptions } from '../helpers/htmlTextProcessing.js';
 import * as xh from '../helpers/xml.js';
 import * as utils from '../utils.js';
 import * as path from 'node:path';
+import * as fspromises from 'node:fs/promises';
+import { getTemplate } from '../helpers/template.js';
 
 const log = utils.createNameSpace('common/common');
 
@@ -185,4 +187,23 @@ export function* filterFiles(
 
     console.error(`Unhandled "mimetype": ${mimetype}`.red, file);
   }
+}
+
+/**
+ * Copy the default `text-ln.css` stylesheet into the given epubctx.
+ * @param epubctx The Epub context to copy the file into
+ */
+export async function copyStylesheet(
+  epubctx: epubh.EpubContext<epubh.BaseEpubOptions<epubh.BaseEpubContextTrackers, 'Global'>, epubh.InputEpubCustomData>
+) {
+  const stylesheetpath = path.resolve(epubctx.contentOPFDir, epubh.FileDir.Styles, 'stylesheet.css');
+  await utils.mkdir(path.dirname(stylesheetpath));
+  await fspromises.writeFile(stylesheetpath, await getTemplate('text-ln.css'));
+  epubctx.addFile(
+    new epubh.EpubContextFileBase({
+      id: 'stylesheet',
+      mediaType: epubh.STATICS.CSS_MIMETYPE,
+      filePath: stylesheetpath,
+    })
+  );
 }

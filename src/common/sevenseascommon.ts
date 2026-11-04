@@ -1,7 +1,6 @@
 import * as utils from '../utils.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
-import { getTemplate } from '../helpers/template.js';
 import * as xh from '../helpers/xml.js';
 import * as sh from '../helpers/string.js';
 import * as epubh from '../helpers/epub.js';
@@ -141,16 +140,7 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     optionsClass: new (config.customECOptions ?? SevenSeasECOptions)(),
   });
 
-  const stylesheetpath = path.resolve(epubctxOut.contentOPFDir, epubh.FileDir.Styles, 'stylesheet.css');
-  await utils.mkdir(path.dirname(stylesheetpath));
-  await fspromises.writeFile(stylesheetpath, await getTemplate('text-ln.css'));
-  epubctxOut.addFile(
-    new epubh.EpubContextFileBase({
-      id: 'stylesheet',
-      mediaType: epubh.STATICS.CSS_MIMETYPE,
-      filePath: stylesheetpath,
-    })
-  );
+  await common.copyStylesheet(epubctxOut);
 
   const extraFilterRegex: common.FilterFilesExtraIgnore = [
     // ignore common names for table-of-contents

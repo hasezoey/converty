@@ -130,7 +130,7 @@ export interface SevenSeasConfig {
   /** Define a custom title regex filter-out */
   TitlesToFilter?: RegExp;
   /** Define a custom files regex filter-out */
-  FilesToFilter?: RegExp;
+  FilesToFilter?: common.FilterFilesExtraIgnore;
 }
 
 export async function process(options: utils.ConverterOptions, config: SevenSeasConfig): Promise<string> {
@@ -152,53 +152,19 @@ export async function process(options: utils.ConverterOptions, config: SevenSeas
     })
   );
 
-  for (const file of epubctxInput.files) {
-    /** Alias to make it easier to handle */
-    const filePath = file.filePath;
-
-    if (new RegExp(config.FilesToFilter ?? DEFAULT_FILES_TO_FILTER_OUT_REGEX).test(filePath)) {
-      log(`Skipping file "${file.id}" because it is in the filter regex`);
-      continue;
-    }
-
-    // skip "content.opf" file, because it is handled outside of this loop
-    if (/\.opf/.test(filePath)) {
-      continue;
-    }
-    // ignore all .ncx files (like toc.ncx)
-    if (/\.ncx/.test(filePath)) {
-      continue;
-    }
+  const extraFilterRegex: common.FilterFilesExtraIgnore = [
     // ignore common names for table-of-contents
-    if (/^(?:toc|nav).xhtml$/.test(path.basename(filePath))) {
-      continue;
-    }
+    { regex: /^(?:toc|nav).xhtml$/, basename: true },
+  ];
 
-    const mimetype = file.mediaType;
-    log(`Processing file "${file.id}", ${mimetype}`);
+  if (config.FilesToFilter) {
+    extraFilterRegex.push(...config.FilesToFilter);
+  } else {
+    extraFilterRegex.push(DEFAULT_FILES_TO_FILTER_OUT_REGEX);
+  }
 
-    utils.assertion(typeof mimetype === 'string', new Error('Expected "mimetype" to be of string'));
-
-    if (/image/gim.test(mimetype)) {
-      // ignore image files, because they will be copied when required
-      continue;
-    }
-    if (mimetype === epubh.STATICS.CSS_MIMETYPE) {
-      // ignore css input files, because our own will be applied
-      continue;
-    }
-    if (file instanceof epubh.EpubContextFileXHTML) {
-      // ignore all files that are not listed in the spine
-      if (!file.customData?.spineIndex) {
-        log(`Skipping file "${file.id}" as it is not listed in the original spine!`);
-        continue;
-      }
-
-      await (config.processHTMLFile ?? processHTMLFile)(file.filePath, epubctxOut, config);
-      continue;
-    }
-
-    console.error(`Unhandled "mimetype": ${mimetype}`.red, file);
+  for (const file of common.filterFiles(epubctxInput, extraFilterRegex, false)) {
+    await (config.processHTMLFile ?? processHTMLFile)(file.filePath, epubctxOut, config);
   }
 
   // check needs to be done, because it does not carry over from the function that defined it

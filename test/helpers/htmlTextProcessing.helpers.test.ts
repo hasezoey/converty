@@ -127,8 +127,8 @@ describe('htmlTextProcessing helpers', () => {
     });
   });
 
-  describe('traverseParent', () => {
-    it('should traverse all parents upwards', () => {
+  describe('traverseElements', () => {
+    it('should traverse all parents upwards HTML', () => {
       const { document } = xh.newJSDOM('<html><body><div><span><em id="target"></em></span></div></body></html>');
       const targetElem = xh.queryDefinedElement(document, '#target');
 
@@ -235,7 +235,7 @@ describe('htmlTextProcessing helpers', () => {
 
       // Actual parent that should always be found
       expect(htmltp.hasInChain(targetElem, 'div')).toBe(true);
-      // Self element should not be found
+      // Self element should be found
       expect(htmltp.hasInChain(targetElem, 'em')).toBe(true);
       // Non-existant element, should never be found
       expect(htmltp.hasInChain(targetElem, 'section')).toBe(false);

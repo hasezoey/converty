@@ -81,40 +81,19 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
   const stylesheetpath = path.resolve(epubctxOutput.contentOPFDir, STYLE_PATH);
   let done_style = false;
 
-  for (const file of epubctxInput.files) {
-    /** Alias to make it easier to handle */
-    const filePath = file.filePath;
+  // process the files from input to output
+  const extraFilterRegex: common.FilterFilesExtraIgnore = [
+    FILES_TO_FILTER_OUT_REGEX,
+    // ignore common names for table-of-contents
+    { regex: /^(?:toc|nav).xhtml$/, basename: true },
+  ];
 
-    if (new RegExp(FILES_TO_FILTER_OUT_REGEX).test(filePath)) {
-      log(`Skipping file "${file.id}" because it is in the filter regex`);
-      continue;
-    }
+  for (const file of common.filterFiles(epubctxInput, extraFilterRegex, true)) {
+    if (file instanceof epubh.EpubContextFileXHTML) {
+      await processHTMLFile(epubctxInput, epubctxOutput, file);
+    } else {
+      utils.assertion(file.mediaType === epubh.STATICS.CSS_MIMETYPE, new Error('Expected "mimetype" to be a stylesheet'));
 
-    // skip "content.opf" file, because we re-generate it
-    if (/\.opf/.test(filePath)) {
-      continue;
-    }
-    // ignore all .ncx files (like toc.ncx), as we re-generate those
-    if (/\.ncx/.test(filePath)) {
-      continue;
-    }
-    // ignore toc XHTMLs as we re-generate those
-    // NOTE: some series dont name their files that way, so we have to later test via title / header after parsing the xhtml
-    if (/^(?:toc|nav).xhtml$/.test(path.basename(filePath))) {
-      continue;
-    }
-
-    const mimetype = file.mediaType;
-    const file_basename = path.basename(file.filePath);
-    log(`Processing file "${file.id}"("${file_basename}"), ${mimetype}`);
-
-    utils.assertion(typeof mimetype === 'string', new Error('Expected "mimetype" to be of string'));
-
-    if (/image/gim.test(mimetype)) {
-      // ignore image files, because they will be copied when required
-      continue;
-    }
-    if (mimetype === epubh.STATICS.CSS_MIMETYPE) {
       if (done_style) {
         console.log(`Found more than 1 stylesheets, only one is supported, skipping. File: ${file.filePath}`.red);
         continue;
@@ -132,18 +111,6 @@ export async function process(options: utils.ConverterOptions): Promise<string> 
       );
       continue;
     }
-    if (file instanceof epubh.EpubContextFileXHTML) {
-      // ignore all files that are not listed in the spine
-      if (!file.customData?.spineIndex) {
-        log(`Skipping file "${file.id}" as it is not listed in the original spine!`);
-        continue;
-      }
-
-      await processHTMLFile(epubctxInput, epubctxOutput, file);
-      continue;
-    }
-
-    console.error(`Unhandled "mimetype": ${mimetype}`.red, file);
   }
 
   return await finishEpubctx(epubctxOutput, options, [epubctxInput], {

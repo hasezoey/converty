@@ -86,4 +86,34 @@ describe('lastofkind_ln process', () => {
 
     expect(await utils.pathExists(path.join(resultPath, 'OEBPS', 'Styles', 'stylesheet.css'))).toBe(true);
   });
+
+  it('should skip a "contents.xhtml" file from the spine', async () => {
+    const fixture = await createEpubFixture({
+      title: 'Reincarnated as the Last of My Kind Vol. 1',
+      coverImage: false,
+      chapters: [
+        {
+          id: 'contents',
+          href: 'Text/contents.xhtml',
+          title: 'Contents',
+          body: '<h1>Contents</h1><p>Chapter 1</p>',
+        },
+      ],
+    });
+    cleanupPaths.push(fixture.rootDir);
+
+    const workDir = await utils.createTmpDir('converty-lastofkind-');
+    cleanupPaths.push(workDir);
+    const outputDir = path.join(workDir, 'output');
+    await utils.mkdir(outputDir);
+
+    const resultPath = await lastofkind_ln().process({
+      converterInputPath: fixture.rootDir,
+      converterOutputPath: outputDir,
+      fileInputPath: fixture.rootDir,
+    });
+
+    const textFiles = (await fspromises.readdir(path.join(resultPath, 'OEBPS', 'Text'))).sort();
+    expect(textFiles).toEqual(['chapter1.xhtml', 'chapter2.xhtml', 'toc.xhtml']);
+  });
 });

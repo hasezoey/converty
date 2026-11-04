@@ -173,7 +173,7 @@ describe('sevenseasCommon process', () => {
         fileInputPath: fixture.rootDir,
       },
       {
-        FilesToFilter: filesToFilter,
+        FilesToFilter: [filesToFilter],
         processHTMLFile: async (filePath, epubctxOut, config) => {
           processedFiles.push(path.basename(filePath));
 

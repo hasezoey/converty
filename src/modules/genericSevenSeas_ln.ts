@@ -29,7 +29,7 @@ export default function genericSevenSeas_ln(): utils.ConverterModule {
 
 export async function process(options: utils.ConverterOptions): Promise<string> {
   return ssc.process(options, {
-    FilesToFilter: FILES_TO_FILTER_OUT_REGEX,
+    FilesToFilter: [FILES_TO_FILTER_OUT_REGEX],
     TitlesToFilter: TITLES_TO_FILTER_OUT_REGEX,
   });
 }

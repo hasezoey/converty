@@ -25,7 +25,7 @@ const log = utils.createNameSpace('lastofkind_ln');
 // STATIC OPTIONS
 const INPUT_MATCH_REGEX = /Reincarnated as the Last of My Kind/gim;
 /** Regex of files to filter out (to not include in the output) */
-const FILES_TO_FILTER_OUT_REGEX = /^$/gim;
+const FILES_TO_FILTER_OUT_REGEX = /^contents.xhtml$/gim;
 const COVER_XHTML_FILENAME = 'cover';
 const TITLES_TO_FILTER_OUT_REGEX = /other series/gim;
 const JSDOM_XHTML_OPTIONS = STATICS.JSDOM_XHTML_OPTIONS;
@@ -86,50 +86,14 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   );
 
   // process the files from input to output
+  const extraFilterRegex: common.FilterFilesExtraIgnore = [
+    { regex: FILES_TO_FILTER_OUT_REGEX, basename: true },
+    // ignore common names for table-of-contents
+    { regex: /^(?:toc|nav).xhtml$/, basename: true },
+  ];
 
-  for (const file of epubctxInput.files) {
-    /** Alias to make it easier to handle */
-    const filePath = file.filePath;
-
-    if (new RegExp(FILES_TO_FILTER_OUT_REGEX).test(filePath)) {
-      log(`Skipping file "${file}" because it is in the filter regex`);
-      continue;
-    }
-
-    // skip "content.opf" file, because it is handled outside of this loop
-    if (/content\.opf/.test(filePath)) {
-      continue;
-    }
-    // ignore all .ncx files (like toc.ncx)
-    if (/\.ncx/.test(filePath)) {
-      continue;
-    }
-
-    const mimetype = file.mediaType;
-    log(`Processing file "${file.id}", ${mimetype}`);
-
-    utils.assertion(typeof mimetype === 'string', new Error('Expected "mimetype" to be of string'));
-
-    if (/image/gim.test(mimetype)) {
-      // ignore image files, because they will be copied when required
-      continue;
-    }
-    if (mimetype === epubh.STATICS.CSS_MIMETYPE) {
-      // ignore css input files, because our own will be applied
-      continue;
-    }
-    if (file instanceof epubh.EpubContextFileXHTML) {
-      // ignore all files that are not listed in the spine
-      if (!file.customData?.spineIndex) {
-        log(`Skipping file "${file.id}" as it is not listed in the original spine!`);
-        continue;
-      }
-
-      await processHTMLFile(file.filePath, epubctxOut);
-      continue;
-    }
-
-    console.error(`Unhandled "mimetype": ${mimetype}`.red);
+  for (const file of common.filterFiles(epubctxInput, extraFilterRegex, false)) {
+    await processHTMLFile(file.filePath, epubctxOut);
   }
 
   // apply metadata

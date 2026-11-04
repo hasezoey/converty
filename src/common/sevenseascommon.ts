@@ -786,7 +786,7 @@ export const GENERIC_TITLE_REGEX = /^\s*(?<type>.+?)(?: (?<num>\d+))?(?:: (?<tit
 
 /** Helper function to process a array into lowercase and remove all spaces */
 export function processTitles(arr: string[]): string[] {
-  return arr.map((v) => v.toLowerCase().replaceAll(/\s/g, ''));
+  return arr.map(preProcessTitle);
 }
 
 /** Basically {@link EntryInformationExt}, just without "title"(fullTitle) */

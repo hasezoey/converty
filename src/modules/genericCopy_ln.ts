@@ -58,7 +58,7 @@ export function matcher(name: string) {
   return ret;
 }
 
-export default function genericSevenSeas_ln(): utils.ConverterModule {
+export default function genericCopy_ln(): utils.ConverterModule {
   return { matcher, process };
 }
 

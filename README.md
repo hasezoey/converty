@@ -1,17 +1,17 @@
-# Coverty
+# Converty
 
 Simple EPUB(-like) converter collection.
 
-Note: This is mainly a personal project, so it may or may not get more useable.
+Note: This is mainly a personal project, so it may or may not get more usable.
 
 ## What this is
 
-- A collection of scripts to transform a input EPUB(-like) to a Consistent EPUB with the styles that are wanted by the User
+- A collection of scripts to transform an input EPUB-like to a consistent EPUB matching the user's desired styles.
 
 ## What this is not
 
-- This Project is not performance oriented
-- This Project is not intendet for Production use
+- This project is not performance-oriented
+- This project is not intended for production use
 
 ## How to use
 
@@ -22,7 +22,7 @@ Requirements:
 
 ### Running
 
-To transform a supported epub(-like), the input will need to be put into `CONVERTER_READ_PATH`(defined in `src/main.ts`), which is by default `~/Downloads/converty-in`, and then the project needs to be run:
+To transform a supported epub-like, the input will need to be put into `CONVERTER_READ_PATH`(defined in `src/main.ts`), which is by default `~/Downloads/converty-in`, and then the project needs to be run:
 
 ```sh
 # This script assumes the CWD/PWD is the project root
@@ -31,7 +31,7 @@ To transform a supported epub(-like), the input will need to be put into `CONVER
 mkdir -p ~/Downloads/converty-in
 
 # Copy input file to the transform input
-# No Data in the input path is touched, but it is safer to copy it in
+# No data in the input path is touched, but it is safer to copy it.
 cp /path/to/input.epub ~/Downloads/converty-in
 
 # Making sure everything is installed
@@ -45,13 +45,13 @@ ls -al ~/Downloads/converty-out
 ```
 
 Note: The project can be run first to have it create the folders (like input and output).  
-Note: The inputs need to be named according to `INPUT_MATCH_REGEX` (defined in each module), this is done to easily match files to modules.
+Note: The inputs need to be named according to `INPUT_MATCH_REGEX` (defined in each module), which is done to easily match files to modules.
 
 ### Adding Modules
 
-Custom Modules can be added and placed in `src/modules`, and all modules must have a default-export which returns a object with the interface of `ConverterModule`(`src/utils.ts`), and the rest (like processing the input to output) is up to the module.
+Custom Modules can be added and placed in `src/modules`, and all modules must have a default export returning an object with the `ConverterModule`(`src/utils.ts`) interface, and the rest (like processing the input to output) is up to the module.
 
-See existing Modules for help.
+See existing `modules` for help.
 
 ### Testing
 
@@ -74,9 +74,10 @@ There is the environment variable `DEBUG_OUTPUT` which will output files uncompr
 
 #### run:compare script
 
-There is also a comparison script `run:compare` which will create a separate output directory along with `input` and `output` which is a git repository, the script will run like normal and then commit all the output in the git repository to make comparing changes easier (commit messages include the commit they are generated from).
+The compare script `run:compare` will create a separate output directory, which is a git repository.
+This can be used for comparing book changes against code changes.
 
-This makes regression testing much easier by having a simple script to run to find what changed or while using `git bisect`.  
+This makes regression testing much easier by having a simple script to run to find what changed or when using `git bisect`.  
 
 Makes use of `DEBUG_OUTPUT` to pretty print the output.
 
@@ -86,4 +87,4 @@ See [Supported Titles](./SUPPORTED_TITLES.md).
 
 ## Disclaimer
 
-This Project is only a collection of scripts to **transform** inputs to outputs, it does not contain any of the things it is meant to transform.
+This project is only a collection of scripts to **transform** inputs to outputs; it does not contain any of the things it is meant to transform.

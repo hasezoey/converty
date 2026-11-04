@@ -17,6 +17,6 @@ List of currently Supported inputs with current modules:
 |   `genericCopy_ln`    | `So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds`  | Supports all volumes from 1 to 1              |
 
 Notes:
-- All Conversions that process a EPUB output a EPUB3 and use html elements over css styles (like instead of `font-style: italic`, html element `em` is used)
+- All Conversions that process an EPUB, output an EPUB3 compatible file and use html elements over css styles (for example, using the html element `em` instead of `font-style: italic`)
   They also mostly use the same [templates](./templates/)
 - Unless mentioned otherwise, output is in EPUB3

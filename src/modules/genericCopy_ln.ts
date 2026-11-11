@@ -22,6 +22,7 @@ const VERIFIED_MATCH_LIST = [
   'Death March to the Parallel World Rhapsody',
   'High School Prodigies Have It Easy Even in Another World!',
   'So You Want to Live the Slow Life\\? A Guide to Life in the Beastly Wilds',
+  'Another World.s Zombie Apocalypse Is Not My Problem!',
 ];
 const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
 /** Regex of files to filter out (to not include in the output) */

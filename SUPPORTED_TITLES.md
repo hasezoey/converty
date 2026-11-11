@@ -14,7 +14,8 @@ List of currently Supported inputs with current modules:
 | `genericSevenSeas_ln` |            `Modern Dungeon Capture Starting with Broken Skills`            | Supports all volumes from 1 to 3              |
 |   `genericCopy_ln`    |                `Death March to the Parallel World Rhapsody`                | Supports all volumes from 1 to 10             |
 |   `genericCopy_ln`    |        `High School Prodigies Have It Easy Even in Another World!`         | Supports all volumes from 1 to 5              |
-|   `genericCopy_ln`    | `So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds`  | Supports all volumes from 1 to 1              |
+|   `genericCopy_ln`    | `So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds`  | Supports all volumes from 1 to 5              |
+|   `genericCopy_ln`    |           `Another World’s Zombie Apocalypse Is Not My Problem!`           | Supports all volumes from 1 to 1              |
 
 Notes:
 - All Conversions that process an EPUB, output an EPUB3 compatible file and use html elements over css styles (for example, using the html element `em` instead of `font-style: italic`)

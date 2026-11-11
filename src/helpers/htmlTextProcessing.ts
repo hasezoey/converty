@@ -7,6 +7,7 @@ import * as path from 'path';
 import { getTemplate, applyTemplate } from '../helpers/template.js';
 import * as mime from 'mime-types';
 import * as fsextra from 'fs-extra';
+import { fileURLToPath } from 'url';
 
 const log = utils.createNameSpace('htmlTextProcessing');
 
@@ -403,7 +404,9 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
           epubctx.optionsClass.setLastType(LastProcessedType.None);
         }
 
-        const imgFromPath = path.resolve(path.dirname(currentInputFile), imgNode.src);
+        const imgSrcResolved = imgNode.src.startsWith('file:') ? fileURLToPath(imgNode.src) : imgNode.src;
+
+        const imgFromPath = path.resolve(path.dirname(currentInputFile), imgSrcResolved);
         const imgIdData = options.genImageIdData(epubctx.optionsClass, imgFromPath, imgNode, entryType);
         await copyImage(imgFromPath, epubctx, imgIdData.imgFilename, imgIdData.sectionId, imgIdData.imgClass);
         const { dom: imgDOM } = await createIMGlnDOM(

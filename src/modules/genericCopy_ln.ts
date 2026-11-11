@@ -5,6 +5,7 @@ import * as xh from '../helpers/xml.js';
 import * as epubh from '../helpers/epub.js';
 import { copyImage, finishEpubctx, STATICS, TextProcessingECOptions } from '../helpers/htmlTextProcessing.js';
 import * as common from '../common/common.js';
+import { fileURLToPath } from 'url';
 
 /*
 This is a module that does *not* apply the normal templates, but rather copies
@@ -304,11 +305,13 @@ async function copyCoverImg(
     new Error('Expected to find manifest item with `manifest -> item[properties="cover-item"]` or via `metadata -> meta[name="cover"]`')
   );
 
-  const ext = path.extname(coverHref);
+  const resolved = coverHref.startsWith('file:') ? fileURLToPath(coverHref) : coverHref;
+
+  const ext = path.extname(resolved);
   const coverOutName = `cover${ext}`;
-  await copyImage(path.resolve(epubctxInput.contentOPFDir, coverHref), epubctxOutput, coverOutName, coverOutName, epubh.ImgClass.Cover);
+  await copyImage(path.resolve(epubctxInput.contentOPFDir, resolved), epubctxOutput, coverOutName, coverOutName, epubh.ImgClass.Cover);
   epubctxOutput.optionsClass.coverImgId = coverOutName;
-  epubctxOutput.optionsClass.coverInputPath = coverHref;
+  epubctxOutput.optionsClass.coverInputPath = resolved;
 }
 
 /**

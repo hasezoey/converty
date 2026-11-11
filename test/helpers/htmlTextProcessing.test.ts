@@ -9,7 +9,10 @@ import * as xh from '../../src/helpers/xml.js';
 describe('htmlTextProcessing', () => {
   describe('STATICS', () => {
     it('should have the default static values', () => {
-      expect(htmltp.STATICS.JSDOM_XHTML_OPTIONS).toEqual({ contentType: xh.STATICS.XHTML_MIMETYPE });
+      expect(htmltp.STATICS.JSDOM_XHTML_OPTIONS).toEqual({
+        contentType: xh.STATICS.XHTML_MIMETYPE,
+        runScripts: 'outside-only',
+      } satisfies xh.JSDOMOptions);
       expect(htmltp.STATICS.DEFAULT_HEADER_SEARCH_COUNT).toBe(5);
       expect(htmltp.STATICS.DEFAULT_SKIP_ELEMENTS).toBe(0);
     });

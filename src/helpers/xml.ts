@@ -4,6 +4,8 @@ import * as utils from '../utils.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const log = utils.createNameSpace('xmlHelpers');
 
+export type JSDOMOptions = ConstructorParameters<typeof JSDOM>[1];
+
 /**
  * Chain-Assert that input "elem" is defined
  * @param elem The Element to assert to be defined

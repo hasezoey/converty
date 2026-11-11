@@ -1032,7 +1032,7 @@ export function* traverseElements(initElem: Element): Generator<Element> {
 
 export const STATICS = {
   /** Default JSDOM Options */
-  JSDOM_XHTML_OPTIONS: { contentType: xh.STATICS.XHTML_MIMETYPE },
+  JSDOM_XHTML_OPTIONS: { contentType: xh.STATICS.XHTML_MIMETYPE, runScripts: 'outside-only' } satisfies xh.JSDOMOptions,
   /** The default header search count */
   DEFAULT_HEADER_SEARCH_COUNT: 5,
   /** The default amount of elements to skip regardless of what they are */

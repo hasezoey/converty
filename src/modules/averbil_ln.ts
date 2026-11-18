@@ -3,6 +3,11 @@ import * as epubh from '../helpers/epub.js';
 import * as ssc from '../common/sevenseascommon.js';
 import * as common from '../common/common.js';
 
+/*
+ * This module is for handling the light novel series "Didn't I Say to Make My Abilities Average".
+ * This is required as this series has some weird styling here and there than cannot be easily handled by generic processing.
+ */
+
 const log = utils.createNameSpace('averbil_ln');
 
 // STATIC OPTIONS

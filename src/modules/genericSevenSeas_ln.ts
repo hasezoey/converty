@@ -2,6 +2,11 @@ import * as utils from '../utils.js';
 import * as ssc from '../common/sevenseascommon.js';
 import * as common from '../common/common.js';
 
+/*
+ * This module contains generic processing of "Seven Seas Entertainment" light novels.
+ * There is currently only one series which needs special handling, found in {@link averbil_ln.ts}.
+ */
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _log = utils.createNameSpace('genericSevenSeas_ln');
 

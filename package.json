@@ -31,7 +31,6 @@
     "@commitlint/cli": "^20.4.2",
     "@commitlint/config-conventional": "^20.4.2",
     "@eslint/js": "^10.0.1",
-    "@prettier/plugin-xml": "^3.4.2",
     "@types/debug": "^4.1.12",
     "@types/fs-extra": "^11.0.4",
     "@types/jsdom": "^28.0.0",
@@ -47,12 +46,13 @@
     "globals": "^17.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.0",
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "prettier": "^3.8.1",
+    "@prettier/plugin-xml": "^3.4.2",
     "colors": "^1.4.0",
     "debug": "^4.4.3",
     "downloads-folder": "^3.0.3",

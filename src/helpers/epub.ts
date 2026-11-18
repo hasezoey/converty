@@ -8,6 +8,7 @@ import { JSDOM } from 'jsdom';
 import yazl from 'yazl';
 import yauzl from 'yauzl';
 import * as mime from 'mime-types';
+import * as prettier from 'prettier';
 
 const log = utils.createNameSpace('epubHelpers');
 
@@ -1183,10 +1184,8 @@ export function applySeriesMetadata(document: Document, metadataElem: Element, i
 export async function serializeXML(dom: JSDOM): Promise<string> {
   let serialized = dom.serialize();
 
-  if (utils.debugOutputEnabled()) {
-    serialized = await (
-      await import('prettier')
-    ).format(serialized, {
+  if (utils.prettyOutputEnabled()) {
+    serialized = await prettier.format(serialized, {
       plugins: ['@prettier/plugin-xml'],
       parser: 'xml',
       bracketSameLine: true,

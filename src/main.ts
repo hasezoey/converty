@@ -40,6 +40,11 @@ interface ConverterPConfig {
    * @default false
    */
   disableNoModuleWarning?: boolean;
+  /**
+   * Enable pretty output for XML / XHTML files
+   * @default false
+   */
+  prettyOutput?: boolean;
 }
 
 // CODE
@@ -194,6 +199,10 @@ export default async function main(options?: MainOptions) {
   utils.mkdir(converterINPUTPath);
   utils.mkdir(converterOUTPUTPath);
   await createDownloadsSymlink();
+
+  if (config?.prettyOutput && process.env['PRETTY_OUTPUT'] === undefined) {
+    process.env['PRETTY_OUTPUT'] = 'true';
+  }
 
   log('Starting Main Loop');
   const modules = await load_modules();

@@ -6,7 +6,7 @@ import * as path from 'node:path';
 /*
 This script is to ease comparision between generation changes by commiting each run as a git commit in the output directory, also forces:
 - output to be directories instead of .epubs
-- forces `DEBUG_OUTPUT` to be on (using prettier on output xml / xhtml files)
+- forces `DEBUG_OUTPUT` to be on for directory output instead of compress epub
 
 Usage of this script otherwise the same as "main.js".
 */
@@ -55,7 +55,7 @@ export async function compareGen() {
 
   console.log('\nRunning Converter\n'.green);
 
-  // set to output in debug format (no compression and prettified)
+  // set to output in debug format (no compression)
   process.env['DEBUG_OUTPUT'] = 'true';
 
   // actually run the converter

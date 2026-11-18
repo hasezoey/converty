@@ -68,9 +68,20 @@ npm run test:watch
 npm run test:coverage
 ```
 
-### Extra modes
+### Environment variables
 
-There is the environment variable `DEBUG_OUTPUT` which will output files uncompressed and prettified where possible.
+### PRETTY_OUTPUT
+
+Enables prettifing all the xhtml files instead of them being a single line most of the time.
+
+### DEBUG_OUTPUT
+
+Force-Enables [`PRETTY_OUTPUT`](#pretty_output).
+
+Enables Quality-of-Life things to make debugging easier. This includes:
+
+- Output all files prettified
+- Output to directories (instead of compressed epub)
 
 #### run:compare script
 
@@ -79,7 +90,7 @@ This can be used for comparing book changes against code changes.
 
 This makes regression testing much easier by having a simple script to run to find what changed or when using `git bisect`.  
 
-Makes use of `DEBUG_OUTPUT` to pretty print the output.
+Makes use of `DEBUG_OUTPUT` & `PRETTY_OUTPUT` to not compress the final images.
 
 ## Currently Supported Titles
 

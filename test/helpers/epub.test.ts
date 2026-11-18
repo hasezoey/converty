@@ -640,8 +640,13 @@ describe('epubHelpers', () => {
   });
 
   describe('serializeXML', () => {
+    beforeEach(() => {
+      vi.stubEnv('DEBUG_OUTPUT', '0');
+      vi.stubEnv('PRETTY_OUTPUT', '0');
+    });
+
     afterEach(() => {
-      delete process.env['DEBUG_OUTPUT'];
+      vi.unstubAllEnvs();
     });
 
     it('should serialize the dom with the xml declaration', async () => {
@@ -653,8 +658,16 @@ describe('epubHelpers', () => {
       expect(serialized).toContain('<p>Some text</p>');
     });
 
-    it('should prettify the output when debug output is enabled', async () => {
-      process.env['DEBUG_OUTPUT'] = '1';
+    it('should not prettify the output when both output options are disabled', async () => {
+      const { dom } = xh.newJSDOM('<html><body><p>Some text</p></body></html>');
+
+      const serialized = await epubh.serializeXML(dom);
+
+      expect(serialized).toBe(`${xh.STATICS.XML_BEGINNING_OP}\n${dom.serialize()}`);
+    });
+
+    it.each(['PRETTY_OUTPUT', 'DEBUG_OUTPUT'])('should prettify the output when %s is enabled', async (envVar) => {
+      vi.stubEnv(envVar, '1');
       const { dom } = xh.newJSDOM('<html><body><p>Some text</p></body></html>');
 
       const serialized = await epubh.serializeXML(dom);

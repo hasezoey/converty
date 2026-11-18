@@ -322,3 +322,10 @@ export function envToBool(env: string = ''): boolean {
 export function debugOutputEnabled(): boolean {
   return envToBool(process.env['DEBUG_OUTPUT']);
 }
+
+/**
+ * Check whether pretty output is enabled or not
+ */
+export function prettyOutputEnabled(): boolean {
+  return debugOutputEnabled() || envToBool(process.env['PRETTY_OUTPUT']);
+}

@@ -18,7 +18,11 @@ import {
 import * as ssc from '../common/sevenseascommon.js';
 import * as common from '../common/common.js';
 
-const log = utils.createNameSpace('lastofkind_ln');
+/*
+ * This module handles generic processing of light novels from "Cross Infinite World".
+ */
+
+const log = utils.createNameSpace('crossinfworld');
 
 // STATIC OPTIONS
 const VERIFIED_MATCH_LIST = [/Reincarnated as the Last of My Kind/i];
@@ -36,13 +40,13 @@ const TITLE_CHECK_NUMBER = 10;
 // EXPORTS
 const matcher = common.createCommonMatcher(INPUT_MATCH);
 
-export default function lastofkind_ln(): utils.ConverterModule {
+export default function crossinfworld(): utils.ConverterModule {
   return { matcher, process };
 }
 
 // LOCAL CODE
 
-class LastOfKindECOptions extends TextProcessingECOptions {
+class CrossInfWorldECOptions extends TextProcessingECOptions {
   public titleCache?: common.IsTitleCache;
 }
 
@@ -56,9 +60,9 @@ async function process(options: utils.ConverterOptions): Promise<string> {
   const epubctxInput = await epubh.getInputContext(options.fileInputPath);
 
   // create a output epubctx
-  const epubctxOut = new epubh.EpubContext<LastOfKindECOptions>({
+  const epubctxOut = new epubh.EpubContext<CrossInfWorldECOptions>({
     title: epubctxInput.title,
-    optionsClass: new LastOfKindECOptions(),
+    optionsClass: new CrossInfWorldECOptions(),
   });
 
   // apply the common stylesheet
@@ -91,7 +95,7 @@ async function process(options: utils.ConverterOptions): Promise<string> {
  * @param filePath The file to process ((x)html)
  * @param epubctxOut The Epub Context to add new files to
  */
-async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<LastOfKindECOptions>): Promise<void> {
+async function processHTMLFile(filePath: string, epubctxOut: epubh.EpubContext<CrossInfWorldECOptions>): Promise<void> {
   const loadedFile = await fspromises.readFile(filePath);
   const { document: documentInput } = xh.newJSDOM(loadedFile, JSDOM_XHTML_OPTIONS);
 
@@ -181,7 +185,7 @@ function determineType(document: Document): EntryInformation {
  * @param cache Optional Cache to not compute styles too often when not required
  * @returns A String with the detected content of the element if a title, "false" otherwise
  */
-function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: LastOfKindECOptions): false | string {
+function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: CrossInfWorldECOptions): false | string {
   const processedTitle = sh.xmlToString(elem.textContent ?? '');
 
   // basic fast test if the content matches the parsed title
@@ -206,7 +210,7 @@ function isTitle(document: Document, elem: Element, entryType: EntryInformation,
 async function doGenericPage(
   documentInput: Document,
   entryType: EntryInformation,
-  epubctxOut: epubh.EpubContext<LastOfKindECOptions>,
+  epubctxOut: epubh.EpubContext<CrossInfWorldECOptions>,
   currentInputFile: string,
   skipElements?: number
 ): Promise<void> {
@@ -285,7 +289,7 @@ async function doGenericPage(
 
 /** Helper for consistent Image naming */
 function genImgIdData(
-  optionsClass: LastOfKindECOptions,
+  optionsClass: CrossInfWorldECOptions,
   inputPath: string,
   imgNode: Element,
   entryType: EntryInformation
@@ -366,7 +370,7 @@ function genImgIdData(
  * @param parentElem The Element the new nodes are added to (will not be applied by this function), required for testing and applying styles
  * @returns The array of new Nodes
  */
-function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: LastOfKindECOptions): Node[] {
+function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: CrossInfWorldECOptions): Node[] {
   // if node is text, return as text
   if (origNode.nodeType === documentNew.TEXT_NODE) {
     utils.assertionDefined(origNode.textContent, new Error('Expected "origElem.textContent" to be defined'));

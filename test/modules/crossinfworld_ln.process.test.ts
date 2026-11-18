@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import * as utils from '../../src/utils.js';
-import lastofkind_ln from '../../src/modules/lastofkind_ln.js';
+import crossinfworld_ln from '../../src/modules/crossinfworld_ln.js';
 import { createEpubFixture } from '../fixtures/epub.js';
 
 // jsdom's "getComputedStyle" is broken for XML documents in this environment,
@@ -34,7 +34,7 @@ vi.mock('../../src/helpers/xml.js', async (importOriginal) => {
   };
 });
 
-describe('lastofkind_ln process', () => {
+describe('crossinfworld_ln process', () => {
   const cleanupPaths: string[] = [];
 
   beforeAll(() => {
@@ -53,12 +53,12 @@ describe('lastofkind_ln process', () => {
     const fixture = await createEpubFixture({ title: 'Reincarnated as the Last of My Kind Vol. 1', coverImage: false });
     cleanupPaths.push(fixture.rootDir);
 
-    const workDir = await utils.createTmpDir('converty-lastofkind-');
+    const workDir = await utils.createTmpDir('converty-crossinfworld-');
     cleanupPaths.push(workDir);
     const outputDir = path.join(workDir, 'output');
     await utils.mkdir(outputDir);
 
-    const resultPath = await lastofkind_ln().process({
+    const resultPath = await crossinfworld_ln().process({
       converterInputPath: fixture.rootDir,
       converterOutputPath: outputDir,
       fileInputPath: fixture.rootDir,
@@ -102,12 +102,12 @@ describe('lastofkind_ln process', () => {
     });
     cleanupPaths.push(fixture.rootDir);
 
-    const workDir = await utils.createTmpDir('converty-lastofkind-');
+    const workDir = await utils.createTmpDir('converty-crossinfworld-');
     cleanupPaths.push(workDir);
     const outputDir = path.join(workDir, 'output');
     await utils.mkdir(outputDir);
 
-    const resultPath = await lastofkind_ln().process({
+    const resultPath = await crossinfworld_ln().process({
       converterInputPath: fixture.rootDir,
       converterOutputPath: outputDir,
       fileInputPath: fixture.rootDir,

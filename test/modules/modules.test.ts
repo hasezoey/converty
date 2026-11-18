@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import averbil_ln from '../../src/modules/averbil_ln.js';
 import genericCopy_ln from '../../src/modules/genericCopy_ln.js';
 import genericSevenSeas_ln from '../../src/modules/genericSevenSeas_ln.js';
-import lastofkind_ln from '../../src/modules/lastofkind_ln.js';
+import crossinfworld_ln from '../../src/modules/crossinfworld_ln.js';
 
 describe('modules', () => {
   describe('module shape', () => {
@@ -10,7 +10,7 @@ describe('modules', () => {
       averbil_ln,
       genericCopy_ln,
       genericSevenSeas_ln,
-      lastofkind_ln,
+      crossinfworld_ln: crossinfworld_ln,
     };
 
     for (const [name, moduleFn] of Object.entries(modules)) {
@@ -73,8 +73,8 @@ describe('modules', () => {
     });
   });
 
-  describe('lastofkind_ln matcher', () => {
-    const matcher = lastofkind_ln().matcher;
+  describe('crossinfworld_ln matcher', () => {
+    const matcher = crossinfworld_ln().matcher;
 
     it('should match supported series names', () => {
       expect(matcher('Reincarnated as the Last of My Kind Vol. 1')).toBe(true);

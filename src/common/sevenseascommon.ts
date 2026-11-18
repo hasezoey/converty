@@ -28,8 +28,6 @@ const log = utils.createNameSpace('sevenseascommon');
 export const DEFAULT_FILES_TO_FILTER_OUT_REGEX = /newsletter|sevenseaslogo/gim;
 /** Regex of titles to filter out (to not include in the output) */
 export const DEFAULT_TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
-/** Cover file name (without extension) for the xhtml file */
-export const COVER_XHTML_FILENAME = 'cover';
 
 /** Base Config for SevenSeas processes */
 export interface SevenSeasConfig {
@@ -463,7 +461,7 @@ export function genImgIdData(
       imgClass: epubh.ImgClass.Cover,
       sectionId: `cover${ext}`,
       imgFilename: `Cover${ext}`,
-      xhtmlFilename: COVER_XHTML_FILENAME,
+      xhtmlFilename: 'cover',
       useType: {
         type: epubh.EpubContextFileXHTMLTypes.IMG,
         imgClass: epubh.ImgClass.Cover,

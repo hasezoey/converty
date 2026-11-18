@@ -241,12 +241,9 @@ export function detectTitleByFontSize(elem: Element, titleCache?: IsTitleCache):
   const useElem = innerElem ? innerElem : elem;
 
   const elemCompStyle = window.getComputedStyle(useElem);
-  let elemFontSizePx: number;
+  const elemFontSizePx = htmltp.fontSizeToPx(elemCompStyle.fontSize, bodyFontSize) ?? bodyFontSize;
 
-  {
-    const elemFontSizePxTMP = parseInt(elemCompStyle.fontSize);
-    elemFontSizePx = Number.isNaN(elemFontSizePxTMP) ? bodyFontSize : elemFontSizePxTMP;
-  }
+  utils.assertion(!Number.isNaN(elemFontSizePx), new Error(`Element font size is NaN, value was: "${elemCompStyle.fontSize}"`));
 
   if (elemFontSizePx >= bodyFontSize * 1.3) {
     return sh.xmlToString(useElem.textContent ?? '') || false;

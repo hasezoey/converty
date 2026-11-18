@@ -37,6 +37,12 @@ describe('common detectTitleByFontSize', () => {
     expect(common.detectTitleByFontSize(elem)).toBe(false);
   });
 
+  it('should resolve percentage font sizes relative to the body font size', () => {
+    const elem = createNestedDocument((styleElem) => (styleElem === styleElem.ownerDocument.body ? '70px' : '91%'));
+
+    expect(common.detectTitleByFontSize(elem)).toBe(false);
+  });
+
   it('should use the first child element for the font size and content', () => {
     const elem = createNestedDocument(
       (styleElem) => (styleElem.tagName === 'SPAN' ? '13px' : '10px'),

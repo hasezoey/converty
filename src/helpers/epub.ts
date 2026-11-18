@@ -1051,11 +1051,18 @@ export function copyMetadata(
         continue;
       }
 
-      // use provided element's content id, only if not available fallback to custom name
-      const fileId = elem.getAttribute('content') ?? 'cover';
-      const coverImgId = epubctx.files.find((v) => v.id.includes(fileId) && v.mediaType != xh.STATICS.XHTML_MIMETYPE);
+      let coverImgId = epubctx.files.find(
+        (v) => v instanceof EpubContextFileImg && v.imgClass === ImgClass.Cover && v.mediaType != xh.STATICS.XHTML_MIMETYPE
+      );
+
+      if (!coverImgId) {
+        // try to use the content id from the input epub's OPF, in case we copied as-is without processing
+        const fileId = elem.getAttribute('content') ?? 'cover';
+        coverImgId = epubctx.files.find((v) => v.id.includes(fileId) && v.mediaType != xh.STATICS.XHTML_MIMETYPE);
+      }
+
       // this expect the IMAGE file to already be copied and to be used in some XHTML, instead of potentially being separate
-      utils.assertionDefined(coverImgId, new Error(`Expected to find cover("${fileId}") file in original epub`));
+      utils.assertionDefined(coverImgId, new Error(`Expected to find cover marked in output epubctx, or the same id from the input opf!`));
       const newCoverNode = document.createElementNS(metadataElem.namespaceURI, 'meta');
       newCoverNode.setAttribute('name', 'cover');
       newCoverNode.setAttribute('content', coverImgId.id);

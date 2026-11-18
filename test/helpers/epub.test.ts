@@ -601,13 +601,41 @@ describe('epubHelpers', () => {
       expect(coverMeta[0].getAttribute('content')).toBe('existing-cover.png');
     });
 
+    it('should prefer the image marked as the cover in imgClass over the input cover id', () => {
+      const input = createInputDocument('<meta name="cover" content="input-cover" />');
+      const output = createOutputDocument();
+
+      ctx.addFile(
+        new epubh.EpubContextFileImg({
+          id: 'input-cover',
+          mediaType: 'image/png',
+          filePath: '/converty/input-cover.png',
+          imgClass: epubh.ImgClass.Insert,
+        })
+      );
+      ctx.addFile(
+        new epubh.EpubContextFileImg({
+          id: 'actual-cover',
+          mediaType: 'image/jpeg',
+          filePath: '/converty/actual-cover.jpg',
+          imgClass: epubh.ImgClass.Cover,
+        })
+      );
+
+      epubh.copyMetadata(output.document, Array.from(input.metadataElem.children), ctx, output.metadataElem, input.packageElem, { c: 0 });
+
+      const coverMeta = Array.from(output.metadataElem.children).find((v) => v.localName === 'meta' && v.getAttribute('name') === 'cover');
+
+      expect(coverMeta?.getAttribute('content')).toBe('actual-cover');
+    });
+
     it('should throw when the cover image could not be found', () => {
       const input = createInputDocument('<meta name="cover" content="missing-cover" />');
       const output = createOutputDocument();
 
       expect(() =>
         epubh.copyMetadata(output.document, Array.from(input.metadataElem.children), ctx, output.metadataElem, input.packageElem, { c: 0 })
-      ).toThrow(/Expected to find cover\("missing-cover"\) file in original epub/);
+      ).toThrow(/Expected to find cover marked in output epubctx, or the same id from the input opf!/);
     });
   });
 

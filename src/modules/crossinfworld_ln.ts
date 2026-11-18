@@ -25,11 +25,13 @@ import * as common from '../common/common.js';
 const log = utils.createNameSpace('crossinfworld');
 
 // STATIC OPTIONS
-const VERIFIED_MATCH_LIST = [/Reincarnated as the Last of My Kind/i];
+const VERIFIED_MATCH_LIST = [
+  'Reincarnated as the Last of My Kind',
+  'So You Want to Live the Slow Life. A Guide to Life in the Beastly Wilds',
+];
 const INPUT_MATCH = common.createMatcherRegex(VERIFIED_MATCH_LIST);
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /^contents.xhtml$/gim;
-const COVER_XHTML_FILENAME = 'cover';
 const TITLES_TO_FILTER_OUT_REGEX = /other series/gim;
 const JSDOM_XHTML_OPTIONS = STATICS.JSDOM_XHTML_OPTIONS;
 /** How many elements to check at the beginning to be a title */
@@ -186,7 +188,12 @@ function determineType(document: Document): EntryInformation {
  * @returns A String with the detected content of the element if a title, "false" otherwise
  */
 function isTitle(document: Document, elem: Element, entryType: EntryInformation, optionsClass: CrossInfWorldECOptions): false | string {
-  const processedTitle = sh.xmlToString(elem.textContent ?? '');
+  const processedTitle = sh.xmlToString(elem.textContent ?? '').trim();
+
+  // dont try to detect a title in a empty string
+  if (processedTitle.length === 0) {
+    return false;
+  }
 
   // basic fast test if the content matches the parsed title
   // not using just "includes" because it is slower than directly checking
@@ -338,7 +345,7 @@ function genImgIdData(
       imgClass: epubh.ImgClass.Cover,
       sectionId: `cover${ext}`,
       imgFilename: `Cover${ext}`,
-      xhtmlFilename: COVER_XHTML_FILENAME,
+      xhtmlFilename: 'cover',
       useType: {
         type: epubh.EpubContextFileXHTMLTypes.IMG,
         imgClass: epubh.ImgClass.Cover,

@@ -46,7 +46,6 @@ describe('modules', () => {
     it('should match supported series names', () => {
       expect(matcher('Death March to the Parallel World Rhapsody Vol. 1')).toBe(true);
       expect(matcher('High School Prodigies Have It Easy Even in Another World!')).toBe(true);
-      expect(matcher('So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds')).toBe(true);
     });
 
     it('should not match unrelated names', () => {
@@ -78,6 +77,7 @@ describe('modules', () => {
 
     it('should match supported series names', () => {
       expect(matcher('Reincarnated as the Last of My Kind Vol. 1')).toBe(true);
+      expect(matcher('So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds Volume 1')).toBe(true);
     });
 
     it('should not match unrelated names', () => {

@@ -254,3 +254,39 @@ export function detectTitleByFontSize(elem: Element, titleCache?: IsTitleCache):
 
   return false;
 }
+
+/**
+ * Convert a array of string or regexp to a regexp array.
+ * @param array The array of mixed string and regexps
+ * @returns A array of regexp
+ */
+export function createMatcherRegex(array: (string | RegExp)[]): RegExp[] {
+  return array.map((v) => {
+    if (typeof v === 'string') {
+      return new RegExp(v, 'i');
+    }
+
+    return v;
+  });
+}
+
+/**
+ * Create a matcher for the common regex array.
+ * @param inputRegex The regex array to match against
+ * @returns The matcher function matching the {@link utils.ConverterModule} interface, with reference to the given regex
+ */
+export function createCommonMatcher(inputRegex: RegExp[]): (name: string) => boolean {
+  return function commonMatcher(name: string) {
+    for (const exp of inputRegex) {
+      const res = exp.test(name);
+      // reset regex after use, because they have a state, seemingly even with "test"
+      exp.lastIndex = 0;
+
+      if (res) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+}

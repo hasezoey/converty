@@ -36,23 +36,6 @@ describe('sevenseasCommon', () => {
     ...overrides,
   });
 
-  describe('matcher', () => {
-    it('should detect supported series names', () => {
-      const sevenSeasMatcher = ssc.matcher(new RegExp('Some Series', 'gi'));
-
-      expect(sevenSeasMatcher('Some Series - Book 1')).toBe(true);
-      expect(sevenSeasMatcher('some series')).toBe(true);
-      expect(sevenSeasMatcher('Some Other Series')).toBe(false);
-    });
-
-    it('should reset the regex state after every check', () => {
-      const sevenSeasMatcher = ssc.matcher(new RegExp('Some Series', 'gi'));
-
-      expect(sevenSeasMatcher('Some Series')).toBe(true);
-      expect(sevenSeasMatcher('Some Series')).toBe(true);
-    });
-  });
-
   describe('compareEntryInformation', () => {
     it('should compare full entries', () => {
       const last = createEntryType({ title: 'Chapter 1', imgType: epubh.ImgType.Insert });

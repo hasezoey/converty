@@ -21,7 +21,8 @@ import * as common from '../common/common.js';
 const log = utils.createNameSpace('lastofkind_ln');
 
 // STATIC OPTIONS
-const INPUT_MATCH_REGEX = /Reincarnated as the Last of My Kind/gim;
+const VERIFIED_MATCH_LIST = [/Reincarnated as the Last of My Kind/i];
+const INPUT_MATCH = common.createMatcherRegex(VERIFIED_MATCH_LIST);
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /^contents.xhtml$/gim;
 const COVER_XHTML_FILENAME = 'cover';
@@ -33,21 +34,10 @@ const TITLE_CHECK_NUMBER = 10;
 // CODE
 
 // EXPORTS
+const matcher = common.createCommonMatcher(INPUT_MATCH);
+
 export default function lastofkind_ln(): utils.ConverterModule {
   return { matcher, process };
-}
-
-/**
- * The Matcher to determine if the given file is for this module
- * @param name The filename to test on
- * @returns "true" if the file is for this module, "false" otherwise
- */
-function matcher(name: string): boolean {
-  const ret = INPUT_MATCH_REGEX.test(name);
-  // reset regex after use, because they have a state, seemingly even with "test"
-  INPUT_MATCH_REGEX.lastIndex = 0;
-
-  return ret;
 }
 
 // LOCAL CODE

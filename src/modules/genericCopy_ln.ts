@@ -25,7 +25,7 @@ const VERIFIED_MATCH_LIST = [
   'So You Want to Live the Slow Life\\? A Guide to Life in the Beastly Wilds',
   'Another World.s Zombie Apocalypse Is Not My Problem!',
 ];
-const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
+const INPUT_MATCH = common.createMatcherRegex(VERIFIED_MATCH_LIST);
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = /newsletter/gim;
 /** Regex for detecting the series in the ContentOPF */
@@ -52,13 +52,7 @@ class GenericCopyECOptions extends TextProcessingECOptions {
 }
 
 // EXPORTS
-export function matcher(name: string) {
-  const ret = INPUT_MATCH_REGEX.test(name);
-  // reset regex after use, because they have a state, seemingly even with "test"
-  INPUT_MATCH_REGEX.lastIndex = 0;
-
-  return ret;
-}
+const matcher = common.createCommonMatcher(INPUT_MATCH);
 
 export default function genericCopy_ln(): utils.ConverterModule {
   return { matcher, process };

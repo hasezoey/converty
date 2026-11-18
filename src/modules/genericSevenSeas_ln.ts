@@ -1,5 +1,6 @@
 import * as utils from '../utils.js';
 import * as ssc from '../common/sevenseascommon.js';
+import * as common from '../common/common.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _log = utils.createNameSpace('genericSevenSeas_ln');
@@ -13,7 +14,7 @@ const VERIFIED_MATCH_LIST = [
   'Reborn as a Space Mercenary.{1} I Woke Up P(?:iloting the Strongest Starship!)?',
   'Modern Dungeon Capture Starting with Broken Skills',
 ];
-const INPUT_MATCH_REGEX = new RegExp(VERIFIED_MATCH_LIST.join('|'), 'i');
+const INPUT_MATCH = common.createMatcherRegex(VERIFIED_MATCH_LIST);
 /** Regex of files to filter out (to not include in the output) */
 const FILES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_FILES_TO_FILTER_OUT_REGEX;
 const TITLES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_TITLES_TO_FILTER_OUT_REGEX;
@@ -21,7 +22,7 @@ const TITLES_TO_FILTER_OUT_REGEX = ssc.DEFAULT_TITLES_TO_FILTER_OUT_REGEX;
 // CODE
 
 // EXPORTS
-export const matcher = ssc.matcher(INPUT_MATCH_REGEX);
+const matcher = common.createCommonMatcher(INPUT_MATCH);
 
 export default function genericSevenSeas_ln(): utils.ConverterModule {
   return { matcher, process };

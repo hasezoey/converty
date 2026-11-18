@@ -31,20 +31,6 @@ export const DEFAULT_TITLES_TO_FILTER_OUT_REGEX = /newsletter/gim;
 /** Cover file name (without extension) for the xhtml file */
 export const COVER_XHTML_FILENAME = 'cover';
 
-// CODE
-
-// EXPORTS
-
-export function matcher(inputRegex: RegExp): (name: string) => boolean {
-  return function SevenSeasMatcher(name: string) {
-    const ret = inputRegex.test(name);
-    // reset regex after use, because they have a state, seemingly even with "test"
-    inputRegex.lastIndex = 0;
-
-    return ret;
-  };
-}
-
 /** Base Config for SevenSeas processes */
 export interface SevenSeasConfig {
   /** Define a custom "ContentOPFFn" */

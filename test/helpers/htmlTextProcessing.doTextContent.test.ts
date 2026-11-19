@@ -73,6 +73,19 @@ describe('htmlTextProcessing doTextContent branches', () => {
     }
   });
 
+  it('should skip a detected heading without logging an unhandled element', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ctx = createContext();
+    const documentInput = createInputDocument(
+      '<html><head><title>Chapter 1</title></head><body><h1>Chapter 1</h1><p>Content.</p></body></html>'
+    );
+    const entryType: htmltp.EntryInformation = { type: htmltp.EntryType.Text, title: 'Chapter 1' };
+
+    await htmltp.doTextContent(documentInput, entryType, ctx, path.join(ctx.rootDir, 'input', 'chapter1.xhtml'), createOptions());
+
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Unhandled "localName": "h1"'));
+  });
+
   it.concurrent('should skip the configured number of elements', async () => {
     const ctx = createContext();
     const documentInput = createInputDocument(

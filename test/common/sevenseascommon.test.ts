@@ -345,6 +345,16 @@ describe('sevenseasCommon', () => {
       expect(children[0].localName).toBe('h1');
       expect(children[1].localName).toBe('p');
     });
+
+    it('should preserve top-level lists as body children', () => {
+      const { document } = xh.newJSDOM('<html><body><p>Before</p><ol><li>First</li><li>Second</li></ol><p>After</p></body></html>');
+
+      const children = ssc.getTextContentBody(document);
+
+      expect(children.map((child) => child.localName)).toEqual(['p', 'ol', 'p']);
+      expect(children[1].children).toHaveLength(2);
+      expect(children[1].textContent).toBe('FirstSecond');
+    });
   });
 
   describe('generatePElementInner', () => {

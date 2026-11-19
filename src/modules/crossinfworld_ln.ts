@@ -5,6 +5,7 @@ import * as sh from '../helpers/string.js';
 import { promises as fspromises } from 'fs';
 import * as path from 'path';
 import {
+  copyListAttributes,
   doTextContent,
   DoTextContentOptionsGenImageData,
   EntryInformation,
@@ -375,6 +376,7 @@ function genImgIdData(
  * @param origNode The original node to process
  * @param documentNew The Document to create new nodes on
  * @param parentElem The Element the new nodes are added to (will not be applied by this function), required for testing and applying styles
+ * @param _optionsClass The active Cross Infinite World processing state
  * @returns The array of new Nodes
  */
 function generatePElementInner(origNode: Node, documentNew: Document, parentElem: Element, _optionsClass: CrossInfWorldECOptions): Node[] {
@@ -401,14 +403,26 @@ function generatePElementInner(origNode: Node, documentNew: Document, parentElem
 
   const origElemStyle = origElem.getAttribute('style');
   const elemObj = new PElemTracker();
-  processCommonStyle(elemObj, parentElem, documentNew, origElem);
+  // Preserve list containers/items, but avoid duplicating a node already created by genPElem.
+  const structuralElem =
+    (origElem.localName === 'ol' || origElem.localName === 'ul' || origElem.localName === 'li') &&
+    origElem.localName !== parentElem.localName
+      ? documentNew.createElement(origElem.localName)
+      : undefined;
+
+  if (!utils.isNullOrUndefined(structuralElem)) {
+    elemObj.setNewElem(structuralElem);
+    copyListAttributes(origElem, structuralElem);
+  }
+
+  processCommonStyle(elemObj, structuralElem ?? parentElem, documentNew, origElem);
 
   // warn on unhandled styles that are set on the element directly, unless they are ignored ones
   const styleList = origElemStyle
     ?.split(';')
     .map((v) => v.trim())
     .filter((v) => v.length > 0);
-  const IGNORE_STYLE_REGEX = /font-style|font-weight|vertical-align|color|text-align/gim;
+  const IGNORE_STYLE_REGEX = /font-style|font-weight|font-size|vertical-align|color|text-align/gim;
 
   // warn against styles being unhandled
   if (!utils.isNullOrUndefined(styleList)) {

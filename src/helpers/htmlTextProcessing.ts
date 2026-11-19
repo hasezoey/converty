@@ -375,17 +375,24 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
       continue;
     }
 
+    // skip source headings because the converter generates its own chapter heading
+    const execIsTitle = epubctx.optionsClass.getTracker('CurrentSubChapter') === 0 && index < options.headerSearchCount;
+
+    if (execIsTitle && options.isTitle(documentInput, elem, entryType, epubctx.optionsClass)) {
+      continue;
+    }
+
     const imgNodes = elem.querySelectorAll('img');
 
-    // use this path if "p" which contains text data, or if a "imgNode" is found
-    // TODO: this currently does not handle inline images
-    if (elem.localName === 'p' || !utils.isNullOrUndefined(imgNodes)) {
+    // Process ordinary text containers, semantic lists, and any element carrying images.
+    // A NodeList is always defined, so checking its length avoids treating headings as image containers.
+    if (elem.localName === 'p' || elem.localName === 'ol' || elem.localName === 'ul' || imgNodes.length > 0) {
       const skipSavingMainDOM = isElementEmpty(mainElem) || onlyhash1(mainElem);
 
       const styles = Array.from(imgNodes).map((node) => documentInput.defaultView!.getComputedStyle(node));
 
       // finish current dom and save the found image and start the next dom
-      if (!utils.isNullOrUndefined(imgNodes) && imgNodes.length === 1 && styles[0].verticalAlign !== 'middle') {
+      if (imgNodes.length === 1 && styles[0].verticalAlign !== 'middle') {
         const imgNode = imgNodes[0];
 
         // dont save a empty dom
@@ -443,7 +450,7 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
         }
 
         continue;
-      } else if (!utils.isNullOrUndefined(imgNodes)) {
+      } else if (imgNodes.length > 0) {
         for (const [idx, imgNode] of imgNodes.entries()) {
           if (styles[idx].verticalAlign !== 'middle') {
             console.log(`Multiple images present, and at least one does not have align "middle"! file: "${currentInputFile}"`);
@@ -459,14 +466,6 @@ export async function doTextContent<Options extends TextProcessingECOptions>(
 
       // skip all elements that are empty when the mainElem does not contain anything yet or only the header
       if (skipSavingMainDOM && sh.xmlToString(elem.textContent ?? '')?.trim().length === 0) {
-        continue;
-      }
-
-      // extra fast checks, because "isTitle" requires much computing and does not need to be executed so often
-      const execIsTitle = epubctx.optionsClass.getTracker('CurrentSubChapter') === 0 && index < options.headerSearchCount;
-
-      // skip the existing header elements
-      if (execIsTitle && options.isTitle(documentInput, elem, entryType, epubctx.optionsClass)) {
         continue;
       }
 
@@ -610,12 +609,12 @@ export function isH1Title(
 }
 
 /**
- * Transform top-level "p" elements to new elements on the new document
- * @param origElem Original container element
- * @param documentNew The document to generate elements on
- * @param options The Functions to use for this run
- * @param epubctx EPUB Context of the Output file
- * @returns The new Node to add
+ * Transform top-level text container or semantic list into an output element.
+ * @param origElem Original paragraph or list container element
+ * @param documentNew The document used to generate the output element
+ * @param options Processing callbacks for translating the element's contents
+ * @param epubctx EPUB context containing the processing options class
+ * @returns A generated `p`, `ol`, or `ul` node, or an empty text node when no content was produced
  */
 function genPElem<Options extends TextProcessingECOptions>(
   origElem: Element,
@@ -623,7 +622,9 @@ function genPElem<Options extends TextProcessingECOptions>(
   options: DoTextContentOptions<Options>,
   epubctx: epubh.EpubContext<Options>
 ): Node {
-  const topElem = documentNew.createElement('p');
+  // Lists are semantic output containers; other top-level text content continues to use the standard paragraph wrapper.
+  const topElem = documentNew.createElement(origElem.localName === 'ol' || origElem.localName === 'ul' ? origElem.localName : 'p');
+  copyListAttributes(origElem, topElem);
 
   const elems = options.genPElemText(origElem, documentNew, topElem, epubctx.optionsClass);
 
@@ -1075,4 +1076,18 @@ export async function finishEpubctx(
   await Promise.all(epubctxClean.map((v) => utils.removeDir(v.rootDir)));
 
   return finalPath;
+}
+
+/** Copy semantic list attributes without carrying presentation-oriented source attributes.
+ * @param origElem Source `ol`, `ul`, or `li` element
+ * @param newElem Generated list element that receives supported attributes
+ */
+export function copyListAttributes(origElem: Element, newElem: Element): void {
+  for (const attribute of ['start', 'reversed', 'type', 'value']) {
+    const value = origElem.getAttribute(attribute);
+
+    if (!utils.isNullOrUndefined(value)) {
+      newElem.setAttribute(attribute, value);
+    }
+  }
 }

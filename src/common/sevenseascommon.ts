@@ -8,6 +8,7 @@ import {
   EntryInformation,
   EntryType,
   TextProcessingECOptions,
+  copyListAttributes,
   doTextContent,
   DoTextContentOptionsGenImageData,
   processCommonStyle,
@@ -509,13 +510,36 @@ export function generatePElementInner(
 ): Node[] {
   const elems = generatePElementInnerTranslate(origNode, documentNew, parentElem, optionsClass, config);
 
-  const res = combineWithLastNode(documentNew, config, elems);
+  const res = combineWithLastNode(documentNew, config, elems, parentElem);
 
   return res ?? elems;
 }
 
-/** Helper for control flow */
-function combineWithLastNode(documentNew: Document, config: SevenSeasConfig, elems: Node[]): Node[] | undefined {
+/**
+ * Combine translated text with the previous output node when the preceding paragraph appears split mid-sentence.
+ * List containers, list items, and their descendants are excluded to preserve list structure.
+ * @param documentNew The output document whose main content is inspected
+ * @param config Configuration containing the optional combination hook
+ * @param elems Translated nodes produced for the current input node
+ * @param parentElem Output parent used while translating the current input node
+ * @returns An empty array when nodes were combined, otherwise `undefined` so the caller uses the original nodes
+ */
+function combineWithLastNode(documentNew: Document, config: SevenSeasConfig, elems: Node[], parentElem: Element): Node[] | undefined {
+  // Structural list content must never be combined with preceding paragraphs.
+  if (parentElem.localName === 'ol' || parentElem.localName === 'ul' || parentElem.localName === 'li' || parentElem.closest('li')) {
+    return undefined;
+  }
+
+  if (
+    elems.some((elem) => {
+      const element = elem.nodeType === documentNew.ELEMENT_NODE ? (elem as Element) : undefined;
+
+      return element?.localName === 'ol' || element?.localName === 'ul' || element?.localName === 'li';
+    })
+  ) {
+    return undefined;
+  }
+
   // quick end for when "elems" is empty or when the node is a separator
   if (elems.length === 0) {
     return undefined;
@@ -588,11 +612,24 @@ export function generatePElementInnerTranslate(
   const origElem = origNode as Element;
 
   const elemObj = new PElemTracker();
-  const { elemCompStyle } = processCommonStyle(elemObj, parentElem, documentNew, origElem);
+  // Preserve list containers/items, but avoid duplicating a node already created by genPElem.
+  const structuralElem =
+    (origElem.localName === 'ol' || origElem.localName === 'ul' || origElem.localName === 'li') &&
+    origElem.localName !== parentElem.localName
+      ? documentNew.createElement(origElem.localName)
+      : undefined;
+
+  if (!utils.isNullOrUndefined(structuralElem)) {
+    elemObj.setNewElem(structuralElem);
+    copyListAttributes(origElem, structuralElem);
+  }
+
+  const styleParentElem = structuralElem ?? parentElem;
+  const { elemCompStyle } = processCommonStyle(elemObj, styleParentElem, documentNew, origElem);
 
   // cover extra indentations, (P_Prose_Formatting__And__Left_Indent)
   if (parseInt(elemCompStyle.marginLeft) > 0) {
-    parentElem.setAttribute('class', 'extra-indent');
+    styleParentElem.setAttribute('class', 'extra-indent');
   }
 
   // cover initial missing boldness but having big font-size (chapter start first letter after heading)

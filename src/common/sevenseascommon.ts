@@ -587,6 +587,7 @@ const stylesToIgnore: string[] = [
   'vertical-align',
   'letter-spacing',
   'text-decoration',
+  'page-break-after',
 ];
 
 /** Return formatted and only elements that are required */

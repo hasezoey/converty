@@ -78,6 +78,7 @@ describe('modules', () => {
     it('should match supported series names', () => {
       expect(matcher('Reincarnated as the Last of My Kind Vol. 1')).toBe(true);
       expect(matcher('So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds Volume 1')).toBe(true);
+      expect(matcher('Another World’s Zombie Apocalypse Is Not My Problem! 1')).toBe(true);
     });
 
     it('should not match unrelated names', () => {

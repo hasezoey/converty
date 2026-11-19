@@ -5,7 +5,6 @@ List of currently Supported inputs with current modules:
 |        Module         |                                   Series                                   | Notes                                         |
 | :-------------------: | :------------------------------------------------------------------------: | :-------------------------------------------- |
 |     `averbil_ln`      | `Didn't I Say to Make My Abilities Average in the Next Life?! Light Novel` | Supports all volumes from 1 to 20 and spinoff |
-|  `crossinfworld_ln`   |                   `Reincarnated as the Last of My Kind`                    | Supports all volumes from 1 to 4              |
 | `genericSevenSeas_ln` |              `I’m the Evil Lord of an Intergalactic Empire!`               | Supports all volumes from 1 to 11             |
 | `genericSevenSeas_ln` |   `Trapped in a Dating Sim: The World of Otome Games is Tough for Mobs`    | Supports all volumes from 1 to 13             |
 | `genericSevenSeas_ln` |       `Trapped in a Dating Sim: Otome Games Are Tough For Us, Too!`        | Supports all volumes from 1 to 1              |
@@ -14,8 +13,9 @@ List of currently Supported inputs with current modules:
 | `genericSevenSeas_ln` |            `Modern Dungeon Capture Starting with Broken Skills`            | Supports all volumes from 1 to 3              |
 |   `genericCopy_ln`    |                `Death March to the Parallel World Rhapsody`                | Supports all volumes from 1 to 10             |
 |   `genericCopy_ln`    |        `High School Prodigies Have It Easy Even in Another World!`         | Supports all volumes from 1 to 5              |
+|  `crossinfworld_ln`   |                   `Reincarnated as the Last of My Kind`                    | Supports all volumes from 1 to 4              |
 |  `crossinfworld_ln`   | `So You Want to Live the Slow Life? A Guide to Life in the Beastly Wilds`  | Supports all volumes from 1 to 5              |
-|   `genericCopy_ln`    |           `Another World’s Zombie Apocalypse Is Not My Problem!`           | Supports all volumes from 1 to 1              |
+|  `crossinfworld_ln`   |           `Another World’s Zombie Apocalypse Is Not My Problem!`           | Supports all volumes from 1 to 1              |
 
 Notes:
 - All Conversions that process an EPUB, output an EPUB3 compatible file and use html elements over css styles (for example, using the html element `em` instead of `font-style: italic`)

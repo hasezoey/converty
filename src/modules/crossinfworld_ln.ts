@@ -29,6 +29,7 @@ const log = utils.createNameSpace('crossinfworld');
 const VERIFIED_MATCH_LIST = [
   'Reincarnated as the Last of My Kind',
   'So You Want to Live the Slow Life. A Guide to Life in the Beastly Wilds',
+  'Another World.s Zombie Apocalypse Is Not My Problem!',
 ];
 const INPUT_MATCH = common.createMatcherRegex(VERIFIED_MATCH_LIST);
 /** Regex of files to filter out (to not include in the output) */

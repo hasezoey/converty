@@ -30,6 +30,7 @@ CI runs `npm run build:tests`, `npm run lint`, and `npm run test:coverage`.
 ## Tools
 
 - Use native file tools (read, glob, grep) instead of chaining bash commands like cat or find when exploring.
+- If an edit tool reports no changes or an ambiguous result, or an edit occurs during interrupted/concurrent editor activity, re-read the affected lines and verify staged/unstaged state before reporting completion.
 - Run tests after multi-file changes.
 - Finally, make sure everything still builds without errors or warnings.
 
@@ -49,6 +50,7 @@ For exact styling see `.editorconfig`, `eslint.config.mjs` and `.prettierrc`, bu
 
 - use LF line endings
 - use 2 SPACE indentation, where TAB is not required
+- add complete TSDoc to new functions and functions with modified signatures, including `@param` entries and `@returns` when applicable
 
 When there are longer xml, json or similar data that needs to be embedded, prettify them instead of having one big line.
 
@@ -77,3 +79,4 @@ If there are any uncertainties, ask for clarification.
 
 - We follow the "a commit should be minimal", at least in a reasonable amount. Example: don't split every single line change into a commit,
   but don't bloat it to the size of many different features. Pause and ask the user if unsure.
+- When splitting work into commits, stage complete groups that build independently. Validate the staged index separately from unstaged files before committing.
